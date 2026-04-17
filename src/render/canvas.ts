@@ -413,13 +413,19 @@ function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerIn
     ctx.save();
     ctx.translate(cx, cy);
     if (t.targetId != null) ctx.rotate(t.angle + Math.PI / 2);
-    if (t.fireFlash > 0) {
+    // Barrel recoil on fire
+    const recoilPct = t.fireFlash > 0 ? (t.fireFlash / 0.18) : 0;
+    if (recoilPct > 0) {
+      const recoilDist = cs * 0.07 * recoilPct;
+      ctx.translate(-Math.sin(t.angle + Math.PI / 2) * recoilDist, Math.cos(t.angle + Math.PI / 2) * recoilDist);
       ctx.shadowColor = def.accentColor;
-      ctx.shadowBlur = 24;
+      ctx.shadowBlur = 28 + recoilPct * 20;
     }
     const s = cs * 0.9;
     ctx.drawImage(sprite, -s / 2, -s / 2, s, s);
     ctx.restore();
+    // Muzzle flash — per-tower style
+    if (t.fireFlash > 0) drawMuzzleFlash(ctx, vp, t, recoilPct);
   } else {
     // Fallback: draw a colored diamond so we always see SOMETHING
     ctx.fillStyle = def.accentColor;
@@ -441,6 +447,146 @@ function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerIn
     ctx.beginPath();
     ctx.arc(t.grid.x * cs + cs - 6 - i * 5, t.grid.y * cs + cs - 6, 2, 0, Math.PI * 2);
     ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawMuzzleFlash(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerInstance, intensity: number): void {
+  const cs = vp.cellSize;
+  const cx = t.grid.x * cs + cs / 2;
+  const cy = t.grid.y * cs + cs / 2;
+  const def = TOWERS[t.def];
+  // Barrel tip position — project outward along firing angle
+  const barrelLen = cs * 0.48;
+  const ang = t.angle + Math.PI / 2;
+  const tipX = cx + Math.cos(ang) * barrelLen;
+  const tipY = cy + Math.sin(ang) * barrelLen;
+  ctx.save();
+  ctx.globalAlpha = intensity * 0.9;
+
+  if (t.def === 'sniper') {
+    // Long bright laser streak forward
+    ctx.strokeStyle = def.accentColor;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = def.accentColor;
+    ctx.shadowBlur = 20;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX + Math.cos(ang) * cs * 0.9, tipY + Math.sin(ang) * cs * 0.9);
+    ctx.stroke();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX + Math.cos(ang) * cs * 0.9, tipY + Math.sin(ang) * cs * 0.9);
+    ctx.stroke();
+
+  } else if (t.def === 'railgun') {
+    // Wide explosive flash + streak
+    ctx.shadowColor = def.accentColor;
+    ctx.shadowBlur = 35;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, cs * 0.14 * intensity, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = def.accentColor;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX + Math.cos(ang) * cs * 1.1, tipY + Math.sin(ang) * cs * 1.1);
+    ctx.stroke();
+
+  } else if (t.def === 'chain') {
+    // Jagged electric fork
+    ctx.strokeStyle = def.accentColor;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = def.accentColor;
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    let fx = tipX, fy = tipY;
+    for (let i = 0; i < 4; i++) {
+      fx += Math.cos(ang) * cs * 0.15 + (Math.random() - 0.5) * cs * 0.18;
+      fy += Math.sin(ang) * cs * 0.15 + (Math.random() - 0.5) * cs * 0.18;
+      ctx.lineTo(fx, fy);
+    }
+    ctx.stroke();
+
+  } else if (t.def === 'pulse') {
+    // Expanding concentric rings (AoE burst feel)
+    ctx.strokeStyle = def.accentColor;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = def.accentColor;
+    ctx.shadowBlur = 18;
+    for (let i = 0; i < 2; i++) {
+      const r = cs * (0.2 + i * 0.18) * intensity;
+      ctx.globalAlpha = intensity * (0.8 - i * 0.3);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+  } else if (t.def === 'scrambler') {
+    // Pink static discharge starburst
+    ctx.strokeStyle = def.accentColor;
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = def.accentColor;
+    ctx.shadowBlur = 12;
+    const rays = 6;
+    for (let i = 0; i < rays; i++) {
+      const ra = ang + (i / rays) * Math.PI * 2;
+      const len = cs * (0.12 + Math.random() * 0.15) * intensity;
+      ctx.beginPath();
+      ctx.moveTo(tipX, tipY);
+      ctx.lineTo(tipX + Math.cos(ra) * len, tipY + Math.sin(ra) * len);
+      ctx.stroke();
+    }
+
+  } else if (t.def === 'antivirus') {
+    // Red cross-shaped burst
+    ctx.strokeStyle = def.accentColor;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = def.accentColor;
+    ctx.shadowBlur = 14;
+    const half = cs * 0.16 * intensity;
+    ctx.beginPath();
+    ctx.moveTo(tipX - half, tipY); ctx.lineTo(tipX + half, tipY);
+    ctx.moveTo(tipX, tipY - half); ctx.lineTo(tipX, tipY + half);
+    ctx.stroke();
+
+  } else if (t.def === 'quantum') {
+    // Spiral particle rings
+    ctx.shadowColor = def.accentColor;
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = def.accentColor;
+    for (let i = 0; i < 5; i++) {
+      const pa = ang + (i / 5) * Math.PI * 2;
+      const pr = cs * 0.18 * intensity;
+      const px = tipX + Math.cos(pa) * pr;
+      const py = tipY + Math.sin(pa) * pr;
+      ctx.globalAlpha = intensity * 0.7;
+      ctx.beginPath();
+      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+  } else {
+    // Default: compact directional flash
+    ctx.shadowColor = def.accentColor;
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = def.accentColor;
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, cs * 0.1 * intensity, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = intensity * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX + Math.cos(ang) * cs * 0.3, tipY + Math.sin(ang) * cs * 0.3);
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -476,11 +622,35 @@ function drawTowerDebuffs(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: 
 
 function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyInstance, t: number): void {
   const cs = vp.cellSize;
-  // Walk bob — vertical sine offset based on progress for a lively gait. Bosses bob slower/bigger.
-  const bobFreq = e.isBoss ? 3.2 : 6.5;
-  const bobAmp = e.isBoss ? 0.06 : 0.035;
-  const bob = Math.sin(e.progress * bobFreq + e.id * 0.7) * bobAmp;
-  const cx = e.pos.x * cs + cs / 2;
+  // Per-enemy walk animation variation
+  let bob = 0;
+  let sway = 0;
+  let scaleX = 1, scaleY = 1;
+  if (e.def === 'juggernaut') {
+    // Slow heavy stomp — big thud every 0.4 progress units, squash on impact
+    const stompCycle = (e.progress * 2.5) % 1;
+    bob = stompCycle < 0.15 ? -0.07 * (1 - stompCycle / 0.15) : 0;
+    scaleX = 1 + (stompCycle < 0.15 ? 0.08 * (stompCycle / 0.15) : 0);
+    scaleY = 1 - (stompCycle < 0.15 ? 0.06 * (stompCycle / 0.15) : 0);
+  } else if (e.def === 'glitch') {
+    // Digital jitter — random-feeling snap offsets
+    const jitterPhase = Math.floor(t * 12 + e.id * 3.7);
+    sway = ((jitterPhase * 1337) % 7 - 3) * 0.018;
+    bob = ((jitterPhase * 2311) % 5 - 2) * 0.022;
+  } else if (e.def === 'parasite') {
+    // Fast dart — high-freq alternating side-to-side with forward lunge
+    sway = Math.sin(e.progress * 28 + e.id) * 0.05;
+    bob = Math.abs(Math.sin(e.progress * 14)) * -0.04;
+  } else if (e.isBoss) {
+    const bobFreq = 3.2;
+    const bobAmp = 0.06;
+    bob = Math.sin(e.progress * bobFreq + e.id * 0.7) * bobAmp;
+  } else {
+    const bobFreq = 6.5;
+    const bobAmp = 0.035;
+    bob = Math.sin(e.progress * bobFreq + e.id * 0.7) * bobAmp;
+  }
+  const cx = e.pos.x * cs + cs / 2 + sway * cs;
   const cy = (e.pos.y + bob) * cs + cs / 2;
   const def = ENEMIES[e.def];
   const size = cs * e.size;
@@ -511,6 +681,7 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(e.angle);
+    ctx.scale(scaleX, scaleY);
     ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
     ctx.restore();
   }
@@ -523,6 +694,25 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
     ctx.arc(cx, cy, size * 0.35, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+  }
+
+  // Juggernaut stomp ground ring
+  if (e.def === 'juggernaut') {
+    const stompCycle = (e.progress * 2.5) % 1;
+    if (stompCycle < 0.2) {
+      const ringAlpha = (1 - stompCycle / 0.2) * 0.6;
+      const ringR = size * (0.4 + stompCycle * 1.5);
+      ctx.save();
+      ctx.globalAlpha = ringAlpha;
+      ctx.strokeStyle = '#ff6600';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#ff6600';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + size * 0.3, ringR, ringR * 0.35, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   // Slow tint overlay

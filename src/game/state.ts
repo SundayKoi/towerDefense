@@ -22,12 +22,18 @@ export function defaultSave(): SaveData {
     shopPurchased: {},
     metaBoosts: {
       globalDamagePct: 0,
+      globalCritChancePct: 0,
+      globalRatePct: 0,
+      globalRangePct: 0,
+      bonusStartingHp: 0,
+      bonusProtocolsPerWave: 0,
       startingLevel: 0,
       extraDraftCards: 0,
       extraRerolls: 0,
       xpBoostPct: 0,
       startingDeployTokens: {},
     },
+    quests: { completed: [] },
     stats: {
       totalRuns: 0,
       totalWins: 0,
@@ -38,6 +44,8 @@ export function defaultSave(): SaveData {
       survivalBestWave: 0,
       totalXpEarned: 0,
       totalProtocolsEarned: 0,
+      towersEverDeployed: [],
+      legendaryDrafts: 0,
     },
     settings: { sfx: true, music: true, particleQuality: 'high', speed: 1, pixelMode: false, pixelFactor: 3 },
   };
@@ -54,9 +62,12 @@ export function loadSave(): SaveData {
       ...parsed,
       metaBoosts: { ...d.metaBoosts, ...(parsed.metaBoosts ?? {}) },
       shopPurchased: parsed.shopPurchased ?? {},
+      quests: parsed.quests ?? { completed: [] },
       stats: { ...d.stats, ...(parsed.stats ?? {}) },
       settings: { ...d.settings, ...(parsed.settings ?? {}) },
     };
+    // Migrate speed setting: clamp 3x→2x
+    if ((s.settings.speed as number) > 2) s.settings.speed = 2;
     // Migrate pre-v2 saves: old card IDs no longer exist in the pool. Reset unlocks to starter set
     // while preserving map completion, stats, shop purchases, and settings.
     if (!parsed.version || parsed.version < 2) {
@@ -90,13 +101,15 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     tokens[k as TowerId] = (tokens[k as TowerId] ?? 0) + (v as number);
   }
 
+  const startHp = d.startHp + (save.metaBoosts.bonusStartingHp ?? 0);
+
   return {
     mapId,
     difficulty,
     wave: 0,
     totalWaves: d.waves,
-    hp: d.startHp,
-    maxHp: d.startHp,
+    hp: startHp,
+    maxHp: startHp,
     phase: 'prep',
     xp: 0,
     level,
@@ -112,9 +125,9 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     spawnElapsed: 0,
     mods: {
       globalDamagePct: save.metaBoosts.globalDamagePct ?? 0,
-      globalRangePct: 0,
-      globalRatePct: 0,
-      globalCritChance: 0,
+      globalRangePct: save.metaBoosts.globalRangePct ?? 0,
+      globalRatePct: save.metaBoosts.globalRatePct ?? 0,
+      globalCritChance: save.metaBoosts.globalCritChancePct ?? 0,
       enemySpeedMult: 1,
       xpMult: 1 + (save.metaBoosts.xpBoostPct ?? 0),
       towerDmg: {},

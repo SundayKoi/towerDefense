@@ -243,11 +243,16 @@ export interface ShopUpgradeDef {
   stackStep: number;    // cost increase per additional stack
   maxStacks: number;    // 1 for one-shot items
   effect: (save: SaveData, stacks: number) => void; // applies to save.metaBoosts
-  category: 'power' | 'economy' | 'utility';
+  category: 'power' | 'economy' | 'utility' | 'loadout';
 }
 
 export interface MetaBoosts {
   globalDamagePct: number;       // additional % damage baked into every run
+  globalCritChancePct: number;   // +% global crit chance per run
+  globalRatePct: number;         // +% global fire rate per run
+  globalRangePct: number;        // +% global range per run
+  bonusStartingHp: number;       // extra starting HP
+  bonusProtocolsPerWave: number; // protocols awarded per wave cleared
   startingLevel: number;         // extra starting level
   extraDraftCards: number;       // extra card options per draft
   extraRerolls: number;          // free rerolls granted per draft
@@ -265,6 +270,7 @@ export interface SaveData {
   protocols: number;                        // meta currency
   shopPurchased: Record<string, number>;    // upgradeId -> stack count
   metaBoosts: MetaBoosts;                   // derived from shop, cached for quick apply
+  quests: { completed: string[] };          // quest IDs claimed
   stats: {
     totalRuns: number;
     totalWins: number;
@@ -275,12 +281,14 @@ export interface SaveData {
     survivalBestWave: number;
     totalXpEarned: number;
     totalProtocolsEarned: number;
+    towersEverDeployed: string[];  // all tower types ever placed across runs
+    legendaryDrafts: number;       // total legendary cards ever picked
   };
   settings: {
     sfx: boolean;
     music: boolean;
     particleQuality: 'low' | 'medium' | 'high';
-    speed: 1 | 2 | 3;
+    speed: 1 | 2;
     pixelMode: boolean;
     pixelFactor: number;
   };

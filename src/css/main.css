@@ -1525,3 +1525,98 @@ html, body { overscroll-behavior: none; }
   transition: opacity 0.15s;
 }
 .enemy-chip:hover { opacity: 1; }
+
+/* ===== Shop Tabs ===== */
+.shop-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 12px 0 4px;
+  border-bottom: 2px solid rgba(255, 45, 149, 0.25);
+  padding-bottom: 0;
+}
+.shop-tab {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  padding: 8px 20px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.shop-tab:hover { color: var(--cyan); }
+.shop-tab.active {
+  color: var(--magenta);
+  background: rgba(255, 45, 149, 0.08);
+  border-color: rgba(255, 45, 149, 0.4);
+  text-shadow: 0 0 8px var(--magenta);
+}
+
+/* ===== Contracts / Quests ===== */
+.quest-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.quest-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, var(--bg-panel), var(--bg));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: border-color 0.15s;
+}
+.quest-item.claimable {
+  border-color: var(--yellow);
+  box-shadow: 0 0 14px rgba(255, 214, 0, 0.15);
+}
+.quest-item.claimed {
+  border-color: rgba(0, 255, 136, 0.3);
+  opacity: 0.6;
+}
+.quest-body { flex: 1; }
+.quest-name {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-size: 12px;
+  color: var(--cyan);
+  margin-bottom: 3px;
+}
+.quest-item.claimable .quest-name { color: var(--yellow); }
+.quest-item.claimed .quest-name { color: var(--green); }
+.quest-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+.quest-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 80px;
+}
+.quest-proto {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  color: var(--yellow);
+  font-size: 14px;
+}
+.quest-done {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--green);
+}
+.quest-locked {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+.quest-claim { padding: 7px 12px; font-size: 11px; }

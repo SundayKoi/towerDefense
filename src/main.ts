@@ -186,7 +186,7 @@ function wireGameScreen() {
 
   h.speedBtn.onclick = () => {
     if (!run) return;
-    run.timeScale = run.timeScale === 1 ? 2 : run.timeScale === 2 ? 3 : 1;
+    run.timeScale = run.timeScale === 1 ? 2 : 1;
     h.speedBtn.textContent = run.timeScale + '\u00d7';
     audio.play('ui_click');
   };
@@ -223,6 +223,11 @@ function wireGameScreen() {
       }
       if (canPlaceAt(run, { x: gx, y: gy })) {
         placeTower(run, defId, { x: gx, y: gy });
+        // Track unique tower types deployed across runs
+        if (!save.stats.towersEverDeployed.includes(defId)) {
+          save.stats.towersEverDeployed.push(defId);
+          writeSave(save);
+        }
         run.selection = { kind: 'none' };
         h.cancelBtn.style.display = 'none';
         renderPalette(h, run, activatePlacement);
@@ -308,7 +313,11 @@ function startLoop() {
         onGameOver: () => finishRun(false),
         onVictory: () => finishRun(true),
         onLevelUp: () => openLevelUpDraft(),
-        onWaveCleared: () => {},
+        onWaveCleared: () => {
+          if (!run) return;
+          const bonus = save.metaBoosts.bonusProtocolsPerWave ?? 0;
+          if (bonus > 0) run.protocolsEarned += bonus;
+        },
         onNewEnemy: (defId) => showEnemyIntroBanner(defId),
         onAutoStart: () => {
           if (!run) return;
@@ -390,7 +399,13 @@ function openLevelUpDraft() {
     r,
     (id) => {
       const c = CARDS_BY_ID[id];
-      if (c) c.apply(r);
+      if (c) {
+        c.apply(r);
+        if (c.rarity === 'legendary') {
+          save.stats.legendaryDrafts = (save.stats.legendaryDrafts ?? 0) + 1;
+          writeSave(save);
+        }
+      }
       r.cardsPicked.push(id);
       r.phase = prevPhase === 'wave' ? 'wave' : 'prep';
       if (runHandles) {
