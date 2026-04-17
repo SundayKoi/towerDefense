@@ -552,12 +552,14 @@ function drawProjectile(ctx: CanvasRenderingContext2D, vp: RenderViewport, p: Pr
   ctx.save();
 
   if (p.fromTower === 'honeypot') {
-    // Honeypot: fat green blob with a thick dripping trail
+    // Fat green goo blob with thick dripping trail
+    ctx.lineCap = 'round';
     if (p.trail.length > 0) {
-      ctx.lineWidth = 7;
+      ctx.lineWidth = 9;
       ctx.strokeStyle = p.trailColor;
-      ctx.globalAlpha = 0.45;
-      ctx.lineCap = 'round';
+      ctx.globalAlpha = 0.5;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 10;
       ctx.beginPath();
       const tp0 = p.trail[0];
       ctx.moveTo(tp0.x * cs + cs / 2, tp0.y * cs + cs / 2);
@@ -570,48 +572,65 @@ function drawProjectile(ctx: CanvasRenderingContext2D, vp: RenderViewport, p: Pr
       ctx.globalAlpha = 1;
     }
     ctx.shadowColor = p.color;
-    ctx.shadowBlur = 16;
+    ctx.shadowBlur = 22;
     ctx.fillStyle = p.color;
     ctx.beginPath();
-    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.arc(cx - 2, cy - 2, 3, 0, Math.PI * 2);
     ctx.fill();
 
   } else if (p.fromTower === 'chain') {
-    // Chain: electric zigzag bolt along the trail
+    // Electric zigzag bolt — thick with bright white core
     if (p.trail.length > 0) {
-      ctx.lineWidth = 2;
+      // Outer glow pass
+      ctx.lineWidth = 5;
       ctx.strokeStyle = p.color;
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.5;
       ctx.shadowColor = p.color;
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 18;
       ctx.beginPath();
       const t0 = p.trail[0];
       ctx.moveTo(t0.x * cs + cs / 2, t0.y * cs + cs / 2);
       for (let i = 1; i < p.trail.length; i++) {
         const tp = p.trail[i];
-        const mx = tp.x * cs + cs / 2 + (Math.random() - 0.5) * 8;
-        const my = tp.y * cs + cs / 2 + (Math.random() - 0.5) * 8;
-        ctx.lineTo(mx, my);
+        ctx.lineTo(tp.x * cs + cs / 2 + (Math.random() - 0.5) * 12, tp.y * cs + cs / 2 + (Math.random() - 0.5) * 12);
+      }
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+      // White inner core
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffffff';
+      ctx.globalAlpha = 0.9;
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.moveTo(t0.x * cs + cs / 2, t0.y * cs + cs / 2);
+      for (let i = 1; i < p.trail.length; i++) {
+        const tp = p.trail[i];
+        ctx.lineTo(tp.x * cs + cs / 2 + (Math.random() - 0.5) * 6, tp.y * cs + cs / 2 + (Math.random() - 0.5) * 6);
       }
       ctx.lineTo(cx, cy);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
-    ctx.shadowColor = p.color;
-    ctx.shadowBlur = 14;
-    ctx.fillStyle = '#fff';
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
     ctx.fill();
 
   } else if (p.fromTower === 'railgun') {
-    // Railgun: long bright beam streak
+    // Long bright hyper-velocity streak with white-hot core
     if (p.trail.length > 0) {
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = p.color;
-      ctx.globalAlpha = 0.85;
+      // Wide glow beam
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = p.trailColor;
+      ctx.globalAlpha = 0.45;
       ctx.shadowColor = p.color;
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 30;
       ctx.lineCap = 'round';
       ctx.beginPath();
       const r0 = p.trail[0];
@@ -622,20 +641,37 @@ function drawProjectile(ctx: CanvasRenderingContext2D, vp: RenderViewport, p: Pr
       }
       ctx.lineTo(cx, cy);
       ctx.stroke();
+      // Bright white core
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#ffffff';
+      ctx.globalAlpha = 0.95;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(r0.x * cs + cs / 2, r0.y * cs + cs / 2);
+      for (let i = 1; i < p.trail.length; i++) {
+        const rp = p.trail[i];
+        ctx.lineTo(rp.x * cs + cs / 2, rp.y * cs + cs / 2);
+      }
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
     }
     ctx.globalAlpha = 1;
-    ctx.shadowColor = '#fff';
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = '#fff';
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 28;
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
     ctx.fill();
 
   } else {
-    // Default: standard colored dot with trail
+    // Default: colored dot with glowing trail — size/glow varies by tower
+    const headR = p.fromTower === 'antivirus' ? 4 : p.fromTower === 'quantum' ? 4.5 : p.isCrit ? 5 : 3.5;
+    const glowBlur = p.fromTower === 'quantum' ? 18 : p.fromTower === 'antivirus' ? 14 : 12;
     ctx.strokeStyle = p.trailColor;
-    ctx.lineWidth = 3;
-    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = p.fromTower === 'quantum' ? 4 : 3;
+    ctx.globalAlpha = 0.65;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = glowBlur * 0.5;
     ctx.beginPath();
     for (let i = 0; i < p.trail.length; i++) {
       const pt = p.trail[i];
@@ -647,11 +683,18 @@ function drawProjectile(ctx: CanvasRenderingContext2D, vp: RenderViewport, p: Pr
     ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.shadowColor = p.color;
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = glowBlur;
     ctx.fillStyle = p.color;
     ctx.beginPath();
-    ctx.arc(cx, cy, p.isCrit ? 5 : 3.5, 0, Math.PI * 2);
+    ctx.arc(cx, cy, headR, 0, Math.PI * 2);
     ctx.fill();
+    if (p.isCrit) {
+      ctx.fillStyle = '#fff';
+      ctx.shadowBlur = 4;
+      ctx.beginPath();
+      ctx.arc(cx - 1, cy - 1, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   ctx.restore();
@@ -667,19 +710,21 @@ function drawPuddles(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: RunSt
     const life = pu.timeLeft / pu.maxTime;
     const pulse = 0.5 + 0.15 * Math.sin(s.elapsed * 4);
     ctx.globalAlpha = life * pulse;
+    const c1 = pu.color ?? '#00ff88';
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    grad.addColorStop(0, '#00ff8855');
-    grad.addColorStop(0.6, '#00cc6633');
+    grad.addColorStop(0, c1 + '55');
+    grad.addColorStop(0.6, c1 + '33');
     grad.addColorStop(1, '#00000000');
     ctx.fillStyle = grad;
+    ctx.strokeStyle = c1;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
     // Rim
+    const rimColor = pu.color ?? '#00ff88';
     ctx.globalAlpha = life * 0.6;
-    ctx.strokeStyle = '#00ff88';
     ctx.lineWidth = 1.5;
-    ctx.shadowColor = '#00ff88';
+    ctx.shadowColor = rimColor;
     ctx.shadowBlur = 8;
     ctx.stroke();
   }

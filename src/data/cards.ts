@@ -1,8 +1,17 @@
 import type { CardDef, RunState, TowerId } from '@/types';
 
-// ==================== DEPLOY CARDS (grant placement tokens) ====================
-// Drafting one adds a token that lets you place the tower on an empty cell.
-// Common deploy cards are abundant; rare/epic give premium towers.
+// ==================== HELPERS ====================
+
+function addToken(s: RunState, id: TowerId, count: number): void {
+  s.deployTokens[id] = (s.deployTokens[id] ?? 0) + count;
+}
+
+function addEffect(s: RunState, tower: TowerId, tag: string): void {
+  if (!s.towerEffects[tower]) s.towerEffects[tower] = new Set<string>();
+  s.towerEffects[tower]!.add(tag);
+}
+
+// ==================== DEPLOY CARDS ====================
 
 const DEPLOY: CardDef[] = [
   {
@@ -29,7 +38,7 @@ const DEPLOY: CardDef[] = [
     rarity: 'common',
     category: 'deploy',
     towerHint: 'honeypot',
-    description: 'Gain a HONEYPOT deploy token. Slows enemies 45%.',
+    description: 'Gain a HONEYPOT deploy token. Slows enemies 45% and drops goo puddles.',
     apply: (s) => { addToken(s, 'honeypot', 1); },
   },
   {
@@ -38,7 +47,7 @@ const DEPLOY: CardDef[] = [
     rarity: 'rare',
     category: 'deploy',
     towerHint: 'antivirus',
-    description: 'Gain an ANTIVIRUS deploy token. Long-range pierce.',
+    description: 'Gain an ANTIVIRUS deploy token. Long-range piercer. Fires 2 shots.',
     apply: (s) => { addToken(s, 'antivirus', 1); },
   },
   {
@@ -47,7 +56,7 @@ const DEPLOY: CardDef[] = [
     rarity: 'rare',
     category: 'deploy',
     towerHint: 'quantum',
-    description: 'Gain a QUANTUM deploy token. 35% crit, ignores phase resist.',
+    description: 'Gain a QUANTUM deploy token. 35% crit chance, 3.5\u00d7 crit damage.',
     apply: (s) => { addToken(s, 'quantum', 1); },
   },
   {
@@ -56,7 +65,7 @@ const DEPLOY: CardDef[] = [
     rarity: 'epic',
     category: 'deploy',
     towerHint: 'ice',
-    description: 'Gain an ICE-BREAKER deploy token. AOE shredder.',
+    description: 'Gain an ICE-BREAKER deploy token. Explosive AOE shredder.',
     apply: (s) => { addToken(s, 'ice', 1); },
   },
   {
@@ -65,7 +74,7 @@ const DEPLOY: CardDef[] = [
     rarity: 'rare',
     category: 'deploy',
     towerHint: 'mine',
-    description: 'Gain 2 LOGIC MINE tokens. One-shot AOE detonation.',
+    description: 'Gain 2 LOGIC MINE tokens. Proximity detonation, one-shot.',
     apply: (s) => { addToken(s, 'mine', 2); },
   },
   {
@@ -74,7 +83,7 @@ const DEPLOY: CardDef[] = [
     rarity: 'epic',
     category: 'deploy',
     towerHint: 'chain',
-    description: 'Gain a CHAIN LIGHTNING deploy token. Arcs through 3.',
+    description: 'Gain a CHAIN LIGHTNING deploy token. Arcs through 3 enemies.',
     apply: (s) => { addToken(s, 'chain', 1); },
   },
   {
@@ -83,232 +92,235 @@ const DEPLOY: CardDef[] = [
     rarity: 'legendary',
     category: 'deploy',
     towerHint: 'railgun',
-    description: 'Gain a RAILGUN deploy token. Pierces every enemy in line.',
+    description: 'Gain a RAILGUN deploy token. Pierces every enemy in its path.',
     apply: (s) => { addToken(s, 'railgun', 1); },
   },
 ];
 
-// ==================== UPGRADE CARDS (tower-specific buffs) ====================
-// Stack permanently on the tower type for the rest of the run.
+// ==================== UPGRADE CARDS (behavioral changes only) ====================
 
 const UPGRADE: CardDef[] = [
-  // --- Firewall ---
+  // --- FIREWALL ---
   {
-    id: 'up_firewall_dmg',
-    name: 'FIREWALL: AMP ROUNDS',
-    rarity: 'common',
+    id: 'fw_burst',
+    name: 'FIREWALL: BURST PROTOCOL',
+    rarity: 'epic',
     category: 'upgrade',
     towerHint: 'firewall',
-    description: 'All FIREWALL towers +25% damage.',
-    apply: (s) => { s.mods.towerDmg.firewall = (s.mods.towerDmg.firewall ?? 0) + 0.25; },
+    description: 'Every 4th FIREWALL shot fires a triple spread burst.',
+    apply: (s) => { addEffect(s, 'firewall', 'burst'); },
   },
   {
-    id: 'up_firewall_rate',
-    name: 'FIREWALL: HYPERCYCLE',
+    id: 'fw_incendiary',
+    name: 'FIREWALL: INCENDIARY.EXE',
     rarity: 'rare',
     category: 'upgrade',
     towerHint: 'firewall',
-    description: 'All FIREWALL towers fire 35% faster.',
-    apply: (s) => { s.mods.towerRate.firewall = (s.mods.towerRate.firewall ?? 0) + 0.35; },
+    description: 'FIREWALL shots leave a small fire zone that burns nearby enemies.',
+    apply: (s) => { addEffect(s, 'firewall', 'incendiary'); },
   },
+
+  // --- HONEYPOT ---
   {
-    id: 'up_firewall_range',
-    name: 'FIREWALL: EXTENDED OPTICS',
-    rarity: 'common',
-    category: 'upgrade',
-    towerHint: 'firewall',
-    description: 'All FIREWALL towers +30% range.',
-    apply: (s) => { s.mods.towerRange.firewall = (s.mods.towerRange.firewall ?? 0) + 0.3; },
-  },
-  // --- Honeypot ---
-  {
-    id: 'up_honeypot_rate',
-    name: 'HONEYPOT: SWARM TRAP',
-    rarity: 'rare',
-    category: 'upgrade',
-    towerHint: 'honeypot',
-    description: 'All HONEYPOTs fire 50% faster.',
-    apply: (s) => { s.mods.towerRate.honeypot = (s.mods.towerRate.honeypot ?? 0) + 0.5; },
-  },
-  {
-    id: 'up_honeypot_range',
-    name: 'HONEYPOT: FIELD GENERATOR',
+    id: 'hp_persistent',
+    name: 'HONEYPOT: PERSISTENT PAYLOAD',
     rarity: 'common',
     category: 'upgrade',
     towerHint: 'honeypot',
-    description: 'All HONEYPOTs +40% range.',
-    apply: (s) => { s.mods.towerRange.honeypot = (s.mods.towerRange.honeypot ?? 0) + 0.4; },
+    description: 'HONEYPOT goo puddles last twice as long.',
+    apply: (s) => { addEffect(s, 'honeypot', 'persistent'); },
   },
-  // --- Antivirus ---
   {
-    id: 'up_antivirus_dmg',
-    name: 'ANTIVIRUS: HOT LOAD',
+    id: 'hp_acid',
+    name: 'HONEYPOT: ACID BATH',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'honeypot',
+    description: 'HONEYPOT goo puddles burn enemies for 10 damage per second.',
+    apply: (s) => { addEffect(s, 'honeypot', 'acid'); },
+  },
+  {
+    id: 'hp_overflow',
+    name: 'HONEYPOT: OVERFLOW',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'honeypot',
+    description: 'HONEYPOT goo puddles double in radius.',
+    apply: (s) => { addEffect(s, 'honeypot', 'overflow'); },
+  },
+
+  // --- ANTIVIRUS ---
+  {
+    id: 'av_quarantine',
+    name: 'ANTIVIRUS: QUARANTINE',
+    rarity: 'common',
+    category: 'upgrade',
+    towerHint: 'antivirus',
+    description: 'ANTIVIRUS hits apply a 30% slow for 1.2s.',
+    apply: (s) => { addEffect(s, 'antivirus', 'quarantine'); },
+  },
+  {
+    id: 'av_triple',
+    name: 'ANTIVIRUS: TRIPLE SCAN',
     rarity: 'rare',
     category: 'upgrade',
     towerHint: 'antivirus',
-    description: 'All ANTIVIRUS +50% damage.',
-    apply: (s) => { s.mods.towerDmg.antivirus = (s.mods.towerDmg.antivirus ?? 0) + 0.5; },
+    description: 'ANTIVIRUS fires 3 projectiles per shot instead of 2.',
+    apply: (s) => { addEffect(s, 'antivirus', 'triple'); },
   },
   {
-    id: 'up_antivirus_range',
-    name: 'ANTIVIRUS: SNIPER PROTOCOL',
+    id: 'av_precision',
+    name: 'ANTIVIRUS: PRECISION TARGETING',
     rarity: 'epic',
     category: 'upgrade',
     towerHint: 'antivirus',
-    description: 'All ANTIVIRUS +75% range.',
-    apply: (s) => { s.mods.towerRange.antivirus = (s.mods.towerRange.antivirus ?? 0) + 0.75; },
+    description: 'ANTIVIRUS secondary (and tertiary) shots always critically strike.',
+    apply: (s) => { addEffect(s, 'antivirus', 'precision'); },
   },
+
+  // --- CHAIN ---
   {
-    id: 'up_antivirus_rate',
-    name: 'ANTIVIRUS: QUICK RELOAD',
-    rarity: 'rare',
-    category: 'upgrade',
-    towerHint: 'antivirus',
-    description: 'All ANTIVIRUS fire 30% faster.',
-    apply: (s) => { s.mods.towerRate.antivirus = (s.mods.towerRate.antivirus ?? 0) + 0.3; },
-  },
-  // --- Quantum ---
-  {
-    id: 'up_quantum_crit',
-    name: 'QUANTUM: CRIT THEORIST',
-    rarity: 'epic',
-    category: 'upgrade',
-    towerHint: 'quantum',
-    description: 'All QUANTUM towers +15% crit chance.',
-    apply: (s) => { s.mods.towerCrit.quantum = (s.mods.towerCrit.quantum ?? 0) + 0.15; },
-  },
-  {
-    id: 'up_quantum_dmg',
-    name: 'QUANTUM: ENTANGLED ROUNDS',
-    rarity: 'rare',
-    category: 'upgrade',
-    towerHint: 'quantum',
-    description: 'All QUANTUM towers +40% damage.',
-    apply: (s) => { s.mods.towerDmg.quantum = (s.mods.towerDmg.quantum ?? 0) + 0.4; },
-  },
-  // --- Ice ---
-  {
-    id: 'up_ice_radius',
-    name: 'ICE: SHATTER FIELD',
-    rarity: 'epic',
-    category: 'upgrade',
-    towerHint: 'ice',
-    description: 'All ICE-BREAKERS +40% damage.',
-    apply: (s) => { s.mods.towerDmg.ice = (s.mods.towerDmg.ice ?? 0) + 0.4; },
-  },
-  {
-    id: 'up_ice_rate',
-    name: 'ICE: OVERCLOCK',
-    rarity: 'rare',
-    category: 'upgrade',
-    towerHint: 'ice',
-    description: 'All ICE-BREAKERS fire 40% faster.',
-    apply: (s) => { s.mods.towerRate.ice = (s.mods.towerRate.ice ?? 0) + 0.4; },
-  },
-  // --- Chain ---
-  {
-    id: 'up_chain_dmg',
-    name: 'CHAIN: AMPLIFIER',
+    id: 'ch_storm',
+    name: 'CHAIN: STORM SURGE',
     rarity: 'rare',
     category: 'upgrade',
     towerHint: 'chain',
-    description: 'All CHAIN towers +45% damage.',
-    apply: (s) => { s.mods.towerDmg.chain = (s.mods.towerDmg.chain ?? 0) + 0.45; },
+    description: 'CHAIN LIGHTNING arcs to 2 additional targets.',
+    apply: (s) => { addEffect(s, 'chain', 'storm'); },
   },
-  // --- Railgun ---
   {
-    id: 'up_railgun_dmg',
-    name: 'RAILGUN: OVERCHARGE',
+    id: 'ch_discharge',
+    name: 'CHAIN: FULL DISCHARGE',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'chain',
+    description: 'CHAIN LIGHTNING jumps deal full damage with no falloff.',
+    apply: (s) => { addEffect(s, 'chain', 'discharge'); },
+  },
+  {
+    id: 'ch_nova',
+    name: 'CHAIN: ARC NOVA',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'chain',
+    description: 'CHAIN LIGHTNING arc reach doubles.',
+    apply: (s) => { addEffect(s, 'chain', 'nova'); },
+  },
+
+  // --- ICE ---
+  {
+    id: 'ic_wide',
+    name: 'ICE: BLIZZARD FIELD',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'ice',
+    description: 'ICE-BREAKER explosion radius is 70% wider.',
+    apply: (s) => { addEffect(s, 'ice', 'wide'); },
+  },
+  {
+    id: 'ic_freeze',
+    name: 'ICE: ABSOLUTE ZERO',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'ice',
+    description: 'ICE-BREAKER stops enemies completely for 0.6s instead of slowing.',
+    apply: (s) => { addEffect(s, 'ice', 'freeze'); },
+  },
+  {
+    id: 'ic_shards',
+    name: 'ICE: SHARD STORM',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'ice',
+    description: 'ICE-BREAKER blasts spawn 6 slow fields in a ring.',
+    apply: (s) => { addEffect(s, 'ice', 'shards'); },
+  },
+
+  // --- QUANTUM ---
+  {
+    id: 'qm_double',
+    name: 'QUANTUM: SUPERPOSITION',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'quantum',
+    description: 'QUANTUM has a 35% chance to fire twice per shot.',
+    apply: (s) => { addEffect(s, 'quantum', 'double'); },
+  },
+  {
+    id: 'qm_entangle',
+    name: 'QUANTUM: ENTANGLEMENT',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'quantum',
+    description: 'QUANTUM critical hits arc to the nearest enemy for 60% damage.',
+    apply: (s) => { addEffect(s, 'quantum', 'entangle'); },
+  },
+  {
+    id: 'qm_phase',
+    name: 'QUANTUM: PHASE SHIFT',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'quantum',
+    description: 'QUANTUM shots ignore all enemy armor.',
+    apply: (s) => { addEffect(s, 'quantum', 'phase'); },
+  },
+
+  // --- RAILGUN ---
+  {
+    id: 'rl_sabot',
+    name: 'RAILGUN: SABOT ROUND',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'railgun',
+    description: 'RAILGUN shots cause a small explosion at each enemy pierced.',
+    apply: (s) => { addEffect(s, 'railgun', 'sabot'); },
+  },
+  {
+    id: 'rl_shockwave',
+    name: 'RAILGUN: SHOCKWAVE',
     rarity: 'epic',
     category: 'upgrade',
     towerHint: 'railgun',
-    description: 'All RAILGUNS +60% damage.',
-    apply: (s) => { s.mods.towerDmg.railgun = (s.mods.towerDmg.railgun ?? 0) + 0.6; },
-  },
-];
-
-// ==================== GLOBAL BUFFS ====================
-
-const BUFFS: CardDef[] = [
-  {
-    id: 'buff_dmg_1',
-    name: 'OVERCLOCK v1',
-    rarity: 'common',
-    category: 'buff',
-    description: 'All towers +12% damage.',
-    apply: (s) => { s.mods.globalDamagePct += 0.12; },
+    description: 'RAILGUN pierced enemies are slowed 70% for 1.5s.',
+    apply: (s) => { addEffect(s, 'railgun', 'shockwave'); },
   },
   {
-    id: 'buff_dmg_2',
-    name: 'OVERCLOCK v2',
-    rarity: 'rare',
-    category: 'buff',
-    description: 'All towers +22% damage.',
-    apply: (s) => { s.mods.globalDamagePct += 0.22; },
-  },
-  {
-    id: 'buff_dmg_3',
-    name: 'OVERCLOCK v3',
-    rarity: 'epic',
-    category: 'buff',
-    description: 'All towers +40% damage.',
-    apply: (s) => { s.mods.globalDamagePct += 0.4; },
-  },
-  {
-    id: 'buff_dmg_max',
-    name: 'OVERCLOCK: MAX',
+    id: 'rl_capacitor',
+    name: 'RAILGUN: CAPACITOR',
     rarity: 'legendary',
-    category: 'buff',
-    description: 'All towers +75% damage.',
-    apply: (s) => { s.mods.globalDamagePct += 0.75; },
+    category: 'upgrade',
+    towerHint: 'railgun',
+    description: 'RAILGUN charges for 8s then auto-fires a 5\u00d7 damage mega shot.',
+    apply: (s) => { addEffect(s, 'railgun', 'capacitor'); },
   },
+
+  // --- MINE ---
   {
-    id: 'buff_range_1',
-    name: 'SIGNAL EXTENDER',
+    id: 'mn_wide',
+    name: 'LOGIC MINE: WIDE BLAST',
     rarity: 'common',
-    category: 'buff',
-    description: 'All towers +15% range.',
-    apply: (s) => { s.mods.globalRangePct += 0.15; },
+    category: 'upgrade',
+    towerHint: 'mine',
+    description: 'LOGIC MINE explosion radius doubles.',
+    apply: (s) => { addEffect(s, 'mine', 'wide'); },
   },
   {
-    id: 'buff_range_2',
-    name: 'SIGNAL AMPLIFIER',
+    id: 'mn_cluster',
+    name: 'LOGIC MINE: CLUSTER CHARGE',
     rarity: 'rare',
-    category: 'buff',
-    description: 'All towers +30% range.',
-    apply: (s) => { s.mods.globalRangePct += 0.3; },
+    category: 'upgrade',
+    towerHint: 'mine',
+    description: 'LOGIC MINE detonation triggers 2 additional explosions nearby.',
+    apply: (s) => { addEffect(s, 'mine', 'cluster'); },
   },
   {
-    id: 'buff_rate_1',
-    name: 'CYCLE BOOST',
-    rarity: 'common',
-    category: 'buff',
-    description: 'All towers fire 15% faster.',
-    apply: (s) => { s.mods.globalRatePct += 0.15; },
-  },
-  {
-    id: 'buff_rate_2',
-    name: 'HYPERTHREAD',
-    rarity: 'rare',
-    category: 'buff',
-    description: 'All towers fire 30% faster.',
-    apply: (s) => { s.mods.globalRatePct += 0.3; },
-  },
-  {
-    id: 'buff_crit',
-    name: 'CRIT INJECTOR',
-    rarity: 'rare',
-    category: 'buff',
-    description: 'All towers +10% crit chance (3\u00d7 damage).',
-    apply: (s) => { s.mods.globalCritChance += 0.1; },
-  },
-  {
-    id: 'buff_xp',
-    name: 'DATA LEECH',
-    rarity: 'rare',
-    category: 'buff',
-    description: 'Gain +30% XP from kills.',
-    apply: (s) => { s.mods.xpMult += 0.3; },
+    id: 'mn_resupply',
+    name: 'LOGIC MINE: AUTO-RESUPPLY',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'mine',
+    description: '60% chance LOGIC MINE respawns after detonation.',
+    apply: (s) => { addEffect(s, 'mine', 'resupply'); },
   },
 ];
 
@@ -336,8 +348,8 @@ const HEAL: CardDef[] = [
     name: 'HARDENED CORE',
     rarity: 'epic',
     category: 'heal',
-    description: '+4 MAX INTEGRITY and fully heal.',
-    apply: (s) => { s.maxHp += 4; s.hp = s.maxHp; },
+    description: '+5 MAX INTEGRITY and fully heal.',
+    apply: (s) => { s.maxHp += 5; s.hp = s.maxHp; },
   },
   {
     id: 'heal_revive',
@@ -349,7 +361,7 @@ const HEAL: CardDef[] = [
   },
 ];
 
-// ==================== EXOTIC / LEGENDARY ====================
+// ==================== EXOTIC ====================
 
 const EXOTIC: CardDef[] = [
   {
@@ -357,7 +369,7 @@ const EXOTIC: CardDef[] = [
     name: 'TIME DILATION',
     rarity: 'legendary',
     category: 'exotic',
-    description: 'All enemies -25% speed for the rest of the run.',
+    description: 'All enemies move 25% slower for the rest of the run.',
     apply: (s) => { s.mods.enemySpeedMult *= 0.75; },
   },
   {
@@ -365,75 +377,63 @@ const EXOTIC: CardDef[] = [
     name: 'REPLICATOR',
     rarity: 'legendary',
     category: 'exotic',
-    description: 'Gain a deploy token of every tower you currently own.',
+    description: 'Gain 1 deploy token for every tower type you have placed.',
     apply: (s) => {
-      for (const t of s.towers) {
-        addToken(s, t.def, 1);
-      }
+      const placed = new Set(s.towers.map((t) => t.def));
+      for (const id of placed) addToken(s, id, 1);
     },
   },
   {
-    id: 'exotic_mass_deploy',
-    name: 'FORK BOMB',
+    id: 'exotic_overclock',
+    name: 'SYSTEM OVERCLOCK',
     rarity: 'epic',
     category: 'exotic',
-    description: 'Gain 3 FIREWALL tokens.',
-    apply: (s) => { addToken(s, 'firewall', 3); },
+    description: 'All towers fire 40% faster for the rest of the run.',
+    apply: (s) => { s.mods.globalRatePct += 0.4; },
   },
 ];
+
+// ==================== EXPORTS ====================
 
 export const CARDS: CardDef[] = [
   ...DEPLOY,
   ...UPGRADE,
-  ...BUFFS,
   ...HEAL,
   ...EXOTIC,
 ];
 
 export const CARDS_BY_ID: Record<string, CardDef> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 
-// Starting unlocked pool (persists in save). Intentionally generous so early runs feel rich.
 export const STARTING_UNLOCKED_CARDS = [
+  // All deploy cards except railgun (legendary)
   ...DEPLOY.filter((c) => c.rarity !== 'legendary').map((c) => c.id),
-  ...UPGRADE.filter((c) => c.rarity !== 'epic').map((c) => c.id),
-  ...BUFFS.filter((c) => c.rarity !== 'legendary').map((c) => c.id),
+  // Common/rare upgrades only
+  ...UPGRADE.filter((c) => c.rarity === 'common' || c.rarity === 'rare').map((c) => c.id),
+  // All heals except legendary
   ...HEAL.filter((c) => c.rarity !== 'legendary').map((c) => c.id),
-  'exotic_mass_deploy',
+  // One exotic starter
+  'exotic_overclock',
 ];
 
 const BASE_WEIGHTS: Record<string, number> = { common: 60, rare: 28, epic: 10, legendary: 2 };
-const PER_LEVEL: Record<string, number> = { common: 0, rare: 0.4, epic: 0.25, legendary: 0.15 };
+const PER_LEVEL: Record<string, number> = { common: 0, rare: 0.5, epic: 0.3, legendary: 0.15 };
 
 export interface DraftContext {
   placedTowerTypes: Set<TowerId>;
   towerCount: number;
 }
 
-// Category weight — biases the draft toward DEPLOY cards early (you need towers) and
-// UPGRADE cards later once you have things to upgrade. Buffs/heals stay constant.
 function categoryWeight(category: string, level: number, ctx: DraftContext): number {
   const n = ctx.towerCount;
   switch (category) {
-    case 'deploy':
-      // 2.5 at 0 towers, falls to 0.4 by 8 towers
-      return Math.max(0.4, 2.5 - n * 0.25);
-    case 'upgrade':
-      // Useless at 0 towers, rises sharply with tower count
-      return Math.min(2.2, 0.15 + n * 0.32);
-    case 'buff':
-      return 1.1;
-    case 'heal':
-      return 1.0;
-    case 'exotic':
-      return Math.min(1.4, 0.25 + level * 0.1);
-    default:
-      return 1.0;
+    case 'deploy':  return Math.max(0.3, 2.5 - n * 0.28);
+    case 'upgrade': return Math.min(2.5, 0.1 + n * 0.38);
+    case 'heal':    return 1.0;
+    case 'exotic':  return Math.min(1.5, 0.2 + level * 0.1);
+    default:        return 1.0;
   }
 }
 
-// Card pool given player state. Level controls rarity weighting; context controls category mix.
-// Upgrade cards targeting a tower you don't own are filtered entirely — you can't get "AMP ROUNDS:
-// FIREWALL" if you haven't placed a Firewall yet.
 export function drawDraft(level: number, unlockedIds: Set<string>, context: DraftContext, count = 3): string[] {
   const pool = CARDS.filter((c) => {
     if (!unlockedIds.has(c.id)) return false;
@@ -442,7 +442,7 @@ export function drawDraft(level: number, unlockedIds: Set<string>, context: Draf
   });
   if (pool.length === 0) return [];
 
-  const rarityW: Record<string, number> = { common: 0, rare: 0, epic: 0, legendary: 0 };
+  const rarityW: Record<string, number> = {};
   for (const r of Object.keys(BASE_WEIGHTS)) {
     rarityW[r] = BASE_WEIGHTS[r] + PER_LEVEL[r] * level;
   }
@@ -450,27 +450,16 @@ export function drawDraft(level: number, unlockedIds: Set<string>, context: Draf
   const picks: string[] = [];
   const used = new Set<string>();
   while (picks.length < count) {
-    // Recompute weights per candidate each iteration (small pool, cheap).
     const weighted = pool
       .filter((c) => !used.has(c.id))
-      .map((c) => ({
-        card: c,
-        weight: rarityW[c.rarity] * categoryWeight(c.category, level, context),
-      }));
-    const totalW = weighted.reduce((s, x) => s + x.weight, 0);
+      .map((c) => ({ card: c, weight: rarityW[c.rarity] * categoryWeight(c.category, level, context) }));
+    const totalW = weighted.reduce((sum, x) => sum + x.weight, 0);
     if (totalW <= 0 || weighted.length === 0) break;
     let r = Math.random() * totalW;
     let picked = weighted[weighted.length - 1];
-    for (const w of weighted) {
-      r -= w.weight;
-      if (r <= 0) { picked = w; break; }
-    }
+    for (const w of weighted) { r -= w.weight; if (r <= 0) { picked = w; break; } }
     used.add(picked.card.id);
     picks.push(picked.card.id);
   }
   return picks;
-}
-
-function addToken(s: RunState, id: TowerId, count: number): void {
-  s.deployTokens[id] = (s.deployTokens[id] ?? 0) + count;
 }

@@ -1,4 +1,4 @@
-import type { DamageType, EnemyInstance, Projectile, RunState, TowerInstance, Vec2 } from '@/types';
+import type { DamageType, EnemyInstance, Projectile, RunState, TowerId, TowerInstance, Vec2 } from '@/types';
 import { ENEMIES } from '@/data/enemies';
 import { TOWERS } from '@/data/towers';
 import { getMap, pathLength, posOnPath } from '@/data/maps';
@@ -13,6 +13,10 @@ import { xpForLevel } from './state';
 
 let entityIdSeq = 1;
 export const nextId = () => entityIdSeq++;
+
+function hasEffect(s: RunState, tower: TowerId, tag: string): boolean {
+  return s.towerEffects[tower]?.has(tag) ?? false;
+}
 
 // ======================= Wave flow =======================
 
@@ -41,6 +45,7 @@ export function endWave(s: RunState, events: EngineEvents): void {
   const isBoss = bossForWave(getMap(s.mapId), s.difficulty, s.wave) != null;
   const proto = isBoss ? 3 : 1;
   s.protocolsEarned += proto;
+  s.floaters.push({ pos: { x: 0, y: -0.5 }, text: `+${proto} \u2b22 PROTOCOL`, vy: -18, life: 2, maxLife: 2, color: '#ffd600', size: 16 });
   // Floating XP notice
   s.floaters.push({
     pos: { x: 0, y: 0 },
@@ -119,10 +124,15 @@ function updatePuddles(s: RunState, dt: number): void {
   for (const pu of s.puddles) {
     pu.timeLeft -= dt;
     for (const e of s.enemies) {
-      if (!e.alive || ENEMIES[e.def].slowImmune) continue;
+      if (!e.alive) continue;
       if (Math.hypot(e.pos.x - pu.pos.x, e.pos.y - pu.pos.y) <= pu.radius) {
-        e.speedMult = Math.min(e.speedMult, 1 - pu.slowPct);
-        e.slowTimer = Math.max(e.slowTimer, pu.slowDuration);
+        if (pu.slowPct > 0 && !ENEMIES[e.def].slowImmune) {
+          e.speedMult = Math.min(e.speedMult, 1 - pu.slowPct);
+          e.slowTimer = Math.max(e.slowTimer, pu.slowDuration);
+        }
+        if (pu.damagePerSec) {
+          damageEnemy(s, e, pu.damagePerSec * dt, false, 'energy');
+        }
       }
     }
   }
@@ -310,6 +320,44 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
   for (const d of t.debuffs) d.timeLeft -= dt;
   t.debuffs = t.debuffs.filter((d) => d.timeLeft > 0);
   t.cooldown = Math.max(0, t.cooldown - dt);
+
+  // Railgun capacitor: charge for 8s then auto-fire a 5× mega shot at best target.
+  if (t.def === 'railgun' && hasEffect(s, 'railgun', 'capacitor')) {
+    t.extras.chargeTimer = (t.extras.chargeTimer ?? 8) - dt;
+    if (t.extras.chargeTimer <= 0) {
+      t.extras.chargeTimer = 8;
+      const range = effectiveRange(s, t) * 2;
+      let megaTarget: EnemyInstance | null = null;
+      let best = -Infinity;
+      for (const e of s.enemies) {
+        if (!e.alive) continue;
+        const d = Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y);
+        if (d <= range && e.hp > best) { megaTarget = e; best = e.hp; }
+      }
+      if (megaTarget) {
+        const def = TOWERS[t.def];
+        const megaDmg = effectiveDamage(s, t) * 5;
+        s.projectiles.push({
+          id: nextId(),
+          pos: { x: t.grid.x, y: t.grid.y },
+          target: megaTarget.id,
+          targetPos: { x: megaTarget.pos.x, y: megaTarget.pos.y },
+          damage: megaDmg,
+          speed: def.projectileSpeed * 1.5,
+          color: '#ffffff',
+          trailColor: '#aaddff',
+          fromTower: 'railgun',
+          damageType: def.damageType,
+          isCrit: true,
+          pierce: true,
+          trail: [],
+        });
+        t.fireFlash = 0.4;
+        s.floaters.push({ pos: { x: t.pos.x, y: t.pos.y - 0.8 }, text: 'MEGA SHOT', vy: -30, life: 1.2, maxLife: 1.2, color: '#ffffff', size: 18 });
+        audio.play('fire_railgun');
+      }
+    }
+  }
   const range = effectiveRange(s, t);
   let best: EnemyInstance | null = null;
   let bestScore = -Infinity;
@@ -357,11 +405,43 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   const dmg = isCrit ? baseDmg * critMult : baseDmg;
 
   if (t.def === 'mine') {
+    let aoeRadius = 1.5;
+    if (hasEffect(s, 'mine', 'wide')) aoeRadius *= 2;
     damageEnemy(s, target, dmg * 2.5, false, def.damageType);
-    s.towers = s.towers.filter((x) => x.id !== t.id);
-    spawnExplosion(s, t.grid, '#ffd600', 1.5);
+    for (const e of s.enemies) {
+      if (!e.alive || e.id === target.id) continue;
+      if (Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= aoeRadius) {
+        damageEnemy(s, e, dmg * 1.5, false, def.damageType);
+      }
+    }
+    spawnExplosion(s, t.grid, '#ffd600', aoeRadius);
+    if (hasEffect(s, 'mine', 'cluster')) {
+      for (let i = 0; i < 2; i++) {
+        const offset = { x: t.grid.x + (Math.random() - 0.5) * 2, y: t.grid.y + (Math.random() - 0.5) * 2 };
+        spawnExplosion(s, offset, '#ffa000', aoeRadius * 0.6);
+        for (const e of s.enemies) {
+          if (!e.alive) continue;
+          if (Math.hypot(e.pos.x - offset.x, e.pos.y - offset.y) <= aoeRadius * 0.6) {
+            damageEnemy(s, e, dmg * 0.8, false, def.damageType);
+          }
+        }
+      }
+    }
+    const respawn = hasEffect(s, 'mine', 'resupply') && Math.random() < 0.6;
+    if (!respawn) s.towers = s.towers.filter((x) => x.id !== t.id);
+    else { t.cooldown = 8; t.fireFlash = 0.15; }
     audio.play('mine');
     return;
+  }
+
+  let aoe = def.aoe?.radius;
+  if (t.def === 'ice' && aoe && hasEffect(s, 'ice', 'wide')) aoe *= 1.7;
+
+  let chainJumps = def.chain?.jumps ?? 0;
+  let chainFalloff = def.chain?.falloff ?? 0.8;
+  if (t.def === 'chain') {
+    if (hasEffect(s, 'chain', 'storm')) chainJumps += 2;
+    if (hasEffect(s, 'chain', 'discharge')) chainFalloff = 1.0;
   }
 
   const proj: Projectile = {
@@ -375,35 +455,66 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
     trailColor: def.trailColor,
     fromTower: t.def,
     damageType: def.damageType,
-    aoe: def.aoe?.radius,
+    aoe,
     isCrit,
     pierce: def.pierce,
     slow: def.slow ? { pct: def.slow.pct, duration: def.slow.duration } : undefined,
-    chain: def.chain ? { jumps: def.chain.jumps, falloff: def.chain.falloff, hit: new Set<number>([target.id]) } : undefined,
+    chain: def.chain ? { jumps: chainJumps, falloff: chainFalloff, hit: new Set<number>([target.id]) } : undefined,
     trail: [],
   };
   s.projectiles.push(proj);
 
-  // Antivirus: fire a second projectile at the next nearest enemy in range.
+  // Antivirus: fire 2 (or 3 with triple) projectiles at nearest enemies.
   if (t.def === 'antivirus') {
     const range = effectiveRange(s, t);
-    let second: EnemyInstance | null = null;
-    let bestD = Infinity;
+    const triple = hasEffect(s, 'antivirus', 'triple');
+    const precision = hasEffect(s, 'antivirus', 'precision');
+    const extras: EnemyInstance[] = [];
     for (const e of s.enemies) {
       if (!e.alive || e.id === target.id) continue;
-      const d = Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y);
-      if (d <= range && d < bestD) { second = e; bestD = d; }
+      if (Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= range) extras.push(e);
+      if (extras.length >= (triple ? 2 : 1)) break;
     }
-    const p2target = second ?? target;
-    s.projectiles.push({
-      ...proj,
-      id: nextId(),
-      pos: { x: t.grid.x + 0.12, y: t.grid.y - 0.12 },
-      target: p2target.id,
-      targetPos: { x: p2target.pos.x, y: p2target.pos.y },
-      damage: dmg * 0.7,
-      trail: [],
-    });
+    const shotCount = triple ? 2 : 1;
+    for (let i = 0; i < shotCount; i++) {
+      const tgt = extras[i] ?? target;
+      s.projectiles.push({
+        ...proj,
+        id: nextId(),
+        pos: { x: t.grid.x + (i + 1) * 0.12, y: t.grid.y - (i + 1) * 0.12 },
+        target: tgt.id,
+        targetPos: { x: tgt.pos.x, y: tgt.pos.y },
+        damage: dmg * (i === 0 ? 0.7 : 0.55),
+        isCrit: precision ? true : isCrit,
+        trail: [],
+      });
+    }
+  }
+
+  // Quantum: 35% chance to fire twice with superposition.
+  if (t.def === 'quantum' && hasEffect(s, 'quantum', 'double') && Math.random() < 0.35) {
+    s.projectiles.push({ ...proj, id: nextId(), pos: { x: t.grid.x, y: t.grid.y }, trail: [] });
+  }
+
+  // Firewall burst: every 4th shot fires triple spread.
+  if (t.def === 'firewall' && hasEffect(s, 'firewall', 'burst')) {
+    t.extras.shotCount = (t.extras.shotCount ?? 0) + 1;
+    if (t.extras.shotCount >= 4) {
+      t.extras.shotCount = 0;
+      for (let i = -1; i <= 1; i += 2) {
+        const angle = t.angle + i * 0.28;
+        const spread = { x: t.grid.x + Math.cos(angle) * 3, y: t.grid.y + Math.sin(angle) * 3 };
+        s.projectiles.push({
+          ...proj,
+          id: nextId(),
+          pos: { x: t.grid.x, y: t.grid.y },
+          target: -1,
+          targetPos: spread,
+          damage: dmg * 0.6,
+          trail: [],
+        });
+      }
+    }
   }
 
   audio.play('fire_' + t.def);
@@ -429,15 +540,23 @@ function updateProjectile(s: RunState, p: Projectile, dt: number): void {
   p.trail.push({ x: p.pos.x, y: p.pos.y });
   if (p.trail.length > 6) p.trail.shift();
   if (dist <= step || dist < 0.15) {
-    if (target) hitEnemy(s, p, target);
-    else {
-      if (p.aoe) {
-        spawnExplosion(s, { x: tx, y: ty }, p.color, p.aoe);
-        for (const e of s.enemies) {
-          if (!e.alive) continue;
-          if (Math.hypot(e.pos.x - tx, e.pos.y - ty) <= p.aoe) {
-            damageEnemy(s, e, p.damage, p.isCrit ?? false, p.damageType);
-          }
+    if (target) {
+      hitEnemy(s, p, target);
+      // Real pierce: find next enemy in travel direction and continue
+      if (p.pierce) {
+        const next = findPierceTarget(s, p, target);
+        if (next) {
+          p.target = next.id;
+          p.targetPos = { x: next.pos.x, y: next.pos.y };
+          return;
+        }
+      }
+    } else if (p.aoe) {
+      spawnExplosion(s, { x: tx, y: ty }, p.color, p.aoe);
+      for (const e of s.enemies) {
+        if (!e.alive) continue;
+        if (Math.hypot(e.pos.x - tx, e.pos.y - ty) <= p.aoe) {
+          damageEnemy(s, e, p.damage, p.isCrit ?? false, p.damageType);
         }
       }
     }
@@ -449,14 +568,94 @@ function updateProjectile(s: RunState, p: Projectile, dt: number): void {
 }
 
 function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
-  damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType);
+  // Quantum phase shift: treat armor as 0
+  const phaseShift = p.fromTower === 'quantum' && hasEffect(s, 'quantum', 'phase');
+  if (phaseShift) {
+    const saved = target.armor;
+    target.armor = 0;
+    damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType);
+    if (target.alive) target.armor = saved;
+  } else {
+    damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType);
+  }
+
   if (p.slow && !ENEMIES[target.def].slowImmune) {
     target.speedMult = Math.min(target.speedMult, 1 - p.slow.pct);
     target.slowTimer = Math.max(target.slowTimer, p.slow.duration);
   }
+
+  // Antivirus quarantine: apply slow on hit
+  if (p.fromTower === 'antivirus' && hasEffect(s, 'antivirus', 'quarantine') && !ENEMIES[target.def].slowImmune) {
+    target.speedMult = Math.min(target.speedMult, 0.7);
+    target.slowTimer = Math.max(target.slowTimer, 1.2);
+  }
+
   // Honeypot: drop a persistent slow puddle at impact point.
   if (p.fromTower === 'honeypot') {
-    s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 1.1, timeLeft: 3.2, maxTime: 3.2, slowPct: 0.4, slowDuration: 0.6 });
+    const persistent = hasEffect(s, 'honeypot', 'persistent');
+    const overflow = hasEffect(s, 'honeypot', 'overflow');
+    const acid = hasEffect(s, 'honeypot', 'acid');
+    const dur = persistent ? 6.4 : 3.2;
+    const rad = overflow ? 2.2 : 1.1;
+    s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: rad, timeLeft: dur, maxTime: dur, slowPct: 0.4, slowDuration: 0.6, damagePerSec: acid ? 10 : undefined });
+  }
+
+  // Firewall incendiary: leave a small fire damage zone
+  if (p.fromTower === 'firewall' && hasEffect(s, 'firewall', 'incendiary')) {
+    s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 0.6, timeLeft: 1.5, maxTime: 1.5, slowPct: 0, slowDuration: 0, damagePerSec: 18, color: '#ff6b00' });
+  }
+
+  // Ice: absolute zero (stop enemies) or shard storm
+  if (p.fromTower === 'ice') {
+    if (hasEffect(s, 'ice', 'freeze') && !ENEMIES[target.def].slowImmune) {
+      target.speedMult = 0;
+      target.slowTimer = Math.max(target.slowTimer, 0.6);
+    }
+    if (hasEffect(s, 'ice', 'shards') && p.aoe) {
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        s.puddles.push({ pos: { x: p.pos.x + Math.cos(a) * p.aoe * 0.8, y: p.pos.y + Math.sin(a) * p.aoe * 0.8 }, radius: 0.4, timeLeft: 2.0, maxTime: 2.0, slowPct: 0.35, slowDuration: 0.5, color: '#88eeff' });
+      }
+    }
+  }
+
+  // Railgun sabot: small explosion at each pierce
+  if (p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'sabot')) {
+    spawnExplosion(s, { x: p.pos.x, y: p.pos.y }, '#e0f0ff', 0.7);
+    for (const e of s.enemies) {
+      if (!e.alive || e.id === target.id) continue;
+      if (Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) <= 0.7) {
+        damageEnemy(s, e, p.damage * 0.4, false, p.damageType);
+      }
+    }
+  }
+
+  // Railgun shockwave: heavy slow on pierce
+  if (p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'shockwave') && !ENEMIES[target.def].slowImmune) {
+    target.speedMult = Math.min(target.speedMult, 0.3);
+    target.slowTimer = Math.max(target.slowTimer, 1.5);
+  }
+
+  // Quantum entanglement: crits arc to nearest enemy
+  if (p.fromTower === 'quantum' && p.isCrit && hasEffect(s, 'quantum', 'entangle')) {
+    const chainRange = 3.0;
+    const next = findChainTarget(s, target, new Set([target.id]), chainRange);
+    if (next) {
+      s.projectiles.push({
+        id: nextId(),
+        pos: { x: target.pos.x, y: target.pos.y },
+        target: next.id,
+        targetPos: { x: next.pos.x, y: next.pos.y },
+        damage: p.damage * 0.6,
+        speed: 18,
+        color: '#ff00ff',
+        trailColor: '#cc00cc',
+        fromTower: 'quantum',
+        damageType: 'energy',
+        isCrit: false,
+        trail: [],
+      });
+    }
   }
   if (p.aoe) {
     spawnExplosion(s, { x: p.pos.x, y: p.pos.y }, p.color, p.aoe);
@@ -468,7 +667,8 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     }
   }
   if (p.chain && p.chain.jumps > 0) {
-    const nextTarget = findChainTarget(s, target, p.chain.hit, 2.2);
+    const chainRange = hasEffect(s, 'chain', 'nova') ? 4.4 : 2.2;
+    const nextTarget = findChainTarget(s, target, p.chain.hit, chainRange);
     if (nextTarget) {
       p.chain.hit.add(nextTarget.id);
       s.projectiles.push({
@@ -483,6 +683,27 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       });
     }
   }
+}
+
+function findPierceTarget(s: RunState, p: Projectile, exclude: EnemyInstance): EnemyInstance | null {
+  let dx = 0, dy = 1;
+  if (p.trail.length > 0) {
+    const last = p.trail[p.trail.length - 1];
+    const ldx = p.pos.x - last.x, ldy = p.pos.y - last.y;
+    const len = Math.hypot(ldx, ldy);
+    if (len > 0) { dx = ldx / len; dy = ldy / len; }
+  }
+  let best: EnemyInstance | null = null;
+  let bestDist = Infinity;
+  for (const e of s.enemies) {
+    if (!e.alive || e.id === exclude.id) continue;
+    const ex = e.pos.x - p.pos.x, ey = e.pos.y - p.pos.y;
+    const d = Math.hypot(ex, ey);
+    if (d < 0.01) continue;
+    const dot = (ex / d) * dx + (ey / d) * dy;
+    if (dot > 0.55 && d < bestDist) { best = e; bestDist = d; }
+  }
+  return best;
 }
 
 function findChainTarget(s: RunState, from: EnemyInstance, exclude: Set<number>, maxDist: number): EnemyInstance | null {
@@ -566,6 +787,7 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
     s.shakeTime = 0.5;
     s.shakeAmp = 16;
     s.protocolsEarned += 5;
+    s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.8 }, text: '+5 \u2b22 PROTOCOL', vy: -35, life: 1.8, maxLife: 1.8, color: '#ffd600', size: 20 });
   }
   // Phantom death: EMP burst jams nearby towers for 3s.
   if (e.def === 'phantom') {
@@ -637,6 +859,7 @@ export function placeTower(s: RunState, defId: keyof typeof TOWERS, grid: Vec2):
     fireFlash: 0,
     targetMode: defaultTargetMode(defId),
     debuffs: [],
+    extras: {},
   };
   s.towers.push(t);
   audio.play('place');

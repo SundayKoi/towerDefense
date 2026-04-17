@@ -136,5 +136,6 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     cardsPicked: [],
     autoStartTimer: null,
     puddles: [],
+    towerEffects: {},
   };
 }

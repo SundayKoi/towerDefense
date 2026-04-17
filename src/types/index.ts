@@ -42,7 +42,7 @@ export type TargetMode = 'first' | 'strong' | 'weak' | 'close';
 // Active debuff on a tower instance from enemy abilities.
 export type TowerDebuff = { kind: 'jammed' | 'infected'; timeLeft: number };
 
-// Persistent slow puddle dropped by honeypot on hit.
+// Persistent ground effect dropped by towers on hit.
 export interface Puddle {
   pos: Vec2;
   radius: number;
@@ -50,6 +50,8 @@ export interface Puddle {
   maxTime: number;
   slowPct: number;
   slowDuration: number;
+  damagePerSec?: number; // acid/fire damage to enemies standing in puddle
+  color?: string;        // override for non-honeypot puddles
 }
 export const TARGET_MODES: readonly TargetMode[] = ['first', 'strong', 'weak', 'close'] as const;
 
@@ -157,6 +159,7 @@ export interface TowerInstance {
   fireFlash: number;
   targetMode: TargetMode;
   debuffs: TowerDebuff[];
+  extras: Record<string, number>; // flexible per-tower state (shot counters, charge timers, etc.)
 }
 
 export interface EnemyInstance {
@@ -298,6 +301,8 @@ export interface RunState {
   enemies: EnemyInstance[];
   projectiles: Projectile[];
   puddles: Puddle[];
+  // Active behavioral upgrades per tower type, applied via card picks.
+  towerEffects: Partial<Record<TowerId, Set<string>>>;
   particles: Particle[];
   floaters: FloatingText[];
   spawnQueue: { def: EnemyId; pathIndex: number; delay: number; boss?: boolean }[];
