@@ -161,10 +161,24 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
     const t = s.towers.find((x) => x.id === sel.towerId);
     if (t) drawRangeCircle(ctx, vp, t.grid, effectiveRange(s, t), TOWERS[t.def].accentColor);
   }
-  if (sel.kind === 'placing' && hoverCell) {
-    const def = TOWERS[sel.def];
-    const valid = canPlaceAt(s, hoverCell);
-    drawPlacementGhost(ctx, vp, hoverCell, def.id, def.range * (1 + s.mods.globalRangePct), valid);
+  if (sel.kind === 'placing') {
+    // Highlight all valid placement cells with a soft green glow so player sees where they can place.
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = '#00ff88';
+    for (let y = 0; y < map.rows; y++) {
+      for (let x = 0; x < map.cols; x++) {
+        if (canPlaceAt(s, { x, y })) {
+          ctx.fillRect(x * vp.cellSize, y * vp.cellSize, vp.cellSize, vp.cellSize);
+        }
+      }
+    }
+    ctx.restore();
+    if (hoverCell) {
+      const def = TOWERS[sel.def];
+      const valid = canPlaceAt(s, hoverCell);
+      drawPlacementGhost(ctx, vp, hoverCell, def.id, def.range * (1 + s.mods.globalRangePct), valid);
+    }
   }
 
   // Puddles (under towers/enemies)
@@ -364,16 +378,25 @@ function drawPlacementGhost(ctx: CanvasRenderingContext2D, vp: RenderViewport, g
   const cs = vp.cellSize;
   const cx = g.x * cs + cs / 2;
   const cy = g.y * cs + cs / 2;
+  const accent = valid ? '#00ff88' : '#ff3355';
   ctx.save();
-  ctx.globalAlpha = 0.5;
+  // Pulsing cell backdrop — bright and hard to miss
+  const pulse = 0.5 + 0.25 * Math.sin(performance.now() / 180);
+  ctx.globalAlpha = pulse * 0.6;
+  ctx.fillStyle = accent;
+  ctx.fillRect(g.x * cs, g.y * cs, cs, cs);
+  ctx.globalAlpha = 1;
+  // Sprite preview — 80% opacity so it's clearly visible
+  ctx.globalAlpha = 0.8;
   const sprite = getTowerSprite(id as any);
   if (sprite) ctx.drawImage(sprite, cx - cs * 0.45, cy - cs * 0.45, cs * 0.9, cs * 0.9);
   ctx.globalAlpha = 1;
-  drawRangeCircle(ctx, vp, g, range, valid ? '#00ff88' : '#ff3355');
-  // Cell indicator
-  ctx.strokeStyle = valid ? '#00ff88' : '#ff3355';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(g.x * cs + 2, g.y * cs + 2, cs - 4, cs - 4);
+  // Range circle
+  drawRangeCircle(ctx, vp, g, range, accent);
+  // Thick cell border
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(g.x * cs + 1.5, g.y * cs + 1.5, cs - 3, cs - 3);
   ctx.restore();
 }
 

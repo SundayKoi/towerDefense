@@ -61,11 +61,11 @@ const DEPLOY: CardDef[] = [
   },
   {
     id: 'deploy_mine',
-    name: 'DEPLOY: LOGIC MINE ×2',
+    name: 'DEPLOY: ARTILLERY',
     rarity: 'rare',
     category: 'deploy',
     towerHint: 'mine',
-    description: 'Gain 2 LOGIC MINE tokens. Proximity detonation, one-shot.',
+    description: 'Gain an ARTILLERY deploy token. Heavy AoE shells with long range.',
     apply: (s) => { addToken(s, 'mine', 2); },
   },
   {
@@ -456,50 +456,50 @@ const UPGRADE: CardDef[] = [
     apply: (s) => { addEffect(s, 'railgun', 'penetrator'); },
   },
 
-  // ===== LOGIC MINE (5 upgrades) =====
+  // ===== ARTILLERY (5 upgrades) =====
   {
     id: 'mn_wide',
-    name: 'LOGIC MINE: WIDE BLAST',
+    name: 'ARTILLERY: HEAVY SHELLS',
     rarity: 'common',
     category: 'upgrade',
     towerHint: 'mine',
-    description: 'LOGIC MINE explosion radius doubles.',
+    description: 'ARTILLERY explosion radius doubles.',
     apply: (s) => { addEffect(s, 'mine', 'wide'); },
   },
   {
     id: 'mn_cluster',
-    name: 'LOGIC MINE: CLUSTER CHARGE',
+    name: 'ARTILLERY: CLUSTER MUNITIONS',
     rarity: 'rare',
     category: 'upgrade',
     towerHint: 'mine',
-    description: 'LOGIC MINE detonation triggers 2 additional explosions nearby.',
+    description: 'Each ARTILLERY shot triggers 2 additional shells nearby.',
     apply: (s) => { addEffect(s, 'mine', 'cluster'); },
   },
   {
     id: 'mn_resupply',
-    name: 'LOGIC MINE: AUTO-RESUPPLY',
+    name: 'ARTILLERY: AUTO-LOADER',
     rarity: 'epic',
     category: 'upgrade',
     towerHint: 'mine',
-    description: '60% chance LOGIC MINE respawns after detonation.',
+    description: 'ARTILLERY fires 25% faster.',
     apply: (s) => { addEffect(s, 'mine', 'resupply'); },
   },
   {
     id: 'mn_stun',
-    name: 'LOGIC MINE: EMP CHARGE',
+    name: 'ARTILLERY: SHOCKWAVE SHELLS',
     rarity: 'rare',
     category: 'upgrade',
     towerHint: 'mine',
-    description: 'LOGIC MINE detonation stuns all enemies in blast radius for 1.2s.',
+    description: 'ARTILLERY explosions stun all enemies in blast for 1.2s.',
     apply: (s) => { addEffect(s, 'mine', 'stun'); },
   },
   {
     id: 'mn_armor_strip',
-    name: 'LOGIC MINE: ARMOR CRACK',
+    name: 'ARTILLERY: PENETRATOR SHELLS',
     rarity: 'epic',
     category: 'upgrade',
     towerHint: 'mine',
-    description: 'LOGIC MINE explosion strips 10 armor from all enemies in blast for 4s.',
+    description: 'ARTILLERY explosions strip 10 armor from all enemies in blast for 4s.',
     apply: (s) => { addEffect(s, 'mine', 'armor_strip'); },
   },
 
@@ -896,32 +896,32 @@ const UPGRADE: CardDef[] = [
     apply: (s) => { addEffect(s, 'railgun', 'charged_mega'); },
   },
 
-  // ===== NEW LOGIC MINE CARDS =====
+  // ===== NEW ARTILLERY CARDS =====
   {
-    id: 'mn_pressure_fuse', name: 'LOGIC MINE: PRESSURE FUSE', rarity: 'common', category: 'upgrade', towerHint: 'mine',
-    description: 'LOGIC MINE trigger range +0.4 cells.',
+    id: 'mn_pressure_fuse', name: 'ARTILLERY: ADVANCED TARGETING', rarity: 'common', category: 'upgrade', towerHint: 'mine',
+    description: 'ARTILLERY range +0.4 cells.',
     apply: (s) => { addEffect(s, 'mine', 'pressure_fuse'); },
   },
   {
-    id: 'mn_frag_kit', name: 'LOGIC MINE: FRAG KIT', rarity: 'rare', category: 'upgrade', towerHint: 'mine',
-    description: 'LOGIC MINE explosions scatter 3 mini-blasts in random directions (40% damage each).',
+    id: 'mn_frag_kit', name: 'ARTILLERY: FRAGMENTATION ROUNDS', rarity: 'rare', category: 'upgrade', towerHint: 'mine',
+    description: 'Each ARTILLERY shell scatters 3 mini-blasts (40% damage each).',
     apply: (s) => { addEffect(s, 'mine', 'frag_kit'); },
   },
   {
-    id: 'mn_nanobots', name: 'LOGIC MINE: NANOBOT CHARGE', rarity: 'rare', category: 'upgrade', towerHint: 'mine',
-    description: '35% chance mine leaves an acid puddle (3s, 12 dps) after detonation.',
+    id: 'mn_nanobots', name: 'ARTILLERY: NANOBOT PAYLOAD', rarity: 'rare', category: 'upgrade', towerHint: 'mine',
+    description: '35% chance ARTILLERY impact leaves an acid puddle (3s, 12 dps).',
     apply: (s) => { addEffect(s, 'mine', 'nanobots'); },
   },
   {
-    id: 'mn_demolition', name: 'LOGIC MINE: DEMOLITION', rarity: 'epic', category: 'upgrade', towerHint: 'mine',
+    id: 'mn_demolition', name: 'ARTILLERY: DEMOLITION WARHEAD', rarity: 'epic', category: 'upgrade', towerHint: 'mine',
     requires: ['mn_wide'],
-    description: '[Requires WIDE BLAST] Wide-radius explosions deal +35% damage.',
+    description: '[Requires HEAVY SHELLS] Wide-radius shells deal +35% damage.',
     apply: (s) => { addEffect(s, 'mine', 'demolition'); },
   },
   {
-    id: 'mn_chain_reaction', name: 'LOGIC MINE: CHAIN REACTION', rarity: 'epic', category: 'upgrade', towerHint: 'mine',
+    id: 'mn_chain_reaction', name: 'ARTILLERY: CHAIN DETONATION', rarity: 'epic', category: 'upgrade', towerHint: 'mine',
     requires: ['mn_cluster'],
-    description: '[Requires CLUSTER CHARGE] Cluster explosions deal full damage (was 80%).',
+    description: '[Requires CLUSTER MUNITIONS] Cluster shells deal full damage (was 70%).',
     apply: (s) => { addEffect(s, 'mine', 'chain_reaction'); },
   },
 
@@ -1129,7 +1129,7 @@ const UPGRADE: CardDef[] = [
   },
   {
     id: 'syn_hp_mn', name: 'VOLATILE MIXTURE', rarity: 'rare', category: 'upgrade', towerHint: 'honeypot', towerHint2: 'mine',
-    description: '[HONEYPOT + LOGIC MINE] LOGIC MINE explosions deal 2× damage to enemies inside HONEYPOT puddles.',
+    description: '[HONEYPOT + ARTILLERY] ARTILLERY shells deal +75% bonus damage to enemies inside HONEYPOT puddles.',
     apply: (s) => { addEffect(s, 'mine', 'volatile_mixture'); addEffect(s, 'honeypot', 'volatile_mixture'); },
   },
   {
@@ -1149,7 +1149,7 @@ const UPGRADE: CardDef[] = [
   },
   {
     id: 'syn_rl_mn', name: 'KINETIC MINE', rarity: 'rare', category: 'upgrade', towerHint: 'railgun', towerHint2: 'mine',
-    description: '[RAILGUN + LOGIC MINE] RAILGUN kills drop a LOGIC MINE token at the death location.',
+    description: '[RAILGUN + ARTILLERY] RAILGUN kills drop an ARTILLERY deploy token at the death location.',
     apply: (s) => { addEffect(s, 'railgun', 'kinetic_mine'); addEffect(s, 'mine', 'kinetic_mine'); },
   },
   {
@@ -1164,7 +1164,7 @@ const UPGRADE: CardDef[] = [
   },
   {
     id: 'syn_ch_mn', name: 'LIGHTNING ROD', rarity: 'rare', category: 'upgrade', towerHint: 'chain', towerHint2: 'mine',
-    description: '[CHAIN + LOGIC MINE] LOGIC MINE detonations trigger a 3-jump chain arc from the explosion center.',
+    description: '[CHAIN + ARTILLERY] ARTILLERY impacts trigger a 3-jump chain arc from the explosion center.',
     apply: (s) => { addEffect(s, 'mine', 'lightning_rod'); addEffect(s, 'chain', 'lightning_rod'); },
   },
   {

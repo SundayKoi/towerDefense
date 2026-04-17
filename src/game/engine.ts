@@ -248,7 +248,7 @@ function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
       // Ionic: ignore armor for EMP hits
       const savedArmor = e.armor;
       if (hasEffect(s, 'pulse', 'ionic')) e.armor = 0;
-      damageEnemy(s, e, baseDmg, false, 'energy');
+      damageEnemy(s, e, baseDmg, false, 'energy', false, 'pulse');
       if (hasEffect(s, 'pulse', 'ionic')) e.armor = savedArmor;
 
       // Stun effect
@@ -513,7 +513,9 @@ function tickFxOnly(s: RunState, dtSec: number): void {
 function effectiveRange(s: RunState, t: TowerInstance): number {
   const def = TOWERS[t.def];
   const specificRange = s.mods.towerRange[t.def] ?? 0;
-  return def.range * (1 + s.mods.globalRangePct + specificRange);
+  let r = def.range * (1 + s.mods.globalRangePct + specificRange);
+  if (t.def === 'mine' && hasEffect(s, 'mine', 'pressure_fuse')) r += 0.4;
+  return r;
 }
 
 function effectiveDamage(s: RunState, t: TowerInstance): number {
@@ -550,6 +552,8 @@ function effectiveFireRate(s: RunState, t: TowerInstance, dt = 0): number {
     ).length;
     rate += debuffedInRange * 0.5;
   }
+  // Artillery (mine) auto-loader: +25% fire rate
+  if (t.def === 'mine' && hasEffect(s, 'mine', 'resupply')) rate *= 1.25;
   // Firewall blazing: +25% fire rate during active window, tick timers
   if (t.def === 'firewall' && hasEffect(s, 'firewall', 'blazing')) {
     if (dt > 0) {
@@ -691,103 +695,12 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   }
   const dmg = isCrit ? baseDmg * critMult : baseDmg;
 
-  if (t.def === 'mine') {
-    let aoeRadius = 1.5;
-    if (hasEffect(s, 'mine', 'wide')) aoeRadius *= 2;
-    if (hasEffect(s, 'mine', 'ice_lance')) aoeRadius *= 1.2; // reuse ice_lance tag for mine? No — use separate mine tag
-    const wideDmgMult = (hasEffect(s, 'mine', 'wide') && hasEffect(s, 'mine', 'demolition')) ? 1.35 : 1.0;
-    const clusterDmgMult = hasEffect(s, 'mine', 'chain_reaction') ? 1.0 : 0.8;
-    // Volatile mixture: check if target is in honeypot puddle
-    const targetInPuddle = hasEffect(s, 'mine', 'volatile_mixture') &&
-      s.puddles.some((pu) => pu.fromTower === 'honeypot' && Math.hypot(target.pos.x - pu.pos.x, target.pos.y - pu.pos.y) <= pu.radius);
-    damageEnemy(s, target, dmg * 2.5 * wideDmgMult * (targetInPuddle ? 2 : 1), false, def.damageType);
-    for (const e of s.enemies) {
-      if (!e.alive || e.id === target.id) continue;
-      if (Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= aoeRadius) {
-        const eInPuddle = hasEffect(s, 'mine', 'volatile_mixture') &&
-          s.puddles.some((pu) => pu.fromTower === 'honeypot' && Math.hypot(e.pos.x - pu.pos.x, e.pos.y - pu.pos.y) <= pu.radius);
-        damageEnemy(s, e, dmg * 1.5 * wideDmgMult * (eInPuddle ? 2 : 1), false, def.damageType);
-        // Mine stun
-        if (hasEffect(s, 'mine', 'stun') && !ENEMIES[e.def].slowImmune) {
-          e.speedMult = 0;
-          e.slowTimer = Math.max(e.slowTimer, 1.2);
-        }
-        // Mine armor strip
-        if (hasEffect(s, 'mine', 'armor_strip')) {
-          e.armor = Math.max(0, e.armor - 10);
-        }
-      }
-    }
-    if (hasEffect(s, 'mine', 'stun') && !ENEMIES[target.def].slowImmune) {
-      target.speedMult = 0;
-      target.slowTimer = Math.max(target.slowTimer, 1.2);
-    }
-    if (hasEffect(s, 'mine', 'armor_strip')) {
-      target.armor = Math.max(0, target.armor - 10);
-    }
-    spawnExplosion(s, t.grid, '#ffd600', aoeRadius);
-    if (hasEffect(s, 'mine', 'cluster')) {
-      for (let i = 0; i < 2; i++) {
-        const offset = { x: t.grid.x + (Math.random() - 0.5) * 2, y: t.grid.y + (Math.random() - 0.5) * 2 };
-        spawnExplosion(s, offset, '#ffa000', aoeRadius * 0.6);
-        for (const e of s.enemies) {
-          if (!e.alive) continue;
-          if (Math.hypot(e.pos.x - offset.x, e.pos.y - offset.y) <= aoeRadius * 0.6) {
-            damageEnemy(s, e, dmg * clusterDmgMult, false, def.damageType);
-          }
-        }
-      }
-    }
-    // Frag kit: scatter 3 mini-blasts
-    if (hasEffect(s, 'mine', 'frag_kit')) {
-      for (let f = 0; f < 3; f++) {
-        const angle = Math.random() * Math.PI * 2;
-        const fragPos = { x: t.grid.x + Math.cos(angle) * 1.5, y: t.grid.y + Math.sin(angle) * 1.5 };
-        spawnExplosion(s, fragPos, '#ffaa00', aoeRadius * 0.5);
-        for (const e of s.enemies) {
-          if (!e.alive) continue;
-          if (Math.hypot(e.pos.x - fragPos.x, e.pos.y - fragPos.y) <= aoeRadius * 0.5) {
-            damageEnemy(s, e, dmg * 0.4, false, def.damageType);
-          }
-        }
-      }
-    }
-    const respawn = hasEffect(s, 'mine', 'resupply') && Math.random() < 0.6;
-    // Nanobots: 35% chance to leave acid puddle
-    if (hasEffect(s, 'mine', 'nanobots') && !respawn && Math.random() < 0.35) {
-      s.puddles.push({ pos: { x: t.grid.x, y: t.grid.y }, radius: 1.0, timeLeft: 3, maxTime: 3, slowPct: 0, slowDuration: 0, damagePerSec: 12, color: '#88ff00', fromTower: 'mine' });
-    }
-    // Lightning rod synergy: chain arc from explosion center
-    if (hasEffect(s, 'mine', 'lightning_rod')) {
-      const firstTarget = findChainTarget(s, { pos: { x: t.grid.x, y: t.grid.y } } as EnemyInstance, new Set(), 3.0);
-      if (firstTarget) {
-        s.projectiles.push({
-          id: nextId(),
-          pos: { x: t.grid.x, y: t.grid.y },
-          target: firstTarget.id,
-          targetPos: { x: firstTarget.pos.x, y: firstTarget.pos.y },
-          damage: 30,
-          speed: 20,
-          color: '#ffff00',
-          trailColor: '#ffdd00',
-          fromTower: 'chain',
-          damageType: 'chain',
-          chain: { jumps: 2, falloff: 1.0, hit: new Set([firstTarget.id]) },
-          trail: [],
-        });
-      }
-    }
-    if (!respawn) s.towers = s.towers.filter((x) => x.id !== t.id);
-    else { t.cooldown = 8; t.fireFlash = 0.15; }
-    audio.play('mine');
-    return;
-  }
-
   let aoe = def.aoe?.radius;
   if (t.def === 'ice' && aoe) {
     if (hasEffect(s, 'ice', 'wide')) aoe *= 1.7;
     if (hasEffect(s, 'ice', 'ice_lance')) aoe *= 1.2;
   }
+  if (t.def === 'mine' && aoe && hasEffect(s, 'mine', 'wide')) aoe *= 2;
 
   let chainJumps = def.chain?.jumps ?? 0;
   let chainFalloff = def.chain?.falloff ?? 0.8;
@@ -953,7 +866,7 @@ function updateProjectile(s: RunState, p: Projectile, dt: number): void {
       for (const e of s.enemies) {
         if (!e.alive) continue;
         if (Math.hypot(e.pos.x - tx, e.pos.y - ty) <= p.aoe) {
-          damageEnemy(s, e, p.damage, p.isCrit ?? false, p.damageType);
+          damageEnemy(s, e, p.damage, p.isCrit ?? false, p.damageType, false, p.fromTower);
         }
       }
     }
@@ -1142,14 +1055,14 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
 
   // Sniper overwatch_pen: +100% to marked
   if (p.fromTower === 'sniper' && hasEffect(s, 'sniper', 'overwatch_pen') && (target.marked ?? 0) > 0) {
-    damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType); // deal extra 100%
+    damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType, false, 'sniper'); // deal extra 100%
   }
 
   // Sniper execute: triple damage below 25% HP (deadeye raises to 35%)
   if (p.fromTower === 'sniper' && hasEffect(s, 'sniper', 'execute')) {
     const execThresh = hasEffect(s, 'sniper', 'deadeye') ? 0.35 : 0.25;
     if (target.hp / target.maxHp < execThresh) {
-      damageEnemy(s, target, p.damage * 2, p.isCrit ?? false, p.damageType);
+      damageEnemy(s, target, p.damage * 2, p.isCrit ?? false, p.damageType, false, 'sniper');
     }
   }
 
@@ -1158,7 +1071,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       (target.marked ?? 0) > 0 && !target.isBoss) {
     const oneshotThresh = hasEffect(s, 'sniper', 'apex_predator') ? 0.50 : 0.40;
     if (target.hp / target.maxHp < oneshotThresh) {
-      damageEnemy(s, target, target.hp * 10, true, p.damageType);
+      damageEnemy(s, target, target.hp * 10, true, p.damageType, false, 'sniper');
       s.floaters.push({ pos: { x: target.pos.x, y: target.pos.y - 0.4 }, text: 'ONE SHOT', vy: -30, life: 1.2, maxLife: 1.2, color: '#00ff88', size: 20 });
     }
   }
@@ -1215,7 +1128,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
 
   // Railgun overwatch_pen: +100% to marked
   if (p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'overwatch_pen') && (target.marked ?? 0) > 0) {
-    damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType);
+    damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType, false, 'railgun');
   }
 
   // Honeypot: drop a persistent slow puddle at impact point
@@ -1256,15 +1169,15 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       const shardDps = hasEffect(s, 'ice', 'cryo_nova') ? 8 : undefined;
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
-        s.puddles.push({ pos: { x: p.pos.x + Math.cos(a) * p.aoe * 0.8, y: p.pos.y + Math.sin(a) * p.aoe * 0.8 }, radius: 0.4, timeLeft: 2.0, maxTime: 2.0, slowPct: 0.35, slowDuration: 0.5, color: '#88eeff', damagePerSec: shardDps });
+        s.puddles.push({ pos: { x: p.pos.x + Math.cos(a) * p.aoe * 0.8, y: p.pos.y + Math.sin(a) * p.aoe * 0.8 }, radius: 0.4, timeLeft: 2.0, maxTime: 2.0, slowPct: 0.35, slowDuration: 0.5, color: '#88eeff', damagePerSec: shardDps, fromTower: 'ice' });
       }
     }
     // Glacial field: leave slow field in addition to other effects
     if (hasEffect(s, 'ice', 'glacial')) {
-      s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: p.aoe ?? 1.0, timeLeft: 3.0, maxTime: 3.0, slowPct: 0.25, slowDuration: 0.5, color: '#aaddff' });
+      s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: p.aoe ?? 1.0, timeLeft: 3.0, maxTime: 3.0, slowPct: 0.25, slowDuration: 0.5, color: '#aaddff', fromTower: 'ice' });
     }
     if (hasEffect(s, 'ice', 'permafrost')) {
-      s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 0.8, timeLeft: 3.0, maxTime: 3.0, slowPct: 0.20, slowDuration: 0.4, color: '#aaddff' });
+      s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 0.8, timeLeft: 3.0, maxTime: 3.0, slowPct: 0.20, slowDuration: 0.4, color: '#aaddff', fromTower: 'ice' });
     }
     // Avalanche: if target was fully stopped, bigger explosion
     if (hasEffect(s, 'ice', 'avalanche') && target.speedMult === 0 && p.aoe) {
@@ -1273,14 +1186,14 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       for (const e of s.enemies) {
         if (!e.alive || e.id === target.id) continue;
         if (Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) <= bigAoe) {
-          damageEnemy(s, e, p.damage * 2, p.isCrit ?? false, p.damageType);
+          damageEnemy(s, e, p.damage * 2, p.isCrit ?? false, p.damageType, false, 'ice');
         }
       }
       s.floaters.push({ pos: { x: p.pos.x, y: p.pos.y - 0.4 }, text: 'AVALANCHE!', vy: -28, life: 1.0, maxLife: 1.0, color: '#00aaff', size: 16 });
     }
     // Cryo break synergy: 2x damage to armor-stripped enemies
     if (hasEffect(s, 'ice', 'cryo_break') && target.armor < (ENEMIES[target.def].armor ?? 0)) {
-      damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType); // extra 100%
+      damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType, false, 'ice'); // extra 100%
     }
     // Flash freeze synergy: freeze enemies inside honeypot puddles
     if (hasEffect(s, 'ice', 'flash_freeze') && !ENEMIES[target.def].slowImmune) {
@@ -1314,7 +1227,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     for (const e of s.enemies) {
       if (!e.alive || e.id === target.id) continue;
       if (Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) <= 0.7) {
-        damageEnemy(s, e, p.damage * sabotMult, false, p.damageType);
+        damageEnemy(s, e, p.damage * sabotMult, false, p.damageType, false, 'railgun');
       }
     }
   }
@@ -1369,19 +1282,97 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     }
   }
 
+  // Artillery (mine) — apply stun/armor_strip/volatile to primary target too
+  if (p.fromTower === 'mine') {
+    if (hasEffect(s, 'mine', 'stun') && !ENEMIES[target.def].slowImmune) {
+      target.speedMult = 0;
+      target.slowTimer = Math.max(target.slowTimer, 1.2);
+    }
+    if (hasEffect(s, 'mine', 'armor_strip')) {
+      target.armor = Math.max(0, target.armor - 10);
+    }
+    if (hasEffect(s, 'mine', 'volatile_mixture') && target.alive) {
+      const inPuddle = s.puddles.some((pu) => pu.fromTower === 'honeypot' &&
+        Math.hypot(target.pos.x - pu.pos.x, target.pos.y - pu.pos.y) <= pu.radius);
+      if (inPuddle) damageEnemy(s, target, p.damage * 0.75, false, p.damageType, true, 'mine');
+    }
+  }
+
+  // Artillery (mine) effects on main impact
+  if (p.fromTower === 'mine' && p.aoe) {
+    const baseRad = p.aoe;
+    const wideMult = (hasEffect(s, 'mine', 'wide') && hasEffect(s, 'mine', 'demolition')) ? 1.35 : 1.0;
+    // Cluster: 2 additional shells land nearby
+    if (hasEffect(s, 'mine', 'cluster') && s.projectiles.length < 300) {
+      const clusterFull = hasEffect(s, 'mine', 'chain_reaction');
+      for (let i = 0; i < 2; i++) {
+        const ox = (Math.random() - 0.5) * 2;
+        const oy = (Math.random() - 0.5) * 2;
+        spawnExplosion(s, { x: p.pos.x + ox, y: p.pos.y + oy }, '#ffa000', baseRad * 0.7);
+        for (const e of s.enemies) {
+          if (!e.alive) continue;
+          if (Math.hypot(e.pos.x - (p.pos.x + ox), e.pos.y - (p.pos.y + oy)) <= baseRad * 0.7) {
+            damageEnemy(s, e, p.damage * (clusterFull ? 1.0 : 0.7) * wideMult, false, p.damageType, false, 'mine');
+          }
+        }
+      }
+    }
+    // Frag kit: 3 mini-blasts in random directions
+    if (hasEffect(s, 'mine', 'frag_kit')) {
+      for (let f = 0; f < 3; f++) {
+        const angle = Math.random() * Math.PI * 2;
+        const fpos = { x: p.pos.x + Math.cos(angle) * baseRad, y: p.pos.y + Math.sin(angle) * baseRad };
+        spawnExplosion(s, fpos, '#ffaa00', baseRad * 0.5);
+        for (const e of s.enemies) {
+          if (!e.alive) continue;
+          if (Math.hypot(e.pos.x - fpos.x, e.pos.y - fpos.y) <= baseRad * 0.5) {
+            damageEnemy(s, e, p.damage * 0.4, false, p.damageType, false, 'mine');
+          }
+        }
+      }
+    }
+    // Nanobots: acid puddle on impact
+    if (hasEffect(s, 'mine', 'nanobots') && Math.random() < 0.35 && s.puddles.length < 100) {
+      s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 1.0, timeLeft: 3, maxTime: 3, slowPct: 0, slowDuration: 0, damagePerSec: 12, color: '#88ff00', fromTower: 'mine' });
+    }
+    // Lightning rod synergy: chain arc from impact
+    if (hasEffect(s, 'mine', 'lightning_rod') && s.projectiles.length < 300) {
+      const firstTarget = findChainTarget(s, { pos: { x: p.pos.x, y: p.pos.y } } as EnemyInstance, new Set(), 3.0);
+      if (firstTarget) {
+        s.projectiles.push({
+          id: nextId(), pos: { x: p.pos.x, y: p.pos.y },
+          target: firstTarget.id, targetPos: { x: firstTarget.pos.x, y: firstTarget.pos.y },
+          damage: 30, speed: 20, color: '#ffff00', trailColor: '#ffdd00',
+          fromTower: 'chain', damageType: 'chain',
+          chain: { jumps: 2, falloff: 1.0, hit: new Set([firstTarget.id]) },
+          trail: [],
+        });
+      }
+    }
+  }
+
   if (p.aoe) {
+    const aoeDmgMult = (p.fromTower === 'mine' && hasEffect(s, 'mine', 'wide') && hasEffect(s, 'mine', 'demolition')) ? 1.35 : 1.0;
     spawnExplosion(s, { x: p.pos.x, y: p.pos.y }, p.color, p.aoe);
     for (const e of s.enemies) {
       if (!e.alive || e.id === target.id) continue;
       if (Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) <= p.aoe) {
-        damageEnemy(s, e, p.damage * 0.75, p.isCrit ?? false, p.damageType);
-        // Mine stun in AoE
-        if (p.fromTower === 'mine' && hasEffect(s, 'mine', 'stun') && !ENEMIES[e.def].slowImmune) {
-          e.speedMult = 0;
-          e.slowTimer = Math.max(e.slowTimer, 1.2);
-        }
-        if (p.fromTower === 'mine' && hasEffect(s, 'mine', 'armor_strip')) {
-          e.armor = Math.max(0, e.armor - 10);
+        damageEnemy(s, e, p.damage * 0.75 * aoeDmgMult, p.isCrit ?? false, p.damageType, false, p.fromTower);
+        // Artillery (internally 'mine') — special effects in AoE
+        if (p.fromTower === 'mine') {
+          if (hasEffect(s, 'mine', 'stun') && !ENEMIES[e.def].slowImmune) {
+            e.speedMult = 0;
+            e.slowTimer = Math.max(e.slowTimer, 1.2);
+          }
+          if (hasEffect(s, 'mine', 'armor_strip')) {
+            e.armor = Math.max(0, e.armor - 10);
+          }
+          // Volatile mixture synergy: 2x damage to enemies inside honeypot puddles
+          if (hasEffect(s, 'mine', 'volatile_mixture')) {
+            const inPuddle = s.puddles.some((pu) => pu.fromTower === 'honeypot' &&
+              Math.hypot(e.pos.x - pu.pos.x, e.pos.y - pu.pos.y) <= pu.radius);
+            if (inPuddle) damageEnemy(s, e, p.damage * 0.75, false, p.damageType, false, 'mine');
+          }
         }
       }
     }
