@@ -130,7 +130,7 @@ function updatePuddles(s: RunState, dt: number): void {
           e.slowTimer = Math.max(e.slowTimer, pu.slowDuration);
         }
         if (pu.damagePerSec) {
-          damageEnemy(s, e, pu.damagePerSec * dt, false, 'energy');
+          damageEnemy(s, e, pu.damagePerSec * dt, false, 'energy', true);
         }
       }
     }
@@ -173,8 +173,8 @@ function updateSentinelTower(s: RunState, t: TowerInstance, dt: number): void {
       e.slowTimer = Math.max(e.slowTimer, slowDur * 2);
     }
 
-    // Damage
-    damageEnemy(s, e, baseDps * dt, false, 'energy');
+    // Damage (silent — DoT numbers are visual noise)
+    damageEnemy(s, e, baseDps * dt, false, 'energy', true);
   }
 
   // Gentle fireFlash pulse for visual
@@ -1101,22 +1101,24 @@ function applyResistanceAndArmor(e: EnemyInstance, raw: number, type: DamageType
   return final;
 }
 
-export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: boolean, type: DamageType): void {
+export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: boolean, type: DamageType, silent = false): void {
   const def = ENEMIES[e.def];
   const final = applyResistanceAndArmor(e, dmg, type, isCrit);
   if (final <= 0) {
-    s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'IMMUNE', vy: -18, life: 0.8, maxLife: 0.8, color: '#6b8090', size: 12 });
+    if (!silent) s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'IMMUNE', vy: -18, life: 0.8, maxLife: 0.8, color: '#6b8090', size: 12 });
     e.hitFlash = 0.12;
     return;
   }
   e.hp -= final;
   e.hitFlash = 0.18;
-  const resist = def.resistances?.[type] ?? 1;
-  const isResisted = resist < 1 && !(isCrit && def.critIgnoresResist);
-  const isWeakness = resist > 1;
-  const text = isCrit ? `${Math.round(final)}!` : `${Math.round(final)}`;
-  const color = isCrit ? '#ffd600' : isWeakness ? '#00ff88' : isResisted ? '#6b8090' : '#ff2d95';
-  s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text, vy: -26, life: 0.8, maxLife: 0.8, color, size: isCrit ? 22 : isWeakness ? 18 : 16 });
+  if (!silent) {
+    const resist = def.resistances?.[type] ?? 1;
+    const isResisted = resist < 1 && !(isCrit && def.critIgnoresResist);
+    const isWeakness = resist > 1;
+    const text = isCrit ? `${Math.round(final)}!` : `${Math.round(final)}`;
+    const color = isCrit ? '#ffd600' : isWeakness ? '#00ff88' : isResisted ? '#6b8090' : '#ff2d95';
+    s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text, vy: -26, life: 0.8, maxLife: 0.8, color, size: isCrit ? 22 : isWeakness ? 18 : 16 });
+  }
   if (e.hp <= 0) killEnemy(s, e);
 }
 
