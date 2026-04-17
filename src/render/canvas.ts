@@ -703,7 +703,7 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
   if (sprite) {
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(e.angle);
+    ctx.rotate(e.angle + (def.spriteAngleOffset ?? 0));
     ctx.scale(scaleX, scaleY);
     ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
     ctx.restore();

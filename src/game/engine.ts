@@ -233,6 +233,16 @@ function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
   const range = effectiveRange(s, t) + (hasEffect(s, 'pulse', 'amplify') ? 0.6 : 0);
 
   if (t.cooldown <= 0) {
+    // Only fire if at least one enemy is in range — don't waste the visual burst on empty scans.
+    let anyInRange = false;
+    for (const e of s.enemies) {
+      if (!e.alive) continue;
+      if (Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= range) { anyInRange = true; break; }
+    }
+    if (!anyInRange) {
+      t.cooldown = 0.2; // short re-scan, no burst, no shake, no sound
+      return;
+    }
     t.extras.burstCount = (t.extras.burstCount ?? 0) + 1;
     const isOverload = hasEffect(s, 'pulse', 'overload') && t.extras.burstCount % 4 === 0;
     const dmgMult = isOverload ? 3.0 : 1.0;
@@ -310,10 +320,10 @@ function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
       }
     }
 
-    if (hitAny || true) {
-      // Visual burst ring
-      spawnExplosion(s, t.grid, TOWERS.pulse.projectileColor, range * 0.5);
-      t.fireFlash = 0.4;
+    if (hitAny) {
+      // Visual burst ring — use soft particle ring instead of spawnExplosion (no screen shake, no explode sound)
+      spawnPulseRing(s, t.grid, TOWERS.pulse.projectileColor, range);
+      t.fireFlash = 0.15;
       if (isOverload) {
         s.floaters.push({ pos: { x: t.grid.x, y: t.grid.y - 0.8 }, text: 'OVERLOAD!', vy: -28, life: 1.2, maxLife: 1.2, color: '#ffffff', size: 18 });
       }
@@ -1682,6 +1692,24 @@ function spawnExplosion(s: RunState, pos: Vec2, color: string, radius: number): 
   s.shakeTime = Math.max(s.shakeTime, 0.18);
   s.shakeAmp = Math.max(s.shakeAmp, 6);
   audio.play('explode');
+}
+
+// EMP-style expanding ring — no screen shake, no explode sound. Used by pulse tower.
+function spawnPulseRing(s: RunState, pos: Vec2, color: string, radius: number): void {
+  if (s.particles.length >= MAX_PARTICLES) return;
+  const count = Math.min(24, MAX_PARTICLES - s.particles.length);
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
+    const spd = radius * 3; // expand outward to fill radius over ~0.5s
+    s.particles.push({
+      pos: { x: pos.x, y: pos.y },
+      vel: { x: Math.cos(a) * spd, y: Math.sin(a) * spd },
+      life: 0.45,
+      maxLife: 0.45,
+      size: 3,
+      color,
+    });
+  }
 }
 
 function spawnDeathBurst(s: RunState, pos: Vec2, color: string, accent: string, count: number): void {

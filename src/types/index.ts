@@ -106,6 +106,9 @@ export interface EnemyDef {
   resistances?: Partial<Record<DamageType, number>>;
   // Crit ignores non-zero resistance? (Phantoms historically)
   critIgnoresResist?: boolean;
+  // Added to the render rotation so sprites drawn facing a non-east direction still point forward.
+  // π/2 for NORTH-facing sprites (most humanoid/insect designs), 0 for EAST-facing (worm, leech).
+  spriteAngleOffset?: number;
 }
 
 export interface CardDef {

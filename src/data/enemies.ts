@@ -19,6 +19,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   spider: {
     id: 'spider',
+    spriteAngleOffset: Math.PI / 2,
     name: 'CRAWLER',
     threat: 'LOW',
     hp: 16,
@@ -33,6 +34,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   trojan: {
     id: 'trojan',
+    spriteAngleOffset: Math.PI / 2,
     name: 'TROJAN',
     threat: 'MEDIUM',
     hp: 70,
@@ -65,6 +67,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   phantom: {
     id: 'phantom',
+    spriteAngleOffset: Math.PI / 2,
     name: 'PHANTOM',
     threat: 'HIGH',
     hp: 45,
@@ -81,6 +84,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   wraith: {
     id: 'wraith',
+    spriteAngleOffset: Math.PI / 2,
     name: 'WRAITH',
     threat: 'EXTREME',
     hp: 100,
@@ -112,6 +116,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   bomber: {
     id: 'bomber',
+    spriteAngleOffset: Math.PI / 2,
     name: 'BOMBER',
     threat: 'HIGH',
     hp: 60,
@@ -127,6 +132,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   stealth: {
     id: 'stealth',
+    spriteAngleOffset: Math.PI / 2,
     name: 'GHOST',
     threat: 'HIGH',
     hp: 50,
@@ -143,6 +149,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   kernel: {
     id: 'kernel',
+    spriteAngleOffset: Math.PI / 2,
     name: 'KERNEL',
     threat: 'BOSS',
     hp: 900,
@@ -160,6 +167,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   daemon: {
     id: 'daemon',
+    spriteAngleOffset: Math.PI / 2,
     name: 'DAEMON',
     threat: 'BOSS',
     hp: 650,
@@ -195,6 +203,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   voidlord: {
     id: 'voidlord',
+    spriteAngleOffset: Math.PI / 2,
     name: 'VOID LORD',
     threat: 'FINAL',
     hp: 4500,
@@ -214,6 +223,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   swarm: {
     id: 'swarm',
+    spriteAngleOffset: Math.PI / 2,
     name: 'SWARM QUEEN',
     threat: 'MEGA',
     hp: 1200,
@@ -262,6 +272,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   juggernaut: {
     id: 'juggernaut',
+    spriteAngleOffset: Math.PI / 2,
     name: 'JUGGERNAUT',
     threat: 'HIGH',
     hp: 280,
@@ -278,6 +289,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   parasite: {
     id: 'parasite',
+    spriteAngleOffset: Math.PI / 2,
     name: 'PARASITE',
     threat: 'HIGH',
     hp: 35,
