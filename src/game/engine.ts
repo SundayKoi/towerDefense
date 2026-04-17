@@ -285,7 +285,7 @@ function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
       }
 
       // Storm pulse synergy: trigger chain arc on each hit
-      if (hasEffect(s, 'pulse', 'storm_pulse')) {
+      if (hasEffect(s, 'pulse', 'storm_pulse') && s.projectiles.length < 300) {
         const chainT = s.towers.find((tw) => tw.def === 'chain');
         if (chainT) {
           const hit = new Set<number>([e.id]);
@@ -474,6 +474,13 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
   for (let i = s.enemies.length - 1; i >= 0; i--) { if (!s.enemies[i].alive) s.enemies.splice(i, 1); }
   for (let i = s.projectiles.length - 1; i >= 0; i--) { if (s.projectiles[i].target === -2) s.projectiles.splice(i, 1); }
 
+  // Hard caps — trim oldest to prevent unbounded growth (chain persistence, incendiary puddles, etc.)
+  if (s.puddles.length > 100) s.puddles.splice(0, s.puddles.length - 100);
+  if (s.projectiles.length > 350) s.projectiles.splice(0, s.projectiles.length - 350);
+  if (s.floaters.length > 60) s.floaters.splice(0, s.floaters.length - 60);
+  // Trim projectile trails aggressively in case any leak past the per-frame shift
+  for (const p of s.projectiles) { if (p.trail.length > 8) p.trail.length = 6; }
+
   tickFxOnly(s, dtSec);
 
   if (s.pendingLevelUps > 0) {
@@ -515,9 +522,16 @@ function effectiveDamage(s: RunState, t: TowerInstance): number {
   let dmg = def.damage * (1 + s.mods.globalDamagePct + specific);
   if (t.debuffs.some((d) => d.kind === 'infected')) dmg *= 0.55;
   // Exotic redundancy: 4+ different tower types placed = +20% global damage
-  if (s.cardsPicked.includes('exotic_redundancy')) {
-    const placedTypes = new Set(s.towers.map((tw) => tw.def));
-    if (placedTypes.size >= 4) dmg *= 1.2;
+  // Count unique tower types without allocating a Set.
+  if (s.cardsPicked.includes('exotic_redundancy') && s.towers.length >= 4) {
+    let unique = 0;
+    for (let i = 0; i < s.towers.length; i++) {
+      const id = s.towers[i].def;
+      let seen = false;
+      for (let j = 0; j < i; j++) { if (s.towers[j].def === id) { seen = true; break; } }
+      if (!seen) unique++;
+      if (unique >= 4) { dmg *= 1.2; break; }
+    }
   }
   return dmg;
 }
@@ -1377,7 +1391,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
   }
 
   // Chain persistence: electric burn puddle at hit point
-  if (p.fromTower === 'chain' && hasEffect(s, 'chain', 'persistence')) {
+  if (p.fromTower === 'chain' && hasEffect(s, 'chain', 'persistence') && s.puddles.length < 100) {
     s.puddles.push({ pos: { x: target.pos.x, y: target.pos.y }, radius: 0.35, timeLeft: 0.6, maxTime: 0.6, slowPct: 0, slowDuration: 0, damagePerSec: 10, color: '#ffff44', fromTower: 'chain' });
   }
 
@@ -1411,7 +1425,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       const jumpNum = (p.chain.hit.size); // approximate jump number
       const overchargeMult = hasEffect(s, 'chain', 'overcharge') ? (1 + 0.20 * jumpNum) : 1;
       // Tesla coil: leave electric puddle at each arc hit (megavolt only)
-      if (hasEffect(s, 'chain', 'tesla_coil')) {
+      if (hasEffect(s, 'chain', 'tesla_coil') && s.puddles.length < 100) {
         s.puddles.push({ pos: { x: target.pos.x, y: target.pos.y }, radius: 0.4, timeLeft: 0.6, maxTime: 0.6, slowPct: 0, slowDuration: 0, damagePerSec: 15, color: '#ffffff', fromTower: 'chain' });
       }
       s.projectiles.push({
