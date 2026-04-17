@@ -147,7 +147,7 @@ function updatePuddles(s: RunState, dt: number): void {
         for (const e of s.enemies) {
           if (!e.alive) continue;
           if (Math.hypot(e.pos.x - pu.pos.x, e.pos.y - pu.pos.y) <= pu.radius) {
-            damageEnemy(s, e, 30, false, 'aoe');
+            damageEnemy(s, e, 30, false, 'aoe', false, 'honeypot');
           }
         }
       }
@@ -456,9 +456,9 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       continue;
     }
     if (t.def === 'pulse') {
-      // debuff ticking
+      // debuff ticking (in-place splice to avoid per-frame array allocation)
       for (const d of t.debuffs) d.timeLeft -= dtSec;
-      t.debuffs = t.debuffs.filter((d) => d.timeLeft > 0);
+      for (let i = t.debuffs.length - 1; i >= 0; i--) { if (t.debuffs[i].timeLeft <= 0) t.debuffs.splice(i, 1); }
       updatePulseTower(s, t, dtSec);
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
       continue;
@@ -583,7 +583,8 @@ export function applyTowerDebuff(s: RunState, t: TowerInstance, kind: 'jammed' |
 
 function updateTower(s: RunState, t: TowerInstance, dt: number): void {
   for (const d of t.debuffs) d.timeLeft -= dt;
-  t.debuffs = t.debuffs.filter((d) => d.timeLeft > 0);
+  // In-place splice to avoid per-frame array allocation per tower
+  for (let i = t.debuffs.length - 1; i >= 0; i--) { if (t.debuffs[i].timeLeft <= 0) t.debuffs.splice(i, 1); }
   t.cooldown = Math.max(0, t.cooldown - dt);
 
   // Quantum observer: charge idle time for extra crit mult
@@ -1547,7 +1548,7 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
         for (const other of s.enemies) {
           if (!other.alive) continue;
           if (Math.hypot(other.pos.x - e.pos.x, other.pos.y - e.pos.y) <= pu.radius * 1.5) {
-            damageEnemy(s, other, 80, false, 'aoe');
+            damageEnemy(s, other, 80, false, 'aoe', false, 'honeypot');
           }
         }
         // Chain goo: leave a puddle at detonation point
@@ -1610,10 +1611,16 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
       av.extras.killStreak = (av.extras.killStreak ?? 0) + 1;
       if (av.extras.killStreak >= 3) {
         av.extras.killStreak = 0;
-        // Find nearest enemy and fire a free crit at it
-        const nearest = s.enemies
-          .filter((e2) => e2.alive)
-          .sort((a, b) => Math.hypot(a.pos.x - av.grid.x, a.pos.y - av.grid.y) - Math.hypot(b.pos.x - av.grid.x, b.pos.y - av.grid.y))[0];
+        // Find nearest enemy via single-pass (avoid filter+sort allocation)
+        let nearest: EnemyInstance | null = null;
+        let nearestDistSq = Infinity;
+        for (const e2 of s.enemies) {
+          if (!e2.alive) continue;
+          const dx = e2.pos.x - av.grid.x;
+          const dy = e2.pos.y - av.grid.y;
+          const dsq = dx * dx + dy * dy;
+          if (dsq < nearestDistSq) { nearestDistSq = dsq; nearest = e2; }
+        }
         if (nearest) {
           const def2 = TOWERS.antivirus;
           s.projectiles.push({

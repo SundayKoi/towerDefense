@@ -105,6 +105,13 @@ let runHandles: GameScreenHandles | null = null;
 let hoverCell: { x: number; y: number } | null = null;
 let lastFrame = 0;
 let rafId = 0;
+// Cleanup callbacks registered by wireGameScreen — run on finishRun to release listeners/observers.
+let runCleanups: Array<() => void> = [];
+
+function runRunCleanups() {
+  for (const fn of runCleanups) { try { fn(); } catch {} }
+  runCleanups = [];
+}
 
 function startRun(mapId: string, difficulty: Difficulty) {
   save.stats.totalRuns += 1;
@@ -152,12 +159,17 @@ function wireGameScreen() {
   };
   doResize();
   requestAnimationFrame(() => { doResize(); requestAnimationFrame(doResize); });
-  setTimeout(doResize, 50);
-  setTimeout(doResize, 200);
+  const t1 = setTimeout(doResize, 50);
+  const t2 = setTimeout(doResize, 200);
+  runCleanups.push(() => clearTimeout(t1));
+  runCleanups.push(() => clearTimeout(t2));
   window.addEventListener('resize', doResize);
+  runCleanups.push(() => window.removeEventListener('resize', doResize));
   if (typeof ResizeObserver !== 'undefined') {
-    new ResizeObserver(doResize).observe(wrap);
-    new ResizeObserver(doResize).observe(document.documentElement);
+    const ro1 = new ResizeObserver(doResize); ro1.observe(wrap);
+    const ro2 = new ResizeObserver(doResize); ro2.observe(document.documentElement);
+    runCleanups.push(() => ro1.disconnect());
+    runCleanups.push(() => ro2.disconnect());
   }
   (wireGameScreen as any).__doResize = doResize;
 
@@ -270,11 +282,14 @@ function wireGameScreen() {
     }
   };
 
-  h.canvas.addEventListener('pointerdown', onTap);
-  h.canvas.addEventListener('pointermove', (e) => {
+  const onMove = (e: PointerEvent) => {
     const rect = h.canvas.getBoundingClientRect();
     hoverCell = { x: Math.floor((e.clientX - rect.left) / vp.cellSize), y: Math.floor((e.clientY - rect.top) / vp.cellSize) };
-  });
+  };
+  h.canvas.addEventListener('pointerdown', onTap);
+  h.canvas.addEventListener('pointermove', onMove);
+  runCleanups.push(() => h.canvas.removeEventListener('pointerdown', onTap));
+  runCleanups.push(() => h.canvas.removeEventListener('pointermove', onMove));
 
   (wireGameScreen as any).__vp = vp;
 }
@@ -361,11 +376,13 @@ function pauseRun() {
       if (!run) return;
       const mid = run.mapId, d = run.difficulty;
       cancelAnimationFrame(rafId);
+      runRunCleanups();
       run = null; runHandles = null;
       startRun(mid, d);
     },
     () => {
       cancelAnimationFrame(rafId);
+      runRunCleanups();
       run = null; runHandles = null;
       showMapSelect();
     },
@@ -454,10 +471,12 @@ function finishRun(victory: boolean) {
   openGameOver(run, victory, () => {
     const mid = run!.mapId, d = run!.difficulty;
     cancelAnimationFrame(rafId);
+    runRunCleanups();
     run = null; runHandles = null;
     startRun(mid, d);
   }, () => {
     cancelAnimationFrame(rafId);
+    runRunCleanups();
     run = null; runHandles = null;
     showMapSelect();
   });
