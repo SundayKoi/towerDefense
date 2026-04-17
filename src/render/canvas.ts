@@ -1013,28 +1013,75 @@ function drawSentinelAura(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: 
   const cy = t.grid.y * cs + cs / 2;
   const def = TOWERS[t.def];
   const range = def.range * cs;
+  const col = def.accentColor;
   ctx.save();
-  const pulse = 0.35 + 0.15 * Math.sin(s.elapsed * 2.2 + t.id);
-  ctx.globalAlpha = pulse;
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, range);
-  grad.addColorStop(0, def.accentColor + '40');
-  grad.addColorStop(0.5, def.accentColor + '20');
-  grad.addColorStop(1, 'transparent');
-  ctx.fillStyle = grad;
+
+  // Affected grid cells — subtle tint so you can see which squares are in the field
+  const map = getMap(s.mapId);
+  const cellR = Math.ceil(def.range) + 1;
+  ctx.globalAlpha = 0.07;
+  ctx.fillStyle = col;
+  for (let dx = -cellR; dx <= cellR; dx++) {
+    for (let dy = -cellR; dy <= cellR; dy++) {
+      const gx = t.grid.x + dx;
+      const gy = t.grid.y + dy;
+      if (gx < 0 || gy < 0 || gx >= map.cols || gy >= map.rows) continue;
+      const dist = Math.sqrt((dx + 0.5) ** 2 + (dy + 0.5) ** 2);
+      if (dist > def.range) continue;
+      ctx.fillRect(gx * cs + 1, gy * cs + 1, cs - 2, cs - 2);
+    }
+  }
+
+  // Radar sweep — single bright arc rotating around the field
+  const sweepAngle = (s.elapsed * 1.4 + t.id) % (Math.PI * 2);
+  ctx.globalAlpha = 1;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(sweepAngle);
+  const sweepGrad = ctx.createLinearGradient(0, 0, range, 0);
+  sweepGrad.addColorStop(0, col + '00');
+  sweepGrad.addColorStop(0.6, col + '18');
+  sweepGrad.addColorStop(1, col + '00');
+  ctx.fillStyle = sweepGrad;
+  ctx.globalAlpha = 0.55;
   ctx.beginPath();
-  ctx.arc(cx, cy, range, 0, Math.PI * 2);
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, range, -0.45, 0.45);
+  ctx.closePath();
   ctx.fill();
-  // Pulsing border
-  ctx.globalAlpha = pulse * 0.6;
-  ctx.strokeStyle = def.accentColor;
+  ctx.restore();
+
+  // Range border — two concentric rings for depth
+  ctx.shadowColor = col;
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = col;
   ctx.lineWidth = 1.5;
-  ctx.shadowColor = def.accentColor;
-  ctx.shadowBlur = 10;
-  ctx.setLineDash([4, 4]);
+  ctx.globalAlpha = 0.5 + 0.2 * Math.sin(s.elapsed * 2.5 + t.id);
+  ctx.setLineDash([5, 5]);
+  ctx.lineDashOffset = -(s.elapsed * 18) % 10;
   ctx.beginPath();
   ctx.arc(cx, cy, range, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.globalAlpha = 0.2;
+  ctx.lineWidth = 1;
   ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, range * 0.6, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Tick marks on the border ring for a "sensor" feel
+  ctx.globalAlpha = 0.6;
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 6;
+  ctx.setLineDash([]);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + s.elapsed * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * (range - 5), cy + Math.sin(a) * (range - 5));
+    ctx.lineTo(cx + Math.cos(a) * (range + 3), cy + Math.sin(a) * (range + 3));
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 

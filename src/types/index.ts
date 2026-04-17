@@ -258,6 +258,12 @@ export interface MetaBoosts {
   extraRerolls: number;          // free rerolls granted per draft
   xpBoostPct: number;            // bonus XP from kills
   startingDeployTokens: Partial<Record<TowerId, number>>; // deploy tokens granted at run start
+  // Augments
+  hasRevive: boolean;            // survive one lethal hit per run
+  enemySpeedDebuff: number;      // reduce all enemy speed by this fraction
+  hpRegenPerWave: number;        // HP restored each wave cleared
+  globalArmorReduction: number;  // subtract from every enemy's spawn armor
+  bossProtocolBonus: number;     // extra protocols per boss kill
 }
 
 export interface SaveData {
@@ -337,6 +343,8 @@ export interface RunState {
     towerRate: Partial<Record<TowerId, number>>;
     towerCrit: Partial<Record<TowerId, number>>;
     revive: boolean;
+    globalArmorReduction: number;
+    bossProtocolBonus: number;
   };
   // Draft state
   showDraft: boolean;

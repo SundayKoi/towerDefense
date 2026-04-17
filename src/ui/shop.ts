@@ -17,7 +17,7 @@ function shopScreen(save: SaveData, persist: () => void, onBack: () => void): Sc
     const render = () => {
       const catLabels: Record<string, string> = {
         power: 'COMBAT',
-        loadout: 'LOADOUT',
+        loadout: 'AUGMENTS',
         economy: 'ECONOMY',
         utility: 'UTILITY',
       };

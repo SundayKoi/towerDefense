@@ -315,8 +315,10 @@ function startLoop() {
         onLevelUp: () => openLevelUpDraft(),
         onWaveCleared: () => {
           if (!run) return;
-          const bonus = save.metaBoosts.bonusProtocolsPerWave ?? 0;
-          if (bonus > 0) run.protocolsEarned += bonus;
+          const protoBonus = save.metaBoosts.bonusProtocolsPerWave ?? 0;
+          if (protoBonus > 0) run.protocolsEarned += protoBonus;
+          const hpRegen = save.metaBoosts.hpRegenPerWave ?? 0;
+          if (hpRegen > 0) run.hp = Math.min(run.maxHp, run.hp + hpRegen);
         },
         onNewEnemy: (defId) => showEnemyIntroBanner(defId),
         onAutoStart: () => {

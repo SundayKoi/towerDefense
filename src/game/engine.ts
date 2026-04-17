@@ -42,7 +42,8 @@ export function endWave(s: RunState, events: EngineEvents): void {
   const bonus = 25 + s.wave * 8;
   grantXp(s, bonus);
   const isBoss = bossForWave(getMap(s.mapId), s.difficulty, s.wave) != null;
-  const proto = isBoss ? 3 : 1;
+  const bossBonus = isBoss ? (s.mods.bossProtocolBonus ?? 0) : 0;
+  const proto = (isBoss ? 3 : 1) + bossBonus;
   s.protocolsEarned += proto;
   s.floaters.push({ pos: { x: 0, y: -0.5 }, text: `+${proto} \u2b22 PROTOCOL`, vy: -18, life: 2, maxLife: 2, color: '#ffd600', size: 16 });
   s.floaters.push({ pos: { x: 0, y: 0 }, text: `+${bonus} XP`, vy: -20, life: 2, maxLife: 2, color: '#00fff0', size: 28 });
@@ -92,7 +93,7 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
     baseSpeed: speed,
     speedMult: 1,
     slowTimer: 0,
-    armor: def.armor ?? 0,
+    armor: Math.max(0, (def.armor ?? 0) - (s.mods.globalArmorReduction ?? 0)),
     alive: true,
     isBoss: isBoss || def.threat === 'BOSS' || def.threat === 'MEGA' || def.threat === 'FINAL',
     size: def.size,
