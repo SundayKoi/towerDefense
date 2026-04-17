@@ -113,6 +113,22 @@ function grantXp(s: RunState, amount: number): void {
   }
 }
 
+// ======================= Puddles =======================
+
+function updatePuddles(s: RunState, dt: number): void {
+  for (const pu of s.puddles) {
+    pu.timeLeft -= dt;
+    for (const e of s.enemies) {
+      if (!e.alive || ENEMIES[e.def].slowImmune) continue;
+      if (Math.hypot(e.pos.x - pu.pos.x, e.pos.y - pu.pos.y) <= pu.radius) {
+        e.speedMult = Math.min(e.speedMult, 1 - pu.slowPct);
+        e.slowTimer = Math.max(e.slowTimer, pu.slowDuration);
+      }
+    }
+  }
+  s.puddles = s.puddles.filter((pu) => pu.timeLeft > 0);
+}
+
 // ======================= Update =======================
 
 export function updateRun(s: RunState, dtSec: number, events: EngineEvents): void {
@@ -161,6 +177,19 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     e.pos.x = pos.x;
     e.pos.y = pos.y;
     e.angle = pos.angle;
+    // Rootkit: periodically infects nearby towers.
+    if (e.def === 'rootkit') {
+      e.debuffTimer = (e.debuffTimer ?? 4) - dtSec;
+      if (e.debuffTimer <= 0) {
+        e.debuffTimer = 4;
+        for (const t of s.towers) {
+          if (Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) <= 2.5) {
+            applyTowerDebuff(s, t, 'infected', 5);
+          }
+        }
+      }
+    }
+
     const total = pathLength(path);
     if (e.progress >= total) {
       const dmg = ENEMIES[e.def].damage;
@@ -192,6 +221,9 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       }
     }
   }
+
+  // Puddle updates
+  updatePuddles(s, dtSec);
 
   // Tower updates
   for (const t of s.towers) {
@@ -246,16 +278,37 @@ function effectiveRange(s: RunState, t: TowerInstance): number {
 function effectiveDamage(s: RunState, t: TowerInstance): number {
   const def = TOWERS[t.def];
   const specific = s.mods.towerDmg[t.def] ?? 0;
-  return def.damage * (1 + s.mods.globalDamagePct + specific);
+  let dmg = def.damage * (1 + s.mods.globalDamagePct + specific);
+  if (t.debuffs.some((d) => d.kind === 'infected')) dmg *= 0.55;
+  return dmg;
 }
 
 function effectiveFireRate(s: RunState, t: TowerInstance): number {
   const def = TOWERS[t.def];
   const specificRate = s.mods.towerRate[t.def] ?? 0;
-  return def.fireRate * (1 + s.mods.globalRatePct + specificRate);
+  let rate = def.fireRate * (1 + s.mods.globalRatePct + specificRate);
+  if (t.debuffs.some((d) => d.kind === 'jammed')) rate *= 0.35;
+  return rate;
+}
+
+function applyTowerDebuff(s: RunState, t: TowerInstance, kind: 'jammed' | 'infected', duration: number): void {
+  const existing = t.debuffs.find((d) => d.kind === kind);
+  if (existing) { existing.timeLeft = Math.max(existing.timeLeft, duration); return; }
+  t.debuffs.push({ kind, timeLeft: duration });
+  s.floaters.push({
+    pos: { x: t.pos.x, y: t.pos.y - 0.6 },
+    text: kind === 'jammed' ? 'JAMMED' : 'INFECTED',
+    vy: -22,
+    life: 1.2,
+    maxLife: 1.2,
+    color: kind === 'jammed' ? '#ff6b00' : '#a800ff',
+    size: 14,
+  });
 }
 
 function updateTower(s: RunState, t: TowerInstance, dt: number): void {
+  for (const d of t.debuffs) d.timeLeft -= dt;
+  t.debuffs = t.debuffs.filter((d) => d.timeLeft > 0);
   t.cooldown = Math.max(0, t.cooldown - dt);
   const range = effectiveRange(s, t);
   let best: EnemyInstance | null = null;
@@ -330,6 +383,29 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
     trail: [],
   };
   s.projectiles.push(proj);
+
+  // Antivirus: fire a second projectile at the next nearest enemy in range.
+  if (t.def === 'antivirus') {
+    const range = effectiveRange(s, t);
+    let second: EnemyInstance | null = null;
+    let bestD = Infinity;
+    for (const e of s.enemies) {
+      if (!e.alive || e.id === target.id) continue;
+      const d = Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y);
+      if (d <= range && d < bestD) { second = e; bestD = d; }
+    }
+    const p2target = second ?? target;
+    s.projectiles.push({
+      ...proj,
+      id: nextId(),
+      pos: { x: t.grid.x + 0.12, y: t.grid.y - 0.12 },
+      target: p2target.id,
+      targetPos: { x: p2target.pos.x, y: p2target.pos.y },
+      damage: dmg * 0.7,
+      trail: [],
+    });
+  }
+
   audio.play('fire_' + t.def);
 }
 
@@ -377,6 +453,10 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
   if (p.slow && !ENEMIES[target.def].slowImmune) {
     target.speedMult = Math.min(target.speedMult, 1 - p.slow.pct);
     target.slowTimer = Math.max(target.slowTimer, p.slow.duration);
+  }
+  // Honeypot: drop a persistent slow puddle at impact point.
+  if (p.fromTower === 'honeypot') {
+    s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 1.1, timeLeft: 3.2, maxTime: 3.2, slowPct: 0.4, slowDuration: 0.6 });
   }
   if (p.aoe) {
     spawnExplosion(s, { x: p.pos.x, y: p.pos.y }, p.color, p.aoe);
@@ -487,6 +567,14 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
     s.shakeAmp = 16;
     s.protocolsEarned += 5;
   }
+  // Phantom death: EMP burst jams nearby towers for 3s.
+  if (e.def === 'phantom') {
+    for (const t of s.towers) {
+      if (Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) <= 3.5) {
+        applyTowerDebuff(s, t, 'jammed', 3);
+      }
+    }
+  }
 }
 
 function spawnExplosion(s: RunState, pos: Vec2, color: string, radius: number): void {
@@ -548,6 +636,7 @@ export function placeTower(s: RunState, defId: keyof typeof TOWERS, grid: Vec2):
     angle: 0,
     fireFlash: 0,
     targetMode: defaultTargetMode(defId),
+    debuffs: [],
   };
   s.towers.push(t);
   audio.play('place');

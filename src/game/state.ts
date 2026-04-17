@@ -7,7 +7,7 @@ export const SAVE_KEY = 'netrunner_meta_v1';
 
 // XP threshold for reaching (level+1). Exponential-ish so early levels come fast, late ones earn more.
 export function xpForLevel(level: number): number {
-  return Math.round(30 + level * 12);
+  return Math.round(40 + level * 16);
 }
 
 export function defaultSave(): SaveData {
@@ -135,5 +135,6 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     pendingLevelUps: 0,
     cardsPicked: [],
     autoStartTimer: null,
+    puddles: [],
   };
 }

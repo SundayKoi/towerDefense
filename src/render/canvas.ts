@@ -167,8 +167,11 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
     drawPlacementGhost(ctx, vp, hoverCell, def.id, def.range * (1 + s.mods.globalRangePct), valid);
   }
 
+  // Puddles (under towers/enemies)
+  drawPuddles(ctx, vp, s);
+
   // Towers
-  for (const t of s.towers) drawTower(ctx, vp, t);
+  for (const t of s.towers) { drawTower(ctx, vp, t); drawTowerDebuffs(ctx, vp, t, s.elapsed); }
 
   // Enemies
   for (const e of s.enemies) drawEnemy(ctx, vp, e, s.elapsed);
@@ -439,6 +442,35 @@ function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerIn
   ctx.restore();
 }
 
+function drawTowerDebuffs(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerInstance, elapsed: number): void {
+  if (t.debuffs.length === 0) return;
+  const cs = vp.cellSize;
+  const cx = t.grid.x * cs + cs / 2;
+  const cy = t.grid.y * cs + cs / 2;
+  ctx.save();
+  const pulse = 0.6 + 0.4 * Math.abs(Math.sin(elapsed * 5));
+  for (let i = 0; i < t.debuffs.length; i++) {
+    const d = t.debuffs[i];
+    const color = d.kind === 'jammed' ? '#ff6b00' : '#a800ff';
+    ctx.globalAlpha = pulse * 0.8;
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cs * 0.52 + i * 4, 0, Math.PI * 2);
+    ctx.stroke();
+    // Icon label
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = color;
+    ctx.font = `bold ${Math.round(cs * 0.28)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 6;
+    ctx.fillText(d.kind === 'jammed' ? '⚡' : '☣', cx, cy - cs * 0.4 - i * 10);
+  }
+  ctx.restore();
+}
+
 function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyInstance, t: number): void {
   const cs = vp.cellSize;
   // Walk bob — vertical sine offset based on progress for a lively gait. Bosses bob slower/bigger.
@@ -518,27 +550,139 @@ function drawProjectile(ctx: CanvasRenderingContext2D, vp: RenderViewport, p: Pr
   const cx = p.pos.x * cs + cs / 2;
   const cy = p.pos.y * cs + cs / 2;
   ctx.save();
-  // Trail
-  ctx.strokeStyle = p.trailColor;
-  ctx.lineWidth = 3;
-  ctx.globalAlpha = 0.6;
-  ctx.beginPath();
-  for (let i = 0; i < p.trail.length; i++) {
-    const pt = p.trail[i];
-    const x = pt.x * cs + cs / 2;
-    const y = pt.y * cs + cs / 2;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+
+  if (p.fromTower === 'honeypot') {
+    // Honeypot: fat green blob with a thick dripping trail
+    if (p.trail.length > 0) {
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = p.trailColor;
+      ctx.globalAlpha = 0.45;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      const tp0 = p.trail[0];
+      ctx.moveTo(tp0.x * cs + cs / 2, tp0.y * cs + cs / 2);
+      for (let i = 1; i < p.trail.length; i++) {
+        const tp = p.trail[i];
+        ctx.lineTo(tp.x * cs + cs / 2, tp.y * cs + cs / 2);
+      }
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+  } else if (p.fromTower === 'chain') {
+    // Chain: electric zigzag bolt along the trail
+    if (p.trail.length > 0) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = 0.9;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      const t0 = p.trail[0];
+      ctx.moveTo(t0.x * cs + cs / 2, t0.y * cs + cs / 2);
+      for (let i = 1; i < p.trail.length; i++) {
+        const tp = p.trail[i];
+        const mx = tp.x * cs + cs / 2 + (Math.random() - 0.5) * 8;
+        const my = tp.y * cs + cs / 2 + (Math.random() - 0.5) * 8;
+        ctx.lineTo(mx, my);
+      }
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+  } else if (p.fromTower === 'railgun') {
+    // Railgun: long bright beam streak
+    if (p.trail.length > 0) {
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = 0.85;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 20;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      const r0 = p.trail[0];
+      ctx.moveTo(r0.x * cs + cs / 2, r0.y * cs + cs / 2);
+      for (let i = 1; i < p.trail.length; i++) {
+        const rp = p.trail[i];
+        ctx.lineTo(rp.x * cs + cs / 2, rp.y * cs + cs / 2);
+      }
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+  } else {
+    // Default: standard colored dot with trail
+    ctx.strokeStyle = p.trailColor;
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    for (let i = 0; i < p.trail.length; i++) {
+      const pt = p.trail[i];
+      const x = pt.x * cs + cs / 2;
+      const y = pt.y * cs + cs / 2;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.lineTo(cx, cy);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, p.isCrit ? 5 : 3.5, 0, Math.PI * 2);
+    ctx.fill();
   }
-  ctx.lineTo(cx, cy);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  // Head
-  ctx.shadowColor = p.color;
-  ctx.shadowBlur = 12;
-  ctx.fillStyle = p.color;
-  ctx.beginPath();
-  ctx.arc(cx, cy, p.isCrit ? 5 : 3.5, 0, Math.PI * 2);
-  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawPuddles(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: RunState): void {
+  const cs = vp.cellSize;
+  ctx.save();
+  for (const pu of s.puddles) {
+    const cx = pu.pos.x * cs + cs / 2;
+    const cy = pu.pos.y * cs + cs / 2;
+    const r = pu.radius * cs;
+    const life = pu.timeLeft / pu.maxTime;
+    const pulse = 0.5 + 0.15 * Math.sin(s.elapsed * 4);
+    ctx.globalAlpha = life * pulse;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, '#00ff8855');
+    grad.addColorStop(0.6, '#00cc6633');
+    grad.addColorStop(1, '#00000000');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    // Rim
+    ctx.globalAlpha = life * 0.6;
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = '#00ff88';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

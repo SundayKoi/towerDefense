@@ -38,6 +38,19 @@ export type DamageType = 'kinetic' | 'energy' | 'aoe' | 'chain' | 'pierce';
 
 // Per-tower target priority.
 export type TargetMode = 'first' | 'strong' | 'weak' | 'close';
+
+// Active debuff on a tower instance from enemy abilities.
+export type TowerDebuff = { kind: 'jammed' | 'infected'; timeLeft: number };
+
+// Persistent slow puddle dropped by honeypot on hit.
+export interface Puddle {
+  pos: Vec2;
+  radius: number;
+  timeLeft: number;
+  maxTime: number;
+  slowPct: number;
+  slowDuration: number;
+}
 export const TARGET_MODES: readonly TargetMode[] = ['first', 'strong', 'weak', 'close'] as const;
 
 export interface TowerDef {
@@ -143,6 +156,7 @@ export interface TowerInstance {
   angle: number;
   fireFlash: number;
   targetMode: TargetMode;
+  debuffs: TowerDebuff[];
 }
 
 export interface EnemyInstance {
@@ -163,6 +177,7 @@ export interface EnemyInstance {
   invisTimer: number;
   hitFlash: number;
   angle: number;
+  debuffTimer?: number; // used by Rootkit to pace debuff application
 }
 
 export interface Projectile {
@@ -282,6 +297,7 @@ export interface RunState {
   towers: TowerInstance[];
   enemies: EnemyInstance[];
   projectiles: Projectile[];
+  puddles: Puddle[];
   particles: Particle[];
   floaters: FloatingText[];
   spawnQueue: { def: EnemyId; pathIndex: number; delay: number; boss?: boolean }[];
