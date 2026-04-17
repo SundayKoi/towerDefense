@@ -386,11 +386,11 @@ function openLevelUpDraft() {
   const unlocked = new Set(save.unlockedCards);
   const cardCount = 3 + (save.metaBoosts.extraDraftCards ?? 0);
   const ctx = buildDraftContext(r);
-  r.draftOptions = drawDraft(r.level, unlocked, ctx, cardCount);
+  r.draftOptions = drawDraft(r.level, unlocked, ctx, cardCount, r.cardsPicked);
   r.draftSource = 'level';
   if (r.draftOptions.length === 0) {
     console.warn('[draft] empty pool for unlocked ids — falling back to starter pool');
-    r.draftOptions = drawDraft(r.level, new Set(defaultSave().unlockedCards), ctx, cardCount);
+    r.draftOptions = drawDraft(r.level, new Set(defaultSave().unlockedCards), ctx, cardCount, r.cardsPicked);
     if (r.draftOptions.length === 0) {
       r.phase = prevPhase;
       return;
@@ -423,7 +423,7 @@ function openLevelUpDraft() {
     () => {
       r.phase = prevPhase === 'wave' ? 'wave' : 'prep';
     },
-    () => drawDraft(r.level, new Set(save.unlockedCards), buildDraftContext(r), cardCount),
+    () => drawDraft(r.level, new Set(save.unlockedCards), buildDraftContext(r), cardCount, r.cardsPicked),
   );
 }
 

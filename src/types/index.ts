@@ -116,6 +116,7 @@ export interface CardDef {
   category: 'deploy' | 'upgrade' | 'buff' | 'heal' | 'exotic';
   towerHint?: TowerId;   // for styling deploy/upgrade cards by tower color
   towerHint2?: TowerId;  // synergy cards: BOTH towers must be placed for card to appear
+  requires?: string[];   // card IDs that must be in cardsPicked before this appears
   apply: (state: RunState) => void;
 }
 
