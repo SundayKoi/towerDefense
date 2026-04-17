@@ -135,7 +135,7 @@ function updatePuddles(s: RunState, dt: number): void {
       }
     }
   }
-  s.puddles = s.puddles.filter((pu) => pu.timeLeft > 0);
+  for (let i = s.puddles.length - 1; i >= 0; i--) { if (s.puddles[i].timeLeft <= 0) s.puddles.splice(i, 1); }
 }
 
 // ======================= Sentinel passive field =======================
@@ -302,6 +302,13 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     if (e.marked !== undefined && e.marked > 0) {
       e.marked = Math.max(0, e.marked - dtSec);
     }
+    if (e.collapseTimer !== undefined && e.collapseTimer > 0) {
+      e.collapseTimer -= dtSec;
+      if (e.collapseTimer <= 0) {
+        e.armor = ENEMIES[e.def].armor ?? 0;
+        e.collapseTimer = undefined;
+      }
+    }
 
     // Honeypot coating: spread slow to adjacent enemies
     if (hasEffect(s, 'honeypot', 'coating') && e.speedMult < 0.9) {
@@ -398,9 +405,9 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
   // Projectile updates
   for (const p of s.projectiles) updateProjectile(s, p, dtSec);
 
-  // Remove dead
-  s.enemies = s.enemies.filter((e) => e.alive);
-  s.projectiles = s.projectiles.filter((p) => p.target !== -2);
+  // Remove dead — splice in-place to avoid per-frame array allocation
+  for (let i = s.enemies.length - 1; i >= 0; i--) { if (!s.enemies[i].alive) s.enemies.splice(i, 1); }
+  for (let i = s.projectiles.length - 1; i >= 0; i--) { if (s.projectiles[i].target === -2) s.projectiles.splice(i, 1); }
 
   tickFxOnly(s, dtSec);
 
@@ -421,12 +428,12 @@ function tickFxOnly(s: RunState, dtSec: number): void {
     if (p.gravity) p.vel.y += p.gravity * dtSec;
     p.life -= dtSec;
   }
-  s.particles = s.particles.filter((p) => p.life > 0);
+  for (let i = s.particles.length - 1; i >= 0; i--) { if (s.particles[i].life <= 0) s.particles.splice(i, 1); }
   for (const f of s.floaters) {
     f.life -= dtSec;
     f.pos.y += f.vy * dtSec * 0.01;
   }
-  s.floaters = s.floaters.filter((f) => f.life > 0);
+  for (let i = s.floaters.length - 1; i >= 0; i--) { if (s.floaters[i].life <= 0) s.floaters.splice(i, 1); }
 }
 
 // ======================= Tower targeting & firing =======================
@@ -890,12 +897,10 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     if (sn) sn.cooldown = Math.max(0, sn.cooldown - 0.8);
   }
 
-  // Quantum collapse: reduce armor on hit
+  // Quantum collapse: reduce armor on hit, restore via engine timer (no setTimeout)
   if (p.fromTower === 'quantum' && hasEffect(s, 'quantum', 'collapse')) {
     target.armor = Math.max(0, target.armor * 0.5);
-    setTimeout(() => {
-      if (target.alive) target.armor = ENEMIES[target.def].armor ?? 0;
-    }, 1500); // crude timer — engine-side we rely on the armor being naturally reset when killed
+    target.collapseTimer = 1.5;
   }
 
   // Railgun feedback (kills): reduce cooldown
@@ -1223,8 +1228,11 @@ function spawnWormAt(s: RunState, pos: { x: number; y: number }, pathIndex: numb
   });
 }
 
+const MAX_PARTICLES = 300;
+
 function spawnExplosion(s: RunState, pos: Vec2, color: string, radius: number): void {
-  const count = Math.round(14 * radius);
+  if (s.particles.length >= MAX_PARTICLES) return;
+  const count = Math.min(Math.round(14 * radius), MAX_PARTICLES - s.particles.length);
   for (let i = 0; i < count; i++) {
     const a = Math.random() * Math.PI * 2;
     const spd = 2 + Math.random() * 4;
@@ -1243,7 +1251,9 @@ function spawnExplosion(s: RunState, pos: Vec2, color: string, radius: number): 
 }
 
 function spawnDeathBurst(s: RunState, pos: Vec2, color: string, accent: string, count: number): void {
-  for (let i = 0; i < count; i++) {
+  if (s.particles.length >= MAX_PARTICLES) return;
+  const capped = Math.min(count, MAX_PARTICLES - s.particles.length);
+  for (let i = 0; i < capped; i++) {
     const a = Math.random() * Math.PI * 2;
     const spd = 1.5 + Math.random() * 3.5;
     s.particles.push({

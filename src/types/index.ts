@@ -188,8 +188,9 @@ export interface EnemyInstance {
   invisTimer: number;
   hitFlash: number;
   angle: number;
-  debuffTimer?: number; // used by Rootkit to pace debuff application, -1 = signal has revived
-  marked?: number;      // seconds remaining on mark debuff (takes +30% from all sources)
+  debuffTimer?: number;   // used by Rootkit to pace debuff application, -1 = signal has revived
+  marked?: number;        // seconds remaining on mark debuff (takes +30% from all sources)
+  collapseTimer?: number; // seconds until armor restoration after quantum collapse
 }
 
 export interface Projectile {
