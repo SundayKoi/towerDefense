@@ -1,0 +1,19 @@
+{
+  "name": "netrunner-td",
+  "version": "0.1.0",
+  "description": "NETRUNNER // INTRUSION DEFENSE — cyberpunk roguelike tower defense",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3",
+    "vite": "^7.3.2",
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}

@@ -1,0 +1,425 @@
+import '@/css/main.css';
+import { loadSave, writeSave, createRun, defaultSave } from '@/game/state';
+import { CARDS_BY_ID, drawDraft } from '@/data/cards';
+import { cycleTargetMode, placeTower, removeTower, startWave, updateRun } from '@/game/engine';
+import { applyBloom, applyPixelate, canPlaceAt, createViewport, renderRun, resizeViewport } from '@/render/canvas';
+import { preloadSprites } from '@/render/sprites';
+import { initBackground } from '@/render/background';
+import { startScreen } from '@/ui/start';
+import { mapSelectScreen } from '@/ui/mapSelect';
+import { gameScreen, renderPalette, renderSelectedTower, renderTokensBar, type GameScreenHandles } from '@/ui/game';
+import { openBuildStats, openCardDraft, openEnemyIntel, openGameOver, openPauseMenu, openSettingsModal } from '@/ui/modals';
+import { openShopScreen } from '@/ui/shop';
+import { mount } from '@/ui/screens';
+import { audio } from '@/audio/sfx';
+import type { Difficulty, EnemyId, RunState, SaveData, TowerId } from '@/types';
+import { getMap, isSurvival } from '@/data/maps';
+
+// ---------- Helpers ----------
+
+function isBossWave(r: RunState, wave: number): boolean {
+  const bosses = getMap(r.mapId).bosses[r.difficulty];
+  return bosses[wave] != null;
+}
+
+function showWaveBanner(r: RunState): void {
+  const isBoss = isBossWave(r, r.wave);
+  const el = document.createElement('div');
+  el.className = 'wave-banner' + (isBoss ? ' boss' : '');
+  const waveText = isSurvival(r.mapId) ? `WAVE ${r.wave}` : `WAVE ${r.wave} / ${r.totalWaves}`;
+  el.innerHTML = `
+    <div class="wb-small">${isBoss ? '// BOSS INCOMING' : '// WAVE INITIATED'}</div>
+    <div class="wb-big">${waveText}</div>
+    <div class="wb-underline"></div>
+  `;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2400);
+}
+
+// ---------- Boot ----------
+
+const bgCanvas = document.getElementById('bg-canvas') as HTMLCanvasElement;
+const bgHandle = initBackground(bgCanvas);
+
+let save: SaveData = loadSave();
+bgHandle.setPixelMode(save.settings.pixelMode, save.settings.pixelFactor);
+document.documentElement.classList.toggle('pixel-mode', save.settings.pixelMode);
+
+function applySettings() {
+  writeSave(save);
+  bgHandle.setPixelMode(save.settings.pixelMode, save.settings.pixelFactor);
+  document.documentElement.classList.toggle('pixel-mode', save.settings.pixelMode);
+  audio.setEnabled(save.settings.sfx);
+  audio.setMusicEnabled(save.settings.music);
+}
+
+preloadSprites().then(() => { showStart(); });
+
+const startAudio = () => {
+  audio.startAmbient('menu');
+  window.removeEventListener('pointerdown', startAudio);
+};
+window.addEventListener('pointerdown', startAudio, { once: true });
+
+function showStart() {
+  mount(startScreen(
+    () => showMapSelect(),
+    () => openSettingsModal(save, applySettings),
+    () => openShopScreen(save, () => writeSave(save), showStart),
+  ));
+}
+
+function showMapSelect() {
+  mount(mapSelectScreen(save, (mapId, diff) => startRun(mapId, diff), showStart));
+}
+
+// ---------- Run lifecycle ----------
+
+let run: RunState | null = null;
+let runHandles: GameScreenHandles | null = null;
+let hoverCell: { x: number; y: number } | null = null;
+let lastFrame = 0;
+let rafId = 0;
+
+function startRun(mapId: string, difficulty: Difficulty) {
+  save.stats.totalRuns += 1;
+  writeSave(save);
+  run = createRun(mapId, difficulty, save);
+  const ge = gameScreen(run, save);
+  mount(ge);
+  runHandles = ge.handles();
+  wireGameScreen();
+  startLoop();
+  audio.stopAmbient();
+  audio.startAmbient('game');
+  // If meta-boosts gave us an opening level, let player draft immediately.
+  if (save.metaBoosts.extraDraftCards > 0 || save.metaBoosts.startingLevel > 0) {
+    // No auto-draft at start unless pending level-ups accrued — keep it predictable.
+  }
+}
+
+function wireGameScreen() {
+  if (!run || !runHandles) return;
+  const r = run;
+  const h = runHandles;
+
+  // Viewport
+  const vp = createViewport(h.canvas);
+  const wrap = h.canvas.parentElement as HTMLElement;
+  const doResize = () => {
+    const rect = wrap.getBoundingClientRect();
+    if (rect.width < 4 || rect.height < 4) return;
+    resizeViewport(vp, getMap(r.mapId), rect.width, rect.height);
+  };
+  // Try immediately, then via rAFs, then via timeouts as fallback for slow layout
+  doResize();
+  requestAnimationFrame(() => { doResize(); requestAnimationFrame(doResize); });
+  setTimeout(doResize, 50);
+  setTimeout(doResize, 200);
+  window.addEventListener('resize', doResize);
+  if (typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(() => doResize());
+    ro.observe(wrap);
+  }
+  // Store so the render loop can retry if viewport is still zero after all the above
+  (wireGameScreen as any).__doResize = doResize;
+
+  const activatePlacement = (tid: TowerId) => {
+    r.selection = { kind: 'placing', def: tid };
+    h.paletteEl.classList.remove('open');
+    h.cancelBtn.style.display = '';
+  };
+
+  renderPalette(h, r, activatePlacement);
+  renderTokensBar(h, r, activatePlacement);
+
+  h.startBtn.onclick = () => {
+    if (!run) return;
+    if (run.phase !== 'prep') return;
+    run.autoStartTimer = null;
+    if (tryShowIntelForUpcomingWave(run)) return;
+    startWave(run);
+    showWaveBanner(run);
+    updateHud();
+  };
+
+  h.pauseBtn.onclick = () => { if (run) pauseRun(); };
+
+  h.buildBtn.onclick = () => {
+    if (!run) return;
+    openBuildStats(run);
+  };
+
+  h.speedBtn.onclick = () => {
+    if (!run) return;
+    run.timeScale = run.timeScale === 1 ? 2 : run.timeScale === 2 ? 3 : 1;
+    h.speedBtn.textContent = run.timeScale + '\u00d7';
+    audio.play('ui_click');
+  };
+
+  h.cancelBtn.onclick = () => {
+    if (!run) return;
+    run.selection = { kind: 'none' };
+    h.cancelBtn.style.display = 'none';
+    audio.play('ui_click');
+  };
+
+  const onTap = (evt: PointerEvent) => {
+    if (!run || !runHandles) return;
+    const rect = h.canvas.getBoundingClientRect();
+    const px = evt.clientX - rect.left;
+    const py = evt.clientY - rect.top;
+    const gx = Math.floor(px / vp.cellSize);
+    const gy = Math.floor(py / vp.cellSize);
+    hoverCell = { x: gx, y: gy };
+
+    if (run.selection.kind === 'placing') {
+      if (canPlaceAt(run, { x: gx, y: gy })) {
+        placeTower(run, run.selection.def, { x: gx, y: gy });
+        run.selection = { kind: 'none' };
+        h.cancelBtn.style.display = 'none';
+        renderPalette(h, run, activatePlacement);
+        renderTokensBar(h, run, activatePlacement);
+        updateHud();
+      } else {
+        audio.play('sell');
+      }
+      return;
+    }
+
+    const t = run.towers.find((t) => t.grid.x === gx && t.grid.y === gy);
+    if (t) {
+      run.selection = { kind: 'tower', towerId: t.id };
+      const rerenderSel = () => renderSelectedTower(h, run!,
+        () => { removeTower(run!, t); h.selectedEl.classList.remove('open'); updateHud(); },
+        () => { cycleTargetMode(t); rerenderSel(); },
+      );
+      rerenderSel();
+      return;
+    }
+
+    if (canPlaceAt(run, { x: gx, y: gy })) {
+      // Only open palette if player has any deploy tokens
+      const hasAny = Object.values(run.deployTokens).some((n) => (n ?? 0) > 0);
+      if (hasAny) {
+        h.paletteEl.classList.add('open');
+        renderPalette(h, run, activatePlacement);
+      } else {
+        audio.play('sell');
+      }
+    } else {
+      if (run.selection.kind === 'tower') {
+        run.selection = { kind: 'none' };
+        h.selectedEl.classList.remove('open');
+      }
+    }
+  };
+
+  h.canvas.addEventListener('pointerdown', onTap);
+  h.canvas.addEventListener('pointermove', (e) => {
+    const rect = h.canvas.getBoundingClientRect();
+    hoverCell = { x: Math.floor((e.clientX - rect.left) / vp.cellSize), y: Math.floor((e.clientY - rect.top) / vp.cellSize) };
+  });
+
+  (wireGameScreen as any).__vp = vp;
+}
+
+function updateHud() {
+  if (!run || !runHandles) return;
+  runHandles.hudHp.textContent = String(Math.max(0, Math.round(run.hp)));
+  runHandles.hudLevel.textContent = String(run.level);
+  const pct = Math.max(0, Math.min(100, (run.xp / run.xpToNext) * 100));
+  runHandles.hudXpFill.style.width = pct + '%';
+  runHandles.hudXpText.textContent = `${run.xp}/${run.xpToNext}`;
+  const surv = isSurvival(run.mapId);
+  runHandles.hudWave.textContent = surv ? `${run.wave}/\u221e` : `${run.wave}/${run.totalWaves}`;
+  runHandles.hudMap.textContent = getMap(run.mapId).name;
+  if (run.phase === 'prep') {
+    const nextWave = run.wave + 1;
+    const nextIsBoss = isBossWave(run, nextWave);
+    const countdown = run.autoStartTimer !== null ? ` (${Math.ceil(run.autoStartTimer)}s)` : '';
+    runHandles.startBtn.innerHTML = nextIsBoss
+      ? `START WAVE ${nextWave}${countdown} <span class="boss-incoming">&#9888; BOSS</span>`
+      : `START WAVE ${nextWave}${countdown}`;
+    runHandles.startBtn.classList.toggle('btn-boss', nextIsBoss);
+  } else {
+    runHandles.startBtn.textContent = surv ? `WAVE ${run.wave}/\u221e` : `WAVE ${run.wave}/${run.totalWaves}`;
+    runHandles.startBtn.classList.remove('btn-boss');
+  }
+  runHandles.startBtn.disabled = run.phase !== 'prep';
+}
+
+function startLoop() {
+  cancelAnimationFrame(rafId);
+  lastFrame = performance.now();
+  const frame = (t: number) => {
+    const dt = Math.min(0.1, (t - lastFrame) / 1000);
+    lastFrame = t;
+    if (run && runHandles) {
+      const scaled = dt * run.timeScale;
+      updateRun(run, scaled, {
+        onGameOver: () => finishRun(false),
+        onVictory: () => finishRun(true),
+        onLevelUp: () => openLevelUpDraft(),
+        onWaveCleared: () => {},
+        onAutoStart: () => {
+          if (!run) return;
+          if (tryShowIntelForUpcomingWave(run)) return;
+          startWave(run);
+          showWaveBanner(run);
+          updateHud();
+        },
+      });
+      updateHud();
+      const vp = (wireGameScreen as any).__vp;
+      if (vp) {
+        if (vp.width === 0) {
+          const retry = (wireGameScreen as any).__doResize;
+          if (retry) retry();
+        } else {
+          renderRun(vp, run, hoverCell);
+          const pixel = save.settings.pixelMode;
+          if (pixel) applyPixelate(vp, save.settings.pixelFactor);
+          applyBloom(vp, pixel ? 0.55 : 0.3, pixel);
+        }
+      }
+    }
+    rafId = requestAnimationFrame(frame);
+  };
+  rafId = requestAnimationFrame(frame);
+}
+
+function pauseRun() {
+  if (!run) return;
+  const prevPhase = run.phase;
+  run.phase = 'paused';
+  openPauseMenu(
+    () => { run!.phase = prevPhase; },
+    () => {
+      if (!run) return;
+      const mid = run.mapId, d = run.difficulty;
+      cancelAnimationFrame(rafId);
+      run = null; runHandles = null;
+      startRun(mid, d);
+    },
+    () => {
+      cancelAnimationFrame(rafId);
+      run = null; runHandles = null;
+      showMapSelect();
+    },
+    () => { openSettingsModal(save, applySettings); },
+  );
+}
+
+function buildDraftContext(r: RunState): { placedTowerTypes: Set<TowerId>; towerCount: number } {
+  const placed = new Set<TowerId>();
+  for (const t of r.towers) placed.add(t.def);
+  return { placedTowerTypes: placed, towerCount: r.towers.length };
+}
+
+function openLevelUpDraft() {
+  if (!run) return;
+  if (run.phase === 'draft') return;
+  const r = run;
+  r.pendingLevelUps = Math.max(0, r.pendingLevelUps - 1);
+  const prevPhase = r.phase;
+  r.phase = 'draft';
+  const unlocked = new Set(save.unlockedCards);
+  const cardCount = 3 + (save.metaBoosts.extraDraftCards ?? 0);
+  const ctx = buildDraftContext(r);
+  r.draftOptions = drawDraft(r.level, unlocked, ctx, cardCount);
+  r.draftSource = 'level';
+  if (r.draftOptions.length === 0) {
+    console.warn('[draft] empty pool for unlocked ids — falling back to starter pool');
+    r.draftOptions = drawDraft(r.level, new Set(defaultSave().unlockedCards), ctx, cardCount);
+    if (r.draftOptions.length === 0) {
+      r.phase = prevPhase;
+      return;
+    }
+  }
+  audio.play('card_reveal');
+  openCardDraft(
+    r,
+    (id) => {
+      const c = CARDS_BY_ID[id];
+      if (c) c.apply(r);
+      r.cardsPicked.push(id);
+      r.phase = prevPhase === 'wave' ? 'wave' : 'prep';
+      if (runHandles) {
+        const activate = (tid: TowerId) => {
+          r.selection = { kind: 'placing', def: tid };
+          runHandles!.paletteEl.classList.remove('open');
+          runHandles!.cancelBtn.style.display = '';
+        };
+        renderTokensBar(runHandles, r, activate);
+        renderPalette(runHandles, r, activate);
+      }
+    },
+    () => {
+      r.phase = prevPhase === 'wave' ? 'wave' : 'prep';
+    },
+    () => drawDraft(r.level, new Set(save.unlockedCards), buildDraftContext(r), cardCount),
+  );
+}
+
+function finishRun(victory: boolean) {
+  if (!run) return;
+  save.stats.totalWins += victory ? 1 : 0;
+  save.protocols += run.protocolsEarned;
+  save.stats.totalProtocolsEarned += run.protocolsEarned;
+  if (victory) {
+    const c = (save.completed[run.mapId] ?? {});
+    c[run.difficulty] = true;
+    save.completed[run.mapId] = c;
+    // Clear bonus protocols
+    const clearBonus = run.difficulty === 'hard' ? 100 : run.difficulty === 'medium' ? 50 : 20;
+    save.protocols += clearBonus;
+    save.stats.totalProtocolsEarned += clearBonus;
+    run.protocolsEarned += clearBonus;
+    const reward = getMap(run.mapId).rewards[(run.difficulty + 'Clear') as 'easyClear'|'mediumClear'|'hardClear'];
+    if (reward) {
+      if (reward.type === 'unlock-card' && !save.unlockedCards.includes(reward.id)) save.unlockedCards.push(reward.id);
+      if (reward.type === 'unlock-tower' && !save.unlockedTowers.includes(reward.id as TowerId)) save.unlockedTowers.push(reward.id as TowerId);
+    }
+  }
+  writeSave(save);
+  openGameOver(run, victory, () => {
+    const mid = run!.mapId, d = run!.difficulty;
+    cancelAnimationFrame(rafId);
+    run = null; runHandles = null;
+    startRun(mid, d);
+  }, () => {
+    cancelAnimationFrame(rafId);
+    run = null; runHandles = null;
+    showMapSelect();
+  });
+}
+
+function tryShowIntelForUpcomingWave(r: RunState): boolean {
+  const map = getMap(r.mapId);
+  const nextWave = r.wave + 1;
+  const progress = nextWave / r.totalWaves;
+  let pool: EnemyId[];
+  if (progress < 0.34) pool = map.enemyPool.phase1;
+  else if (progress < 0.67) pool = map.enemyPool.phase2;
+  else pool = map.enemyPool.phase3;
+  const boss = map.bosses[r.difficulty][nextWave];
+
+  let saveChanged = false;
+  for (const eid of pool) {
+    if (!save.seenEnemies.includes(eid)) { save.seenEnemies.push(eid); saveChanged = true; }
+  }
+
+  if (boss && !save.seenEnemies.includes(boss)) {
+    save.seenEnemies.push(boss);
+    writeSave(save);
+    openEnemyIntel(boss as EnemyId, () => {
+      startWave(r);
+      showWaveBanner(r);
+      updateHud();
+    });
+    return true;
+  }
+  if (saveChanged) writeSave(save);
+  return false;
+}

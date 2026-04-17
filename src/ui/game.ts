@@ -1,0 +1,239 @@
+// Game screen: HUD overlay + canvas + action bar.
+// Post-pivot: credits removed. HUD shows HP, LEVEL, XP bar, deploy tokens, and map name.
+
+import type { RunState, SaveData, TargetMode, TowerId } from '@/types';
+import { TOWERS } from '@/data/towers';
+import { getMap } from '@/data/maps';
+import { audio } from '@/audio/sfx';
+import type { Screen } from './screens';
+import { getTowerDataUrl } from '@/render/sprites';
+
+export const TARGET_MODE_LABEL: Record<TargetMode, string> = {
+  first: 'FIRST',
+  strong: 'STRONG',
+  weak: 'WEAK',
+  close: 'CLOSE',
+};
+export const TARGET_MODE_DESC: Record<TargetMode, string> = {
+  first: 'target furthest along path',
+  strong: 'target highest HP',
+  weak: 'target lowest HP (finisher)',
+  close: 'target nearest to tower',
+};
+export const TARGET_MODE_GLYPH: Record<TargetMode, string> = {
+  first: '\u25B6',    // ▶ (forward-pointing)
+  strong: '\u2B24',   // ⬤ (big filled)
+  weak: '\u25CE',     // ◎ (bullseye)
+  close: '\u29BF',    // ⦿ (circle with dot)
+};
+
+export interface GameScreenHandles {
+  canvas: HTMLCanvasElement;
+  hudHp: HTMLElement;
+  hudLevel: HTMLElement;
+  hudXpFill: HTMLElement;
+  hudXpText: HTMLElement;
+  hudWave: HTMLElement;
+  hudMap: HTMLElement;
+  hudTokens: HTMLElement;
+  startBtn: HTMLButtonElement;
+  pauseBtn: HTMLButtonElement;
+  buildBtn: HTMLButtonElement;
+  speedBtn: HTMLButtonElement;
+  cancelBtn: HTMLButtonElement;
+  paletteEl: HTMLElement;
+  selectedEl: HTMLElement;
+  paletteTowersContainer: HTMLElement;
+}
+
+export function gameScreen(s: RunState, _save: SaveData): Screen & { handles: () => GameScreenHandles } {
+  let handles!: GameScreenHandles;
+
+  const fn: Screen = (root) => {
+    root.innerHTML = `
+      <div class="screen game-screen">
+        <header class="hud">
+          <div class="hud-cell hp"><span class="label">INTEGRITY</span><span class="value" id="hud-hp">${s.hp}</span></div>
+          <div class="hud-cell level">
+            <span class="label">LEVEL</span>
+            <span class="value" id="hud-level">${s.level}</span>
+            <div class="xp-bar"><div class="xp-fill" id="hud-xp-fill"></div></div>
+            <span class="xp-text" id="hud-xp-text">${s.xp}/${s.xpToNext}</span>
+          </div>
+          <div class="hud-cell wave"><span class="label">WAVE</span><span class="value" id="hud-wave">${s.wave}/${s.totalWaves}</span></div>
+          <div class="hud-cell map"><span class="label">MAP</span><span class="value" id="hud-map">${getMap(s.mapId).name}</span></div>
+        </header>
+
+        <div class="tokens-bar" id="hud-tokens"></div>
+
+        <div class="canvas-wrap">
+          <canvas id="game-canvas"></canvas>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn action-btn" id="btn-pause" aria-label="menu">&#9776;</button>
+          <button class="btn action-btn" id="btn-build" aria-label="build" title="Build &amp; stats">&#9878;</button>
+          <button class="btn action-btn" id="btn-speed">1&times;</button>
+          <button class="btn btn-danger" id="btn-cancel" style="display:none">CANCEL</button>
+          <button class="btn btn-primary btn-grow" id="btn-start-wave">START WAVE</button>
+        </div>
+
+        <div class="palette" id="tower-palette">
+          <div class="palette-header">
+            <span>DEPLOY ICE</span>
+            <button class="palette-close" id="palette-close">&times;</button>
+          </div>
+          <div class="palette-towers" id="palette-towers"></div>
+        </div>
+
+        <div class="selected-tower" id="selected-tower"></div>
+      </div>
+    `;
+
+    const canvas = root.querySelector('#game-canvas') as HTMLCanvasElement;
+    handles = {
+      canvas,
+      hudHp: root.querySelector('#hud-hp') as HTMLElement,
+      hudLevel: root.querySelector('#hud-level') as HTMLElement,
+      hudXpFill: root.querySelector('#hud-xp-fill') as HTMLElement,
+      hudXpText: root.querySelector('#hud-xp-text') as HTMLElement,
+      hudWave: root.querySelector('#hud-wave') as HTMLElement,
+      hudMap: root.querySelector('#hud-map') as HTMLElement,
+      hudTokens: root.querySelector('#hud-tokens') as HTMLElement,
+      startBtn: root.querySelector('#btn-start-wave') as HTMLButtonElement,
+      pauseBtn: root.querySelector('#btn-pause') as HTMLButtonElement,
+      buildBtn: root.querySelector('#btn-build') as HTMLButtonElement,
+      speedBtn: root.querySelector('#btn-speed') as HTMLButtonElement,
+      cancelBtn: root.querySelector('#btn-cancel') as HTMLButtonElement,
+      paletteEl: root.querySelector('#tower-palette') as HTMLElement,
+      selectedEl: root.querySelector('#selected-tower') as HTMLElement,
+      paletteTowersContainer: root.querySelector('#palette-towers') as HTMLElement,
+    };
+
+    const close = root.querySelector('#palette-close') as HTMLButtonElement;
+    close.onclick = () => { handles.paletteEl.classList.remove('open'); audio.play('ui_click'); };
+  };
+
+  (fn as any).handles = () => handles;
+  return fn as Screen & { handles: () => GameScreenHandles };
+}
+
+// Render the tokens bar: shows towers the player currently has deploy-tokens for.
+export function renderTokensBar(handles: GameScreenHandles, s: RunState, onTokenClick: (id: TowerId) => void): void {
+  const bar = handles.hudTokens;
+  bar.innerHTML = '';
+  const entries = Object.entries(s.deployTokens).filter(([, n]) => (n as number) > 0) as [TowerId, number][];
+  if (entries.length === 0) {
+    bar.classList.add('empty');
+    bar.innerHTML = '<span class="tokens-empty">NO DEPLOYS — LEVEL UP TO DRAFT TOWERS</span>';
+    return;
+  }
+  bar.classList.remove('empty');
+  for (const [id, count] of entries) {
+    const def = TOWERS[id];
+    const btn = document.createElement('button');
+    btn.className = 'token-chip';
+    btn.style.setProperty('--accent', def.accentColor);
+    btn.innerHTML = `
+      <span class="token-portrait"></span>
+      <span class="token-info">
+        <span class="token-name">${def.name}</span>
+        <span class="token-count">\u00d7${count}</span>
+      </span>
+    `;
+    const url = getTowerDataUrl(id);
+    if (url) {
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = def.name;
+      (btn.querySelector('.token-portrait') as HTMLElement).appendChild(img);
+    }
+    btn.onclick = () => { audio.play('ui_click'); onTokenClick(id); };
+    bar.appendChild(btn);
+  }
+}
+
+// Tower palette (shown when tapping empty cell) — lists only tokens you have.
+export function renderPalette(handles: GameScreenHandles, s: RunState, onPick: (id: TowerId) => void): void {
+  const container = handles.paletteTowersContainer;
+  container.innerHTML = '';
+  const entries = Object.entries(s.deployTokens).filter(([, n]) => (n as number) > 0) as [TowerId, number][];
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="palette-empty">No deploy tokens. Clear waves and level up to draft towers.</div>';
+    return;
+  }
+  for (const [id, count] of entries) {
+    const def = TOWERS[id];
+    const btn = document.createElement('button');
+    btn.className = 'tower-card';
+    btn.style.setProperty('--accent', def.accentColor);
+    btn.innerHTML = `
+      <div class="tower-card-portrait" style="--accent:${def.accentColor}"></div>
+      <div class="tower-card-name">${def.name}</div>
+      <div class="tower-card-stats">
+        <span>${def.damage} DMG</span><span>${def.range.toFixed(1)} RNG</span>
+      </div>
+      <div class="tower-card-cost">\u00d7${count} AVAILABLE</div>
+      <div class="tower-card-desc">${def.description}</div>
+    `;
+    const portrait = btn.querySelector('.tower-card-portrait') as HTMLElement;
+    const url = getTowerDataUrl(id);
+    if (url) {
+      const img = document.createElement('img');
+      img.src = url;
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.filter = `drop-shadow(0 0 8px ${def.accentColor})`;
+      portrait.appendChild(img);
+    }
+    btn.onclick = () => { audio.play('ui_click'); onPick(id); };
+    container.appendChild(btn);
+  }
+}
+
+// Selected tower detail panel. No upgrade button — upgrades come from cards.
+// Includes a TARGETING mode toggle (FIRST / STRONG / WEAK / CLOSE) cycling on tap.
+export function renderSelectedTower(
+  handles: GameScreenHandles,
+  s: RunState,
+  onRemove: () => void,
+  onCycleTarget: () => void,
+): void {
+  const box = handles.selectedEl;
+  const sel = s.selection;
+  if (sel.kind !== 'tower') { box.classList.remove('open'); box.innerHTML = ''; return; }
+  const t = s.towers.find((x) => x.id === sel.towerId);
+  if (!t) { box.classList.remove('open'); box.innerHTML = ''; return; }
+  const def = TOWERS[t.def];
+  const dmgMod = 1 + s.mods.globalDamagePct + (s.mods.towerDmg[t.def] ?? 0);
+  const rangeMod = 1 + s.mods.globalRangePct + (s.mods.towerRange[t.def] ?? 0);
+  const rateMod = 1 + s.mods.globalRatePct + (s.mods.towerRate[t.def] ?? 0);
+  const effDmg = Math.round(def.damage * dmgMod);
+  const effRange = (def.range * rangeMod).toFixed(1);
+  const effRate = (def.fireRate * rateMod).toFixed(2);
+  box.innerHTML = `
+    <div class="sel-tower-header" style="--accent:${def.accentColor}">
+      <div class="sel-tower-name">${def.name} <span class="sel-tower-type">${def.damageType.toUpperCase()}</span></div>
+      <button class="palette-close" id="sel-close">&times;</button>
+    </div>
+    <div class="sel-tower-stats">
+      <span>DMG <b>${effDmg}</b></span>
+      <span>RNG <b>${effRange}</b></span>
+      <span>RATE <b>${effRate}/s</b></span>
+    </div>
+    <button class="target-mode-btn" id="sel-target">
+      <span class="tm-glyph">${TARGET_MODE_GLYPH[t.targetMode]}</span>
+      <span class="tm-body">
+        <span class="tm-label">TARGETING: ${TARGET_MODE_LABEL[t.targetMode]}</span>
+        <span class="tm-desc">${TARGET_MODE_DESC[t.targetMode]} — tap to cycle</span>
+      </span>
+    </button>
+    <div class="sel-tower-actions">
+      <button class="btn btn-danger" id="sel-remove">REMOVE TOWER</button>
+    </div>
+  `;
+  box.classList.add('open');
+  (box.querySelector('#sel-close') as HTMLButtonElement).onclick = () => { s.selection = { kind: 'none' }; box.classList.remove('open'); };
+  (box.querySelector('#sel-target') as HTMLButtonElement).onclick = () => { onCycleTarget(); };
+  (box.querySelector('#sel-remove') as HTMLButtonElement).onclick = () => { audio.play('ui_click'); onRemove(); };
+}
