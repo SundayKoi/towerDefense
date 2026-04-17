@@ -290,8 +290,8 @@ function drawPortal(ctx: CanvasRenderingContext2D, vp: RenderViewport, g: Vec2, 
   ctx.save();
   // Slow expanding rings — 1 full cycle per ~1.8 seconds, with 3 rings phased for a steady, calm pulse.
   for (let i = 0; i < 3; i++) {
-    const phase = (t * 0.55 + i * 0.33) % 1;
-    const r = phase * cs * 0.85;
+    const phase = ((t * 0.55 + i * 0.33) % 1 + 1) % 1;
+    const r = Math.max(0, phase * cs * 0.85);
     ctx.globalAlpha = (1 - phase) * 0.8;
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
