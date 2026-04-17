@@ -30,9 +30,11 @@ class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private enabled = true;
+  private musicEnabled = true;
   private musicGain: GainNode | null = null;
   private musicNodes: { stop: () => void }[] = [];
   private musicActive = false;
+  private pendingMusicKind: 'menu' | 'game' | null = null;
 
   setEnabled(on: boolean) { this.enabled = on; }
 
@@ -144,7 +146,9 @@ class AudioEngine {
   // =========== Ambient music (procedural drone + pulse) ===========
 
   startAmbient(kind: 'menu' | 'game' = 'game'): void {
-    if (!this.enabled) return;
+    // Remember the last-requested kind so re-enabling music picks up where it should.
+    this.pendingMusicKind = kind;
+    if (!this.musicEnabled) return;
     const ctx = this.ensure();
     if (!ctx || !this.master) return;
     if (this.musicActive) return;
@@ -242,7 +246,8 @@ class AudioEngine {
   }
 
   setMusicEnabled(on: boolean): void {
-    if (on && !this.musicActive) this.startAmbient('game');
+    this.musicEnabled = on;
+    if (on && !this.musicActive) this.startAmbient(this.pendingMusicKind ?? 'game');
     if (!on && this.musicActive) this.stopAmbient();
   }
 }

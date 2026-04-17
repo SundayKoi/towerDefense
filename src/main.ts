@@ -66,6 +66,9 @@ const bgHandle = initBackground(bgCanvas);
 let save: SaveData = loadSave();
 bgHandle.setPixelMode(save.settings.pixelMode, save.settings.pixelFactor);
 document.documentElement.classList.toggle('pixel-mode', save.settings.pixelMode);
+// Sync audio engine with saved preferences before anything tries to play/start music.
+audio.setEnabled(save.settings.sfx);
+audio.setMusicEnabled(save.settings.music);
 
 function applySettings() {
   writeSave(save);
@@ -78,7 +81,7 @@ function applySettings() {
 preloadSprites().then(() => { showStart(); });
 
 const startAudio = () => {
-  audio.startAmbient('menu');
+  if (save.settings.music) audio.startAmbient('menu');
   window.removeEventListener('pointerdown', startAudio);
 };
 window.addEventListener('pointerdown', startAudio, { once: true });
