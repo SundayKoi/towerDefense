@@ -376,6 +376,7 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
 
 .canvas-wrap {
   flex: 1;
+  min-height: 0;
   display: flex;
   justify-content: center;
   align-items: center;

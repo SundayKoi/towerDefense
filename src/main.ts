@@ -107,21 +107,33 @@ function wireGameScreen() {
   const vp = createViewport(h.canvas);
   const wrap = h.canvas.parentElement as HTMLElement;
   const doResize = () => {
-    const rect = wrap.getBoundingClientRect();
-    if (rect.width < 4 || rect.height < 4) return;
-    resizeViewport(vp, getMap(r.mapId), rect.width, rect.height);
+    // Primary: measure canvas-wrap directly
+    let w = wrap.getBoundingClientRect().width;
+    let hh = wrap.getBoundingClientRect().height;
+    // Fallback: game-screen is always sized (position:fixed derived) — subtract bar heights
+    if (w < 4 || hh < 4) {
+      const gs = wrap.closest('.game-screen') as HTMLElement | null;
+      const gsRect = gs?.getBoundingClientRect();
+      if (gsRect && gsRect.width > 4) {
+        w = gsRect.width;
+        const hudH = (document.querySelector('.hud') as HTMLElement | null)?.offsetHeight ?? 0;
+        const tokH = (document.getElementById('hud-tokens') as HTMLElement | null)?.offsetHeight ?? 0;
+        const actH = (document.querySelector('.action-bar') as HTMLElement | null)?.offsetHeight ?? 0;
+        hh = gsRect.height - hudH - tokH - actH;
+      }
+    }
+    if (w < 4 || hh < 4) return;
+    resizeViewport(vp, getMap(r.mapId), w, hh);
   };
-  // Try immediately, then via rAFs, then via timeouts as fallback for slow layout
   doResize();
   requestAnimationFrame(() => { doResize(); requestAnimationFrame(doResize); });
   setTimeout(doResize, 50);
   setTimeout(doResize, 200);
   window.addEventListener('resize', doResize);
   if (typeof ResizeObserver !== 'undefined') {
-    const ro = new ResizeObserver(() => doResize());
-    ro.observe(wrap);
+    new ResizeObserver(doResize).observe(wrap);
+    new ResizeObserver(doResize).observe(document.documentElement);
   }
-  // Store so the render loop can retry if viewport is still zero after all the above
   (wireGameScreen as any).__doResize = doResize;
 
   const activatePlacement = (tid: TowerId) => {
