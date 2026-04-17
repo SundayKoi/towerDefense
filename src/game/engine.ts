@@ -1107,8 +1107,8 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     if (inField) damageEnemy(s, target, p.damage * 0.6, p.isCrit ?? false, p.damageType, true);
   }
 
-  // Firewall ricochet: fire at 2nd nearby enemy
-  if (p.fromTower === 'firewall' && hasEffect(s, 'firewall', 'ricochet')) {
+  // Firewall ricochet: fire at 2nd nearby enemy (one bounce only — ricochetDone prevents infinite chain)
+  if (p.fromTower === 'firewall' && hasEffect(s, 'firewall', 'ricochet') && !p.ricochetDone && s.projectiles.length < 300) {
     const next = findChainTarget(s, target, new Set([target.id]), 2.5);
     if (next) {
       s.projectiles.push({
@@ -1123,6 +1123,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
         fromTower: 'firewall',
         damageType: p.damageType,
         trail: [],
+        ricochetDone: true,
       });
     }
   }

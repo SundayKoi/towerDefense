@@ -212,6 +212,8 @@ export interface Projectile {
   slow?: { pct: number; duration: number };
   chain?: { jumps: number; falloff: number; hit: Set<number> };
   trail: Vec2[];
+  // True on projectiles spawned from a firewall ricochet to prevent infinite re-ricochet.
+  ricochetDone?: boolean;
 }
 
 export interface Particle {
