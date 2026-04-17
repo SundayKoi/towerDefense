@@ -13,6 +13,7 @@ import { openShopScreen } from '@/ui/shop';
 import { mount } from '@/ui/screens';
 import { audio } from '@/audio/sfx';
 import type { Difficulty, EnemyId, RunState, SaveData, TowerId } from '@/types';
+import { ENEMIES } from '@/data/enemies';
 import { getMap, isSurvival } from '@/data/maps';
 
 // ---------- Helpers ----------
@@ -20,6 +21,27 @@ import { getMap, isSurvival } from '@/data/maps';
 function isBossWave(r: RunState, wave: number): boolean {
   const bosses = getMap(r.mapId).bosses[r.difficulty];
   return bosses[wave] != null;
+}
+
+function showEnemyIntroBanner(defId: EnemyId): void {
+  const def = ENEMIES[defId];
+  const threatColor: Record<string, string> = {
+    LOW: '#00ff88', MEDIUM: '#ffd600', HIGH: '#ff9900', EXTREME: '#ff3355',
+    BOSS: '#ff2d95', MEGA: '#b847ff', FINAL: '#ffffff',
+  };
+  const col = threatColor[def.threat] ?? '#ff9900';
+  const el = document.createElement('div');
+  el.className = 'enemy-intro-banner';
+  el.style.cssText = `border-color:${col};`;
+  el.innerHTML = `
+    <div class="eib-threat" style="color:${col}">// NEW THREAT DETECTED — ${def.threat}</div>
+    <div class="eib-name" style="color:${col}">${def.name}</div>
+    <div class="eib-desc">${def.description}</div>
+    <div class="eib-tip">COUNTER: ${def.counterTip}</div>
+  `;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('eib-fade'), 3200);
+  setTimeout(() => el.remove(), 4000);
 }
 
 function showWaveBanner(r: RunState): void {
@@ -186,8 +208,21 @@ function wireGameScreen() {
     hoverCell = { x: gx, y: gy };
 
     if (run.selection.kind === 'placing') {
+      const defId = run.selection.def;
+      // Singleton check: already have this tower type deployed
+      if (run.towers.some((t) => t.def === defId)) {
+        const msg = document.createElement('div');
+        msg.className = 'wave-banner';
+        msg.innerHTML = `<div class="wb-small">// SINGLETON LIMIT</div><div class="wb-big">ALREADY DEPLOYED</div>`;
+        document.body.appendChild(msg);
+        setTimeout(() => msg.remove(), 1600);
+        run.selection = { kind: 'none' };
+        h.cancelBtn.style.display = 'none';
+        audio.play('sell');
+        return;
+      }
       if (canPlaceAt(run, { x: gx, y: gy })) {
-        placeTower(run, run.selection.def, { x: gx, y: gy });
+        placeTower(run, defId, { x: gx, y: gy });
         run.selection = { kind: 'none' };
         h.cancelBtn.style.display = 'none';
         renderPalette(h, run, activatePlacement);
@@ -274,6 +309,7 @@ function startLoop() {
         onVictory: () => finishRun(true),
         onLevelUp: () => openLevelUpDraft(),
         onWaveCleared: () => {},
+        onNewEnemy: (defId) => showEnemyIntroBanner(defId),
         onAutoStart: () => {
           if (!run) return;
           if (tryShowIntelForUpcomingWave(run)) return;

@@ -1,4 +1,4 @@
-import type { DamageType, EnemyInstance, Projectile, RunState, TowerId, TowerInstance, Vec2 } from '@/types';
+import type { DamageType, EnemyId, EnemyInstance, Projectile, RunState, TowerId, TowerInstance, Vec2 } from '@/types';
 import { ENEMIES } from '@/data/enemies';
 import { TOWERS } from '@/data/towers';
 import { getMap, pathLength, posOnPath } from '@/data/maps';
@@ -35,27 +35,17 @@ export interface EngineEvents {
   onLevelUp: () => void;       // fires when s.pendingLevelUps goes from 0 → >0
   onWaveCleared: () => void;   // optional end-of-wave bonus hook
   onAutoStart: () => void;     // fires when the 10s countdown expires
+  onNewEnemy?: (defId: EnemyId) => void; // first encounter this run
 }
 
 export function endWave(s: RunState, events: EngineEvents): void {
-  // Wave-clear XP bonus
   const bonus = 25 + s.wave * 8;
   grantXp(s, bonus);
-  // Meta currency: 1 protocol per wave, +2 on boss waves
   const isBoss = bossForWave(getMap(s.mapId), s.difficulty, s.wave) != null;
   const proto = isBoss ? 3 : 1;
   s.protocolsEarned += proto;
   s.floaters.push({ pos: { x: 0, y: -0.5 }, text: `+${proto} \u2b22 PROTOCOL`, vy: -18, life: 2, maxLife: 2, color: '#ffd600', size: 16 });
-  // Floating XP notice
-  s.floaters.push({
-    pos: { x: 0, y: 0 },
-    text: `+${bonus} XP`,
-    vy: -20,
-    life: 2,
-    maxLife: 2,
-    color: '#00fff0',
-    size: 28,
-  });
+  s.floaters.push({ pos: { x: 0, y: 0 }, text: `+${bonus} XP`, vy: -20, life: 2, maxLife: 2, color: '#00fff0', size: 28 });
   if (s.wave >= s.totalWaves) {
     s.phase = 'victory';
     events.onVictory();
@@ -68,7 +58,7 @@ export function endWave(s: RunState, events: EngineEvents): void {
 
 // ======================= Spawning =======================
 
-function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number, isBoss = false): void {
+function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number, isBoss = false, events?: EngineEvents): void {
   const def = ENEMIES[defId];
   const map = getMap(s.mapId);
   let hp = def.hp;
@@ -84,6 +74,13 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
   const speed = def.speed * (s.mods.enemySpeedMult) * (1 + Math.min(0.3, (s.wave - 1) * 0.01));
   const path = map.paths[pathIndex] ?? map.paths[0];
   const start = path.points[0];
+
+  // First-encounter detection for enemy intro popups
+  if (events?.onNewEnemy && !s.seenThisRun.has(defId)) {
+    s.seenThisRun.add(defId);
+    events.onNewEnemy(defId);
+  }
+
   s.enemies.push({
     id: nextId(),
     def: defId,
@@ -126,8 +123,9 @@ function updatePuddles(s: RunState, dt: number): void {
     for (const e of s.enemies) {
       if (!e.alive) continue;
       if (Math.hypot(e.pos.x - pu.pos.x, e.pos.y - pu.pos.y) <= pu.radius) {
-        if (pu.slowPct > 0 && !ENEMIES[e.def].slowImmune) {
-          e.speedMult = Math.min(e.speedMult, 1 - pu.slowPct);
+        const slowPct = pu.slowPct + (hasEffect(s, 'sentinel', 'contamination') ? 0.25 : 0);
+        if (slowPct > 0 && !ENEMIES[e.def].slowImmune) {
+          e.speedMult = Math.min(e.speedMult, 1 - slowPct);
           e.slowTimer = Math.max(e.slowTimer, pu.slowDuration);
         }
         if (pu.damagePerSec) {
@@ -137,6 +135,126 @@ function updatePuddles(s: RunState, dt: number): void {
     }
   }
   s.puddles = s.puddles.filter((pu) => pu.timeLeft > 0);
+}
+
+// ======================= Sentinel passive field =======================
+
+function updateSentinelTower(s: RunState, t: TowerInstance, dt: number): void {
+  const def = TOWERS[t.def];
+  const range = effectiveRange(s, t) + (hasEffect(s, 'sentinel', 'expanded') ? 0.8 : 0);
+  const baseDps = hasEffect(s, 'sentinel', 'reinforced') ? 20 : def.damage;
+  const slowPct = hasEffect(s, 'sentinel', 'anchor') ? 0.45 : def.slow!.pct;
+  const slowDur = def.slow!.duration;
+
+  // Pulse-link: mark all enemies in range every 5s
+  t.extras.pulseTimer = (t.extras.pulseTimer ?? 0) - dt;
+  if (hasEffect(s, 'sentinel', 'pulse_link') && t.extras.pulseTimer <= 0) {
+    t.extras.pulseTimer = 5;
+    for (const e of s.enemies) {
+      if (!e.alive) continue;
+      if (Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= range) {
+        e.marked = Math.max(e.marked ?? 0, 2);
+      }
+    }
+    t.fireFlash = 0.3;
+  }
+
+  for (const e of s.enemies) {
+    if (!e.alive) continue;
+    const dist = Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y);
+    if (dist > range) continue;
+
+    // Slow
+    const slowImmune = ENEMIES[e.def].slowImmune;
+    if (!slowImmune || hasEffect(s, 'sentinel', 'anchor')) {
+      const actualSlow = (slowImmune && hasEffect(s, 'sentinel', 'anchor')) ? 0.20 : slowPct;
+      e.speedMult = Math.min(e.speedMult, 1 - actualSlow);
+      e.slowTimer = Math.max(e.slowTimer, slowDur * 2);
+    }
+
+    // Damage
+    damageEnemy(s, e, baseDps * dt, false, 'energy');
+  }
+
+  // Gentle fireFlash pulse for visual
+  t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dt;
+  if (t.extras.flashTimer <= 0) {
+    t.extras.flashTimer = 1.0;
+    t.fireFlash = 0.15;
+  }
+}
+
+// ======================= Pulse (EMP) burst =======================
+
+function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
+  t.cooldown = Math.max(0, t.cooldown - dt);
+
+  const rechargeTime = 2.5 - (hasEffect(s, 'pulse', 'frequency') ? 0.7 : 0);
+  const range = effectiveRange(s, t) + (hasEffect(s, 'pulse', 'amplify') ? 0.6 : 0);
+
+  if (t.cooldown <= 0) {
+    t.extras.burstCount = (t.extras.burstCount ?? 0) + 1;
+    const isOverload = hasEffect(s, 'pulse', 'overload') && t.extras.burstCount % 4 === 0;
+    const dmgMult = isOverload ? 3.0 : 1.0;
+    const baseDmg = effectiveDamage(s, t) * dmgMult;
+
+    let hitAny = false;
+    for (const e of s.enemies) {
+      if (!e.alive) continue;
+      const dist = Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y);
+      if (dist > range) continue;
+      hitAny = true;
+
+      damageEnemy(s, e, baseDmg, false, 'energy');
+
+      // Stun effect
+      if (hasEffect(s, 'pulse', 'stun') && !ENEMIES[e.def].slowImmune) {
+        e.speedMult = 0;
+        e.slowTimer = Math.max(e.slowTimer, 0.5);
+      }
+
+      // Cascade: push enemy back slightly
+      if (hasEffect(s, 'pulse', 'cascade')) {
+        e.progress = Math.max(0, e.progress - 0.15);
+      }
+
+      // Storm pulse synergy: trigger chain arc on each hit
+      if (hasEffect(s, 'pulse', 'storm_pulse')) {
+        const chainT = s.towers.find((tw) => tw.def === 'chain');
+        if (chainT) {
+          const hit = new Set<number>([e.id]);
+          const next = findChainTarget(s, e, hit, hasEffect(s, 'chain', 'nova') ? 4.4 : 2.2);
+          if (next) {
+            s.projectiles.push({
+              id: nextId(),
+              pos: { x: e.pos.x, y: e.pos.y },
+              target: next.id,
+              targetPos: { x: next.pos.x, y: next.pos.y },
+              damage: effectiveDamage(s, chainT) * (hasEffect(s, 'chain', 'discharge') ? 1.0 : 0.8),
+              speed: 30,
+              color: TOWERS.chain.projectileColor,
+              trailColor: TOWERS.chain.trailColor,
+              fromTower: 'chain',
+              damageType: 'chain',
+              chain: { jumps: 2, falloff: hasEffect(s, 'chain', 'discharge') ? 1.0 : 0.8, hit },
+              trail: [],
+            });
+          }
+        }
+      }
+    }
+
+    if (hitAny || true) {
+      // Visual burst ring
+      spawnExplosion(s, t.grid, TOWERS.pulse.projectileColor, range * 0.5);
+      t.fireFlash = 0.4;
+      if (isOverload) {
+        s.floaters.push({ pos: { x: t.grid.x, y: t.grid.y - 0.8 }, text: 'OVERLOAD!', vy: -28, life: 1.2, maxLife: 1.2, color: '#ffffff', size: 18 });
+      }
+      audio.play('fire_pulse');
+    }
+    t.cooldown = rechargeTime;
+  }
 }
 
 // ======================= Update =======================
@@ -151,7 +269,7 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
 
   if (s.shakeTime > 0) s.shakeTime = Math.max(0, s.shakeTime - dtSec);
 
-  // Auto-start countdown (set after wave clears)
+  // Auto-start countdown
   if (s.phase === 'prep' && s.autoStartTimer !== null) {
     s.autoStartTimer -= dtSec;
     if (s.autoStartTimer <= 0) {
@@ -165,7 +283,7 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     s.spawnElapsed += dtSec;
     const first = s.spawnQueue[0];
     if (s.spawnElapsed >= first.delay) {
-      spawnEnemy(s, first.def, first.pathIndex, first.boss);
+      spawnEnemy(s, first.def, first.pathIndex, first.boss, events);
       s.spawnQueue.shift();
       s.spawnElapsed = 0;
     }
@@ -180,6 +298,21 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       if (e.slowTimer <= 0) e.speedMult = 1;
     }
     if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dtSec);
+    if (e.marked !== undefined && e.marked > 0) {
+      e.marked = Math.max(0, e.marked - dtSec);
+    }
+
+    // Honeypot coating: spread slow to adjacent enemies
+    if (hasEffect(s, 'honeypot', 'coating') && e.speedMult < 0.9) {
+      for (const other of s.enemies) {
+        if (!other.alive || other.id === e.id) continue;
+        if (Math.hypot(other.pos.x - e.pos.x, other.pos.y - e.pos.y) <= 0.8 && !ENEMIES[other.def].slowImmune) {
+          other.speedMult = Math.min(other.speedMult, 1 - (1 - e.speedMult) * 0.5);
+          other.slowTimer = Math.max(other.slowTimer, 0.5);
+        }
+      }
+    }
+
     const speed = e.baseSpeed * e.speedMult;
     e.progress += speed * dtSec;
     const path = map.paths[e.pathIndex] ?? map.paths[0];
@@ -187,7 +320,8 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     e.pos.x = pos.x;
     e.pos.y = pos.y;
     e.angle = pos.angle;
-    // Rootkit: periodically infects nearby towers.
+
+    // Rootkit: periodically infects nearby towers
     if (e.def === 'rootkit') {
       e.debuffTimer = (e.debuffTimer ?? 4) - dtSec;
       if (e.debuffTimer <= 0) {
@@ -198,6 +332,20 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
           }
         }
       }
+    }
+
+    // Parasite: infects nearest tower on close approach then dies
+    if (e.def === 'parasite') {
+      for (const t of s.towers) {
+        if (Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) <= 0.6) {
+          applyTowerDebuff(s, t, 'infected', 6);
+          e.alive = false;
+          spawnDeathBurst(s, e.pos, ENEMIES.parasite.color, ENEMIES.parasite.accent, 8);
+          s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'INFECTED!', vy: -22, life: 1.5, maxLife: 1.5, color: '#a800ff', size: 16 });
+          break;
+        }
+      }
+      if (!e.alive) continue;
     }
 
     const total = pathLength(path);
@@ -212,15 +360,7 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
         if (s.mods.revive) {
           s.mods.revive = false;
           s.hp = 5;
-          s.floaters.push({
-            pos: { x: 0, y: 0 },
-            text: 'REVIVE',
-            vy: -30,
-            life: 2,
-            maxLife: 2,
-            color: '#ffae00',
-            size: 36,
-          });
+          s.floaters.push({ pos: { x: 0, y: 0 }, text: 'REVIVE', vy: -30, life: 2, maxLife: 2, color: '#ffae00', size: 36 });
           audio.play('revive');
         } else {
           s.hp = 0;
@@ -237,6 +377,19 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
 
   // Tower updates
   for (const t of s.towers) {
+    if (t.def === 'sentinel') {
+      updateSentinelTower(s, t, dtSec);
+      if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
+      continue;
+    }
+    if (t.def === 'pulse') {
+      // debuff ticking
+      for (const d of t.debuffs) d.timeLeft -= dtSec;
+      t.debuffs = t.debuffs.filter((d) => d.timeLeft > 0);
+      updatePulseTower(s, t, dtSec);
+      if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
+      continue;
+    }
     updateTower(s, t, dtSec);
     if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
   }
@@ -250,8 +403,6 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
 
   tickFxOnly(s, dtSec);
 
-  // Level-up: fire whenever pending > 0. Callback is responsible for flipping phase to 'draft'
-  // so subsequent frames early-return (see top of updateRun).
   if (s.pendingLevelUps > 0) {
     events.onLevelUp();
   }
@@ -298,10 +449,19 @@ function effectiveFireRate(s: RunState, t: TowerInstance): number {
   const specificRate = s.mods.towerRate[t.def] ?? 0;
   let rate = def.fireRate * (1 + s.mods.globalRatePct + specificRate);
   if (t.debuffs.some((d) => d.kind === 'jammed')) rate *= 0.35;
+  // Scrambler feedback: +0.5 fire rate per debuffed enemy in range
+  if (t.def === 'scrambler' && hasEffect(s, 'scrambler', 'feedback')) {
+    const range = effectiveRange(s, t);
+    const debuffedInRange = s.enemies.filter((e) =>
+      e.alive && e.armor < (ENEMIES[e.def].armor ?? 0) &&
+      Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= range
+    ).length;
+    rate += debuffedInRange * 0.5;
+  }
   return rate;
 }
 
-function applyTowerDebuff(s: RunState, t: TowerInstance, kind: 'jammed' | 'infected', duration: number): void {
+export function applyTowerDebuff(s: RunState, t: TowerInstance, kind: 'jammed' | 'infected', duration: number): void {
   const existing = t.debuffs.find((d) => d.kind === kind);
   if (existing) { existing.timeLeft = Math.max(existing.timeLeft, duration); return; }
   t.debuffs.push({ kind, timeLeft: duration });
@@ -321,7 +481,15 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
   t.debuffs = t.debuffs.filter((d) => d.timeLeft > 0);
   t.cooldown = Math.max(0, t.cooldown - dt);
 
-  // Railgun capacitor: charge for 8s then auto-fire a 5× mega shot at best target.
+  // Quantum observer: charge idle time for extra crit mult
+  if (t.def === 'quantum' && hasEffect(s, 'quantum', 'observer')) {
+    if (t.cooldown > 0) {
+      // Not firing — accumulate charge (capped at 6 = +3.0 extra mult)
+      t.extras.observerCharge = Math.min(6, (t.extras.observerCharge ?? 0) + dt * 2);
+    }
+  }
+
+  // Railgun capacitor: charge for 8s then auto-fire a 5× mega shot
   if (t.def === 'railgun' && hasEffect(s, 'railgun', 'capacitor')) {
     t.extras.chargeTimer = (t.extras.chargeTimer ?? 8) - dt;
     if (t.extras.chargeTimer <= 0) {
@@ -358,6 +526,7 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
       }
     }
   }
+
   const range = effectiveRange(s, t);
   let best: EnemyInstance | null = null;
   let bestScore = -Infinity;
@@ -367,7 +536,6 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
     const dy = e.pos.y - t.grid.y;
     const dist = Math.hypot(dx, dy);
     if (dist > range) continue;
-    // Score by target mode — higher is better.
     let score = 0;
     switch (t.targetMode) {
       case 'first':  score = e.progress; break;
@@ -375,10 +543,9 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
       case 'weak':   score = -e.hp; break;
       case 'close':  score = -dist; break;
     }
-    if (score > bestScore) {
-      bestScore = score;
-      best = e;
-    }
+    // Antivirus overdrive: prefer marked targets
+    if (t.def === 'antivirus' && hasEffect(s, 'antivirus', 'lockdown') && (e.marked ?? 0) > 0) score += 999;
+    if (score > bestScore) { bestScore = score; best = e; }
   }
   if (best) {
     t.targetId = best.id;
@@ -401,7 +568,13 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   const specificCrit = s.mods.towerCrit[t.def] ?? 0;
   const critChance = (def.crit?.chance ?? 0) + s.mods.globalCritChance + specificCrit;
   if (critChance > 0 && Math.random() < critChance) isCrit = true;
-  const critMult = def.crit?.mult ?? 3;
+
+  // Quantum observer: boost crit mult on next shot
+  let critMult = def.crit?.mult ?? 3;
+  if (t.def === 'quantum' && hasEffect(s, 'quantum', 'observer') && (t.extras.observerCharge ?? 0) > 0) {
+    critMult += (t.extras.observerCharge ?? 0) * 0.5;
+    t.extras.observerCharge = 0;
+  }
   const dmg = isCrit ? baseDmg * critMult : baseDmg;
 
   if (t.def === 'mine') {
@@ -412,7 +585,23 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
       if (!e.alive || e.id === target.id) continue;
       if (Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= aoeRadius) {
         damageEnemy(s, e, dmg * 1.5, false, def.damageType);
+        // Mine stun
+        if (hasEffect(s, 'mine', 'stun') && !ENEMIES[e.def].slowImmune) {
+          e.speedMult = 0;
+          e.slowTimer = Math.max(e.slowTimer, 1.2);
+        }
+        // Mine armor strip
+        if (hasEffect(s, 'mine', 'armor_strip')) {
+          e.armor = Math.max(0, e.armor - 10);
+        }
       }
+    }
+    if (hasEffect(s, 'mine', 'stun') && !ENEMIES[target.def].slowImmune) {
+      target.speedMult = 0;
+      target.slowTimer = Math.max(target.slowTimer, 1.2);
+    }
+    if (hasEffect(s, 'mine', 'armor_strip')) {
+      target.armor = Math.max(0, target.armor - 10);
     }
     spawnExplosion(s, t.grid, '#ffd600', aoeRadius);
     if (hasEffect(s, 'mine', 'cluster')) {
@@ -442,6 +631,13 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   if (t.def === 'chain') {
     if (hasEffect(s, 'chain', 'storm')) chainJumps += 2;
     if (hasEffect(s, 'chain', 'discharge')) chainFalloff = 1.0;
+    // Megavolt: every 6th shot has unlimited jumps
+    t.extras.shotCount = (t.extras.shotCount ?? 0) + 1;
+    if (hasEffect(s, 'chain', 'megavolt') && t.extras.shotCount % 6 === 0) {
+      chainJumps = 999;
+      chainFalloff = 1.0;
+      s.floaters.push({ pos: { x: t.grid.x, y: t.grid.y - 0.8 }, text: 'MEGAVOLT!', vy: -28, life: 1.0, maxLife: 1.0, color: '#ffffff', size: 16 });
+    }
   }
 
   const proj: Projectile = {
@@ -464,7 +660,7 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   };
   s.projectiles.push(proj);
 
-  // Antivirus: fire 2 (or 3 with triple) projectiles at nearest enemies.
+  // Antivirus: fire 2 (or 3 with triple) projectiles at nearest enemies
   if (t.def === 'antivirus') {
     const range = effectiveRange(s, t);
     const triple = hasEffect(s, 'antivirus', 'triple');
@@ -489,14 +685,18 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
         trail: [],
       });
     }
+    // Antivirus overdrive: every 3rd kill fires a free crit
+    if (hasEffect(s, 'antivirus', 'overdrive')) {
+      t.extras.killStreak = (t.extras.killStreak ?? 0);
+    }
   }
 
-  // Quantum: 35% chance to fire twice with superposition.
+  // Quantum: 35% chance to fire twice
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'double') && Math.random() < 0.35) {
     s.projectiles.push({ ...proj, id: nextId(), pos: { x: t.grid.x, y: t.grid.y }, trail: [] });
   }
 
-  // Firewall burst: every 4th shot fires triple spread.
+  // Firewall burst: every 4th shot fires triple spread
   if (t.def === 'firewall' && hasEffect(s, 'firewall', 'burst')) {
     t.extras.shotCount = (t.extras.shotCount ?? 0) + 1;
     if (t.extras.shotCount >= 4) {
@@ -544,7 +744,8 @@ function updateProjectile(s: RunState, p: Projectile, dt: number): void {
       hitEnemy(s, p, target);
       // Real pierce: find next enemy in travel direction and continue
       if (p.pierce) {
-        const next = findPierceTarget(s, p, target);
+        const pierceAngle = p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'penetrator') ? 0.35 : 0.55;
+        const next = findPierceTarget(s, p, target, pierceAngle);
         if (next) {
           p.target = next.id;
           p.targetPos = { x: next.pos.x, y: next.pos.y };
@@ -568,20 +769,52 @@ function updateProjectile(s: RunState, p: Projectile, dt: number): void {
 }
 
 function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
+  const markedBonus = (target.marked ?? 0) > 0 ? 1.3 : 1.0;
+
   // Quantum phase shift: treat armor as 0
-  const phaseShift = p.fromTower === 'quantum' && hasEffect(s, 'quantum', 'phase');
+  const phaseShift = p.fromTower === 'quantum' && (hasEffect(s, 'quantum', 'phase') ||
+    (hasEffect(s, 'quantum', 'decoherence') && target.armor < (ENEMIES[target.def].armor ?? 0)));
   if (phaseShift) {
     const saved = target.armor;
     target.armor = 0;
-    damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType);
+    damageEnemy(s, target, p.damage * markedBonus, p.isCrit ?? false, p.damageType);
     if (target.alive) target.armor = saved;
   } else {
-    damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType);
+    damageEnemy(s, target, p.damage * markedBonus, p.isCrit ?? false, p.damageType);
   }
 
   if (p.slow && !ENEMIES[target.def].slowImmune) {
     target.speedMult = Math.min(target.speedMult, 1 - p.slow.pct);
     target.slowTimer = Math.max(target.slowTimer, p.slow.duration);
+  }
+
+  // Scrambler: reduce armor
+  if (p.fromTower === 'scrambler') {
+    const stripAmount = hasEffect(s, 'scrambler', 'deep_scan') ? 6 : 3;
+    target.armor = Math.max(0, target.armor - stripAmount);
+    // Cripple: also slow
+    if (hasEffect(s, 'scrambler', 'cripple') && !ENEMIES[target.def].slowImmune) {
+      target.speedMult = Math.min(target.speedMult, 0.7);
+      target.slowTimer = Math.max(target.slowTimer, 3);
+    }
+    // Overwrite: 20% chance to zero armor
+    if (hasEffect(s, 'scrambler', 'overwrite') && Math.random() < 0.20) {
+      target.armor = 0;
+      s.floaters.push({ pos: { x: target.pos.x, y: target.pos.y - 0.4 }, text: 'OVERWRITE!', vy: -22, life: 1.0, maxLife: 1.0, color: '#ff2d95', size: 14 });
+    }
+    // Broadcast: apply to all enemies in range
+    if (hasEffect(s, 'scrambler', 'broadcast')) {
+      const scramblerTower = s.towers.find((tw) => tw.def === 'scrambler');
+      if (scramblerTower) {
+        const range = effectiveRange(s, scramblerTower);
+        for (const e of s.enemies) {
+          if (!e.alive || e.id === target.id) continue;
+          if (Math.hypot(e.pos.x - scramblerTower.grid.x, e.pos.y - scramblerTower.grid.y) <= range) {
+            e.armor = Math.max(0, e.armor - stripAmount);
+          }
+        }
+      }
+    }
   }
 
   // Antivirus quarantine: apply slow on hit
@@ -590,14 +823,108 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     target.slowTimer = Math.max(target.slowTimer, 1.2);
   }
 
-  // Honeypot: drop a persistent slow puddle at impact point.
+  // Antivirus lockdown: mark target
+  if (p.fromTower === 'antivirus' && hasEffect(s, 'antivirus', 'lockdown')) {
+    const dur = hasEffect(s, 'antivirus', 'surgical') ? 4 : 2;
+    target.marked = Math.max(target.marked ?? 0, dur);
+  }
+
+  // Firewall tracer: mark target
+  if (p.fromTower === 'firewall' && hasEffect(s, 'firewall', 'tracer')) {
+    target.marked = Math.max(target.marked ?? 0, 2);
+  }
+
+  // Firewall ricochet: fire at 2nd nearby enemy
+  if (p.fromTower === 'firewall' && hasEffect(s, 'firewall', 'ricochet')) {
+    const next = findChainTarget(s, target, new Set([target.id]), 2.5);
+    if (next) {
+      s.projectiles.push({
+        id: nextId(),
+        pos: { x: target.pos.x, y: target.pos.y },
+        target: next.id,
+        targetPos: { x: next.pos.x, y: next.pos.y },
+        damage: p.damage * 0.55,
+        speed: p.speed,
+        color: p.color,
+        trailColor: p.trailColor,
+        fromTower: 'firewall',
+        damageType: p.damageType,
+        trail: [],
+      });
+    }
+  }
+
+  // Firewall overdrive: kills reduce cooldown
+  if (p.fromTower === 'firewall' && hasEffect(s, 'firewall', 'overdrive') && !target.alive) {
+    const fw = s.towers.find((tw) => tw.def === 'firewall');
+    if (fw) fw.cooldown = Math.max(0, fw.cooldown - (p.isCrit ? 0.8 : 0.4));
+  }
+
+  // Sniper callout: mark target
+  if (p.fromTower === 'sniper' && hasEffect(s, 'sniper', 'callout')) {
+    const dur = hasEffect(s, 'sniper', 'surgical') ? 6 : 3;
+    target.marked = Math.max(target.marked ?? 0, dur);
+  }
+
+  // Sniper overwatch_pen: +100% to marked
+  if (p.fromTower === 'sniper' && hasEffect(s, 'sniper', 'overwatch_pen') && (target.marked ?? 0) > 0) {
+    damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType); // deal extra 100%
+  }
+
+  // Sniper execute: triple damage below 25% HP
+  if (p.fromTower === 'sniper' && hasEffect(s, 'sniper', 'execute') && target.hp / target.maxHp < 0.25) {
+    damageEnemy(s, target, p.damage * 2, p.isCrit ?? false, p.damageType);
+  }
+
+  // Sniper oneshot: instant kill non-boss below 40% if crit + marked
+  if (p.fromTower === 'sniper' && hasEffect(s, 'sniper', 'oneshot') && p.isCrit &&
+      (target.marked ?? 0) > 0 && !target.isBoss && target.hp / target.maxHp < 0.40) {
+    damageEnemy(s, target, target.hp * 10, true, p.damageType);
+    s.floaters.push({ pos: { x: target.pos.x, y: target.pos.y - 0.4 }, text: 'ONE SHOT', vy: -30, life: 1.2, maxLife: 1.2, color: '#00ff88', size: 20 });
+  }
+
+  // Sniper feedback (rapidfire): kills reduce cooldown
+  if (p.fromTower === 'sniper' && hasEffect(s, 'sniper', 'rapidfire') && !target.alive) {
+    const sn = s.towers.find((tw) => tw.def === 'sniper');
+    if (sn) sn.cooldown = Math.max(0, sn.cooldown - 0.8);
+  }
+
+  // Quantum collapse: reduce armor on hit
+  if (p.fromTower === 'quantum' && hasEffect(s, 'quantum', 'collapse')) {
+    target.armor = Math.max(0, target.armor * 0.5);
+    setTimeout(() => {
+      if (target.alive) target.armor = ENEMIES[target.def].armor ?? 0;
+    }, 1500); // crude timer — engine-side we rely on the armor being naturally reset when killed
+  }
+
+  // Railgun feedback (kills): reduce cooldown
+  if (p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'feedback') && !target.alive) {
+    const rl = s.towers.find((tw) => tw.def === 'railgun');
+    if (rl) rl.cooldown = Math.max(0, rl.cooldown - 0.6);
+  }
+
+  // Railgun overwatch_pen: +100% to marked
+  if (p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'overwatch_pen') && (target.marked ?? 0) > 0) {
+    damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType);
+  }
+
+  // Honeypot: drop a persistent slow puddle at impact point
   if (p.fromTower === 'honeypot') {
     const persistent = hasEffect(s, 'honeypot', 'persistent');
     const overflow = hasEffect(s, 'honeypot', 'overflow');
     const acid = hasEffect(s, 'honeypot', 'acid');
+    const napalm = hasEffect(s, 'honeypot', 'napalm');
     const dur = persistent ? 6.4 : 3.2;
     const rad = overflow ? 2.2 : 1.1;
-    s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: rad, timeLeft: dur, maxTime: dur, slowPct: 0.4, slowDuration: 0.6, damagePerSec: acid ? 10 : undefined });
+    // Napalm synergy: fire damage using firewall tower's damage
+    let dps: number | undefined = acid ? 10 : undefined;
+    let puddleColor: string | undefined;
+    if (napalm) {
+      const fw = s.towers.find((tw) => tw.def === 'firewall');
+      dps = fw ? effectiveDamage(s, fw) * 0.4 : 15;
+      puddleColor = '#ff6b00';
+    }
+    s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: rad, timeLeft: dur, maxTime: dur, slowPct: 0.4, slowDuration: 0.6, damagePerSec: dps, color: puddleColor });
   }
 
   // Firewall incendiary: leave a small fire damage zone
@@ -605,7 +932,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 0.6, timeLeft: 1.5, maxTime: 1.5, slowPct: 0, slowDuration: 0, damagePerSec: 18, color: '#ff6b00' });
   }
 
-  // Ice: absolute zero (stop enemies) or shard storm
+  // Ice effects
   if (p.fromTower === 'ice') {
     if (hasEffect(s, 'ice', 'freeze') && !ENEMIES[target.def].slowImmune) {
       target.speedMult = 0;
@@ -616,6 +943,25 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
         const a = (i / 6) * Math.PI * 2;
         s.puddles.push({ pos: { x: p.pos.x + Math.cos(a) * p.aoe * 0.8, y: p.pos.y + Math.sin(a) * p.aoe * 0.8 }, radius: 0.4, timeLeft: 2.0, maxTime: 2.0, slowPct: 0.35, slowDuration: 0.5, color: '#88eeff' });
       }
+    }
+    if (hasEffect(s, 'ice', 'permafrost')) {
+      s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 0.8, timeLeft: 3.0, maxTime: 3.0, slowPct: 0.20, slowDuration: 0.4, color: '#aaddff' });
+    }
+    // Avalanche: if target was fully stopped, bigger explosion
+    if (hasEffect(s, 'ice', 'avalanche') && target.speedMult === 0 && p.aoe) {
+      const bigAoe = p.aoe * 1.4;
+      spawnExplosion(s, { x: p.pos.x, y: p.pos.y }, '#00aaff', bigAoe);
+      for (const e of s.enemies) {
+        if (!e.alive || e.id === target.id) continue;
+        if (Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) <= bigAoe) {
+          damageEnemy(s, e, p.damage * 2, p.isCrit ?? false, p.damageType);
+        }
+      }
+      s.floaters.push({ pos: { x: p.pos.x, y: p.pos.y - 0.4 }, text: 'AVALANCHE!', vy: -28, life: 1.0, maxLife: 1.0, color: '#00aaff', size: 16 });
+    }
+    // Cryo break synergy: 2x damage to armor-stripped enemies
+    if (hasEffect(s, 'ice', 'cryo_break') && target.armor < (ENEMIES[target.def].armor ?? 0)) {
+      damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType); // extra 100%
     }
   }
 
@@ -630,7 +976,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     }
   }
 
-  // Railgun shockwave: heavy slow on pierce
+  // Railgun shockwave
   if (p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'shockwave') && !ENEMIES[target.def].slowImmune) {
     target.speedMult = Math.min(target.speedMult, 0.3);
     target.slowTimer = Math.max(target.slowTimer, 1.5);
@@ -657,20 +1003,35 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       });
     }
   }
+
   if (p.aoe) {
     spawnExplosion(s, { x: p.pos.x, y: p.pos.y }, p.color, p.aoe);
     for (const e of s.enemies) {
       if (!e.alive || e.id === target.id) continue;
       if (Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) <= p.aoe) {
         damageEnemy(s, e, p.damage * 0.75, p.isCrit ?? false, p.damageType);
+        // Mine stun in AoE
+        if (p.fromTower === 'mine' && hasEffect(s, 'mine', 'stun') && !ENEMIES[e.def].slowImmune) {
+          e.speedMult = 0;
+          e.slowTimer = Math.max(e.slowTimer, 1.2);
+        }
+        if (p.fromTower === 'mine' && hasEffect(s, 'mine', 'armor_strip')) {
+          e.armor = Math.max(0, e.armor - 10);
+        }
       }
     }
   }
+
   if (p.chain && p.chain.jumps > 0) {
     const chainRange = hasEffect(s, 'chain', 'nova') ? 4.4 : 2.2;
     const nextTarget = findChainTarget(s, target, p.chain.hit, chainRange);
     if (nextTarget) {
       p.chain.hit.add(nextTarget.id);
+      // Chain ground: stun
+      if (hasEffect(s, 'chain', 'ground') && !ENEMIES[nextTarget.def].slowImmune) {
+        nextTarget.speedMult = 0;
+        nextTarget.slowTimer = Math.max(nextTarget.slowTimer, 0.35);
+      }
       s.projectiles.push({
         ...p,
         id: nextId(),
@@ -683,9 +1044,15 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       });
     }
   }
+
+  // Chain ground stun on primary target too
+  if (p.fromTower === 'chain' && hasEffect(s, 'chain', 'ground') && !ENEMIES[target.def].slowImmune) {
+    target.speedMult = 0;
+    target.slowTimer = Math.max(target.slowTimer, 0.35);
+  }
 }
 
-function findPierceTarget(s: RunState, p: Projectile, exclude: EnemyInstance): EnemyInstance | null {
+function findPierceTarget(s: RunState, p: Projectile, exclude: EnemyInstance, minDot = 0.55): EnemyInstance | null {
   let dx = 0, dy = 1;
   if (p.trail.length > 0) {
     const last = p.trail[p.trail.length - 1];
@@ -701,7 +1068,7 @@ function findPierceTarget(s: RunState, p: Projectile, exclude: EnemyInstance): E
     const d = Math.hypot(ex, ey);
     if (d < 0.01) continue;
     const dot = (ex / d) * dx + (ey / d) * dy;
-    if (dot > 0.55 && d < bestDist) { best = e; bestDist = d; }
+    if (dot > minDot && d < bestDist) { best = e; bestDist = d; }
   }
   return best;
 }
@@ -712,15 +1079,11 @@ function findChainTarget(s: RunState, from: EnemyInstance, exclude: Set<number>,
   for (const e of s.enemies) {
     if (!e.alive || exclude.has(e.id)) continue;
     const d = Math.hypot(e.pos.x - from.pos.x, e.pos.y - from.pos.y);
-    if (d <= maxDist && d < bestD) {
-      best = e;
-      bestD = d;
-    }
+    if (d <= maxDist && d < bestD) { best = e; bestD = d; }
   }
   return best;
 }
 
-// Apply resistance multiplier + armor. Returns final damage applied.
 function applyResistanceAndArmor(e: EnemyInstance, raw: number, type: DamageType, isCrit: boolean): number {
   const def = ENEMIES[e.def];
   const resist = def.resistances?.[type];
@@ -736,16 +1099,7 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
   const def = ENEMIES[e.def];
   const final = applyResistanceAndArmor(e, dmg, type, isCrit);
   if (final <= 0) {
-    // Show "IMMUNE" feedback
-    s.floaters.push({
-      pos: { x: e.pos.x, y: e.pos.y - 0.4 },
-      text: 'IMMUNE',
-      vy: -18,
-      life: 0.8,
-      maxLife: 0.8,
-      color: '#6b8090',
-      size: 12,
-    });
+    s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'IMMUNE', vy: -18, life: 0.8, maxLife: 0.8, color: '#6b8090', size: 12 });
     e.hitFlash = 0.12;
     return;
   }
@@ -756,15 +1110,7 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
   const isWeakness = resist > 1;
   const text = isCrit ? `${Math.round(final)}!` : `${Math.round(final)}`;
   const color = isCrit ? '#ffd600' : isWeakness ? '#00ff88' : isResisted ? '#6b8090' : '#ff2d95';
-  s.floaters.push({
-    pos: { x: e.pos.x, y: e.pos.y - 0.4 },
-    text,
-    vy: -26,
-    life: 0.8,
-    maxLife: 0.8,
-    color,
-    size: isCrit ? 22 : isWeakness ? 18 : 16,
-  });
+  s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text, vy: -26, life: 0.8, maxLife: 0.8, color, size: isCrit ? 22 : isWeakness ? 18 : 16 });
   if (e.hp <= 0) killEnemy(s, e);
 }
 
@@ -772,15 +1118,7 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
   e.alive = false;
   const def = ENEMIES[e.def];
   grantXp(s, def.xp);
-  s.floaters.push({
-    pos: { x: e.pos.x, y: e.pos.y },
-    text: `+${def.xp} XP`,
-    vy: -40,
-    life: 0.9,
-    maxLife: 0.9,
-    color: '#00fff0',
-    size: 14,
-  });
+  s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y }, text: `+${def.xp} XP`, vy: -40, life: 0.9, maxLife: 0.9, color: '#00fff0', size: 14 });
   spawnDeathBurst(s, e.pos, def.color, def.accent, e.isBoss ? 30 : 14);
   audio.play(e.isBoss ? 'boss_die' : 'enemy_die');
   if (e.isBoss) {
@@ -789,7 +1127,17 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
     s.protocolsEarned += 5;
     s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.8 }, text: '+5 \u2b22 PROTOCOL', vy: -35, life: 1.8, maxLife: 1.8, color: '#ffd600', size: 20 });
   }
-  // Phantom death: EMP burst jams nearby towers for 3s.
+
+  // Glitch: splits into 2 worms on death
+  if (e.def === 'glitch' && !(e.debuffTimer === -999)) {
+    e.debuffTimer = -999; // prevent infinite loop
+    for (let i = 0; i < 2; i++) {
+      spawnWormAt(s, e.pos, e.pathIndex, e.progress);
+    }
+    s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'SPLIT!', vy: -22, life: 0.8, maxLife: 0.8, color: '#00ffcc', size: 14 });
+  }
+
+  // Phantom death: EMP burst jams nearby towers for 3s
   if (e.def === 'phantom') {
     for (const t of s.towers) {
       if (Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) <= 3.5) {
@@ -797,6 +1145,81 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
       }
     }
   }
+
+  // Honeypot detonation: death inside puddle explodes
+  if (hasEffect(s, 'honeypot', 'detonation')) {
+    for (const pu of s.puddles) {
+      if (Math.hypot(e.pos.x - pu.pos.x, e.pos.y - pu.pos.y) <= pu.radius) {
+        spawnExplosion(s, e.pos, '#ffd600', pu.radius);
+        for (const other of s.enemies) {
+          if (!other.alive) continue;
+          if (Math.hypot(other.pos.x - e.pos.x, other.pos.y - e.pos.y) <= pu.radius * 1.5) {
+            damageEnemy(s, other, 80, false, 'aoe');
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  // Antivirus overdrive: track kills, fire free crit
+  if (hasEffect(s, 'antivirus', 'overdrive')) {
+    const av = s.towers.find((t) => t.def === 'antivirus');
+    if (av) {
+      av.extras.killStreak = (av.extras.killStreak ?? 0) + 1;
+      if (av.extras.killStreak >= 3) {
+        av.extras.killStreak = 0;
+        // Find nearest enemy and fire a free crit at it
+        const nearest = s.enemies
+          .filter((e2) => e2.alive)
+          .sort((a, b) => Math.hypot(a.pos.x - av.grid.x, a.pos.y - av.grid.y) - Math.hypot(b.pos.x - av.grid.x, b.pos.y - av.grid.y))[0];
+        if (nearest) {
+          const def2 = TOWERS.antivirus;
+          s.projectiles.push({
+            id: nextId(),
+            pos: { x: av.grid.x, y: av.grid.y },
+            target: nearest.id,
+            targetPos: { x: nearest.pos.x, y: nearest.pos.y },
+            damage: effectiveDamage(s, av) * (def2.crit?.mult ?? 3),
+            speed: def2.projectileSpeed,
+            color: def2.projectileColor,
+            trailColor: def2.trailColor,
+            fromTower: 'antivirus',
+            damageType: def2.damageType,
+            isCrit: true,
+            pierce: true,
+            trail: [],
+          });
+          s.floaters.push({ pos: { x: av.grid.x, y: av.grid.y - 0.8 }, text: 'OVERDRIVE!', vy: -28, life: 1.0, maxLife: 1.0, color: '#ff2d95', size: 16 });
+        }
+      }
+    }
+  }
+}
+
+function spawnWormAt(s: RunState, pos: { x: number; y: number }, pathIndex: number, progress: number): void {
+  const def = ENEMIES.worm;
+  const hp = def.hp * hpScale(s.wave, s.difficulty) * 0.6;
+  s.enemies.push({
+    id: nextId(),
+    def: 'worm',
+    hp,
+    maxHp: hp,
+    pathIndex,
+    progress: Math.max(0, progress - 0.2),
+    pos: { x: pos.x + (Math.random() - 0.5) * 0.3, y: pos.y + (Math.random() - 0.5) * 0.3 },
+    baseSpeed: def.speed * s.mods.enemySpeedMult,
+    speedMult: 1,
+    slowTimer: 0,
+    armor: 0,
+    alive: true,
+    isBoss: false,
+    size: def.size * 0.8,
+    invisTimer: 0,
+    hitFlash: 0,
+    angle: 0,
+    debuffTimer: -999, // mark as split-spawn so they don't chain-split
+  });
 }
 
 function spawnExplosion(s: RunState, pos: Vec2, color: string, radius: number): void {
@@ -834,18 +1257,18 @@ function spawnDeathBurst(s: RunState, pos: Vec2, color: string, accent: string, 
 }
 
 // ======================= Placement helpers =======================
-// Default targeting mode depends on the tower's role: snipers favor STRONG, AOE favors FIRST,
-// mines are proximity so they default CLOSE.
+
 function defaultTargetMode(defId: keyof typeof TOWERS): TowerInstance['targetMode'] {
-  if (defId === 'antivirus' || defId === 'railgun') return 'strong';
+  if (defId === 'antivirus' || defId === 'railgun' || defId === 'sniper') return 'strong';
   if (defId === 'mine') return 'close';
   return 'first';
 }
 
-// Deploy a tower — requires a deploy token for that tower type.
 export function placeTower(s: RunState, defId: keyof typeof TOWERS, grid: Vec2): TowerInstance | null {
   const tokens = s.deployTokens[defId] ?? 0;
   if (tokens <= 0) return null;
+  // Singleton: only one of each tower type per run
+  if (s.towers.some((t) => t.def === defId)) return null;
   s.deployTokens[defId] = tokens - 1;
   const t: TowerInstance = {
     id: nextId(),
@@ -873,7 +1296,6 @@ export function cycleTargetMode(t: TowerInstance): void {
   audio.play('ui_click');
 }
 
-// Remove a tower (no refund, but frees the cell).
 export function removeTower(s: RunState, t: TowerInstance): void {
   s.towers = s.towers.filter((x) => x.id !== t.id);
   s.selection = { kind: 'none' };

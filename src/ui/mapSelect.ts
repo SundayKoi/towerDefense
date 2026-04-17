@@ -1,7 +1,19 @@
 import type { Screen } from './screens';
-import type { Difficulty, SaveData } from '@/types';
+import type { Difficulty, EnemyId, SaveData } from '@/types';
 import { MAPS, isSurvival } from '@/data/maps';
+import { ENEMIES } from '@/data/enemies';
 import { audio } from '@/audio/sfx';
+
+const THREAT_COLOR: Record<string, string> = {
+  LOW: '#00ff88', MEDIUM: '#ffd600', HIGH: '#ff9900',
+  EXTREME: '#ff3355', BOSS: '#ff2d95', MEGA: '#b847ff', FINAL: '#ffffff',
+};
+
+function enemyChip(id: EnemyId): string {
+  const def = ENEMIES[id];
+  const col = THREAT_COLOR[def.threat] ?? '#aaa';
+  return `<span class="enemy-chip" style="border-color:${col};color:${col}" title="${def.description} | COUNTER: ${def.counterTip}">${def.name}</span>`;
+}
 
 export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficulty: Difficulty) => void, onBack: () => void): Screen {
   return (root) => {
@@ -21,9 +33,6 @@ export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficul
 
     const list = root.querySelector('#map-list') as HTMLElement;
 
-    // Unlock rules:
-    // - Campaign map N unlocked if map N-1 easy completed. Map 1 always unlocked.
-    // - Survival unlocked after clearing mainframe easy.
     const unlockStatus: Record<string, boolean> = {};
     const campaign = MAPS.filter((m) => !isSurvival(m.id));
     for (let i = 0; i < campaign.length; i++) {
@@ -37,9 +46,16 @@ export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficul
       const unlocked = unlockStatus[m.id];
       const survival = isSurvival(m.id);
       const compl = save.completed[m.id] ?? {};
+
+      // Unique enemies across all phases
+      const allEnemies = [...new Set([...m.enemyPool.phase1, ...m.enemyPool.phase2, ...m.enemyPool.phase3])] as EnemyId[];
+      // All unique boss IDs across difficulties
+      const allBossIds = [...new Set(Object.values(m.bosses).flatMap((bMap) => Object.values(bMap)))] as EnemyId[];
+
       const row = document.createElement('div');
       row.className = 'map-row' + (unlocked ? '' : ' locked') + (survival ? ' survival-row' : '');
       const orderLabel = survival ? '\u221e' : String(m.order).padStart(2, '0');
+
       row.innerHTML = `
         <div class="map-row-header" style="--accent:${m.accentColor};--secondary:${m.secondaryColor}">
           <div class="map-num">${orderLabel}</div>
@@ -49,6 +65,17 @@ export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficul
           </div>
           <div class="map-paths">${m.paths.length} PATH${m.paths.length > 1 ? 'S' : ''}</div>
         </div>
+        ${unlocked ? `
+        <div class="map-enemy-roster">
+          <div class="roster-section">
+            <span class="roster-label">ENEMIES</span>
+            ${allEnemies.map((id) => enemyChip(id)).join('')}
+          </div>
+          <div class="roster-section">
+            <span class="roster-label" style="color:#ff2d95">BOSSES</span>
+            ${allBossIds.map((id) => enemyChip(id)).join('')}
+          </div>
+        </div>` : ''}
         <div class="diff-row">
           ${['easy','medium','hard'].map((d) => {
             const done = (compl as any)[d];

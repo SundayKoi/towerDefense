@@ -24,15 +24,6 @@ const DEPLOY: CardDef[] = [
     apply: (s) => { addToken(s, 'firewall', 1); },
   },
   {
-    id: 'deploy_firewall_2x',
-    name: 'DEPLOY: FIREWALL \u00d72',
-    rarity: 'rare',
-    category: 'deploy',
-    towerHint: 'firewall',
-    description: 'Gain 2 FIREWALL deploy tokens.',
-    apply: (s) => { addToken(s, 'firewall', 2); },
-  },
-  {
     id: 'deploy_honeypot',
     name: 'DEPLOY: HONEYPOT',
     rarity: 'common',
@@ -56,7 +47,7 @@ const DEPLOY: CardDef[] = [
     rarity: 'rare',
     category: 'deploy',
     towerHint: 'quantum',
-    description: 'Gain a QUANTUM deploy token. 35% crit chance, 3.5\u00d7 crit damage.',
+    description: 'Gain a QUANTUM deploy token. 35% crit chance, 3.5× crit damage.',
     apply: (s) => { addToken(s, 'quantum', 1); },
   },
   {
@@ -70,7 +61,7 @@ const DEPLOY: CardDef[] = [
   },
   {
     id: 'deploy_mine',
-    name: 'DEPLOY: LOGIC MINE \u00d72',
+    name: 'DEPLOY: LOGIC MINE ×2',
     rarity: 'rare',
     category: 'deploy',
     towerHint: 'mine',
@@ -95,12 +86,48 @@ const DEPLOY: CardDef[] = [
     description: 'Gain a RAILGUN deploy token. Pierces every enemy in its path.',
     apply: (s) => { addToken(s, 'railgun', 1); },
   },
+  {
+    id: 'deploy_pulse',
+    name: 'DEPLOY: EMP ARRAY',
+    rarity: 'rare',
+    category: 'deploy',
+    towerHint: 'pulse',
+    description: 'Gain an EMP ARRAY deploy token. Radial burst every 2.5s hits all enemies in range.',
+    apply: (s) => { addToken(s, 'pulse', 1); },
+  },
+  {
+    id: 'deploy_sniper',
+    name: 'DEPLOY: OVERWATCH',
+    rarity: 'epic',
+    category: 'deploy',
+    towerHint: 'sniper',
+    description: 'Gain an OVERWATCH deploy token. Extreme range, massive damage, 40% crit at 4×.',
+    apply: (s) => { addToken(s, 'sniper', 1); },
+  },
+  {
+    id: 'deploy_scrambler',
+    name: 'DEPLOY: DISRUPTOR',
+    rarity: 'rare',
+    category: 'deploy',
+    towerHint: 'scrambler',
+    description: 'Gain a DISRUPTOR deploy token. Strips armor on every hit, enabling lethal combos.',
+    apply: (s) => { addToken(s, 'scrambler', 1); },
+  },
+  {
+    id: 'deploy_sentinel',
+    name: 'DEPLOY: SENTINEL NODE',
+    rarity: 'epic',
+    category: 'deploy',
+    towerHint: 'sentinel',
+    description: 'Gain a SENTINEL NODE token. Passive field damages and slows all nearby enemies.',
+    apply: (s) => { addToken(s, 'sentinel', 1); },
+  },
 ];
 
 // ==================== UPGRADE CARDS (behavioral changes only) ====================
 
 const UPGRADE: CardDef[] = [
-  // --- FIREWALL ---
+  // ===== FIREWALL (5 upgrades) =====
   {
     id: 'fw_burst',
     name: 'FIREWALL: BURST PROTOCOL',
@@ -119,8 +146,35 @@ const UPGRADE: CardDef[] = [
     description: 'FIREWALL shots leave a small fire zone that burns nearby enemies.',
     apply: (s) => { addEffect(s, 'firewall', 'incendiary'); },
   },
+  {
+    id: 'fw_ricochet',
+    name: 'FIREWALL: RICOCHET',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'firewall',
+    description: 'FIREWALL shots ricochet to a 2nd nearby enemy for 55% damage.',
+    apply: (s) => { addEffect(s, 'firewall', 'ricochet'); },
+  },
+  {
+    id: 'fw_tracer',
+    name: 'FIREWALL: TRACER ROUNDS',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'firewall',
+    description: 'FIREWALL shots mark enemies hit — marked enemies take +30% from all sources for 2s.',
+    apply: (s) => { addEffect(s, 'firewall', 'tracer'); },
+  },
+  {
+    id: 'fw_overdrive',
+    name: 'FIREWALL: OVERDRIVE',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'firewall',
+    description: 'Every kill shortens FIREWALL\'s next cooldown by 0.4s (crits reduce it by 0.8s).',
+    apply: (s) => { addEffect(s, 'firewall', 'overdrive'); },
+  },
 
-  // --- HONEYPOT ---
+  // ===== HONEYPOT (5 upgrades) =====
   {
     id: 'hp_persistent',
     name: 'HONEYPOT: PERSISTENT PAYLOAD',
@@ -148,8 +202,26 @@ const UPGRADE: CardDef[] = [
     description: 'HONEYPOT goo puddles double in radius.',
     apply: (s) => { addEffect(s, 'honeypot', 'overflow'); },
   },
+  {
+    id: 'hp_detonation',
+    name: 'HONEYPOT: GOO DETONATION',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'honeypot',
+    description: 'When an enemy dies inside a HONEYPOT puddle it detonates for 80 AoE damage.',
+    apply: (s) => { addEffect(s, 'honeypot', 'detonation'); },
+  },
+  {
+    id: 'hp_coating',
+    name: 'HONEYPOT: VIRAL COATING',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'honeypot',
+    description: 'Enemies slowed by HONEYPOT spread 50% of the slow effect to adjacent enemies on contact.',
+    apply: (s) => { addEffect(s, 'honeypot', 'coating'); },
+  },
 
-  // --- ANTIVIRUS ---
+  // ===== ANTIVIRUS (5 upgrades) =====
   {
     id: 'av_quarantine',
     name: 'ANTIVIRUS: QUARANTINE',
@@ -177,8 +249,26 @@ const UPGRADE: CardDef[] = [
     description: 'ANTIVIRUS secondary (and tertiary) shots always critically strike.',
     apply: (s) => { addEffect(s, 'antivirus', 'precision'); },
   },
+  {
+    id: 'av_lockdown',
+    name: 'ANTIVIRUS: LOCKDOWN',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'antivirus',
+    description: 'ANTIVIRUS marks targets on hit — marked enemies take +30% from all sources for 2s.',
+    apply: (s) => { addEffect(s, 'antivirus', 'lockdown'); },
+  },
+  {
+    id: 'av_overdrive',
+    name: 'ANTIVIRUS: OVERDRIVE SCAN',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'antivirus',
+    description: 'Every 3rd ANTIVIRUS kill without missing triggers a free instant-crit shot at nearest enemy.',
+    apply: (s) => { addEffect(s, 'antivirus', 'overdrive'); },
+  },
 
-  // --- CHAIN ---
+  // ===== CHAIN LIGHTNING (5 upgrades) =====
   {
     id: 'ch_storm',
     name: 'CHAIN: STORM SURGE',
@@ -206,8 +296,26 @@ const UPGRADE: CardDef[] = [
     description: 'CHAIN LIGHTNING arc reach doubles.',
     apply: (s) => { addEffect(s, 'chain', 'nova'); },
   },
+  {
+    id: 'ch_ground',
+    name: 'CHAIN: GROUND FAULT',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'chain',
+    description: 'CHAIN LIGHTNING stuns each hit enemy for 0.35s (no movement, no act).',
+    apply: (s) => { addEffect(s, 'chain', 'ground'); },
+  },
+  {
+    id: 'ch_megavolt',
+    name: 'CHAIN: MEGAVOLT',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'chain',
+    description: 'Every 6th CHAIN shot fires a megavolt — no arc limit, no falloff, no range cap.',
+    apply: (s) => { addEffect(s, 'chain', 'megavolt'); },
+  },
 
-  // --- ICE ---
+  // ===== ICE-BREAKER (5 upgrades) =====
   {
     id: 'ic_wide',
     name: 'ICE: BLIZZARD FIELD',
@@ -235,8 +343,26 @@ const UPGRADE: CardDef[] = [
     description: 'ICE-BREAKER blasts spawn 6 slow fields in a ring.',
     apply: (s) => { addEffect(s, 'ice', 'shards'); },
   },
+  {
+    id: 'ic_permafrost',
+    name: 'ICE: PERMAFROST',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'ice',
+    description: 'Enemies hit by ICE-BREAKER leave a cryo field for 3s that slows nearby enemies 20%.',
+    apply: (s) => { addEffect(s, 'ice', 'permafrost'); },
+  },
+  {
+    id: 'ic_avalanche',
+    name: 'ICE: AVALANCHE',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'ice',
+    description: 'ICE-BREAKER hitting a fully-stopped enemy explodes for 2× damage in a 40% wider radius.',
+    apply: (s) => { addEffect(s, 'ice', 'avalanche'); },
+  },
 
-  // --- QUANTUM ---
+  // ===== QUANTUM (5 upgrades) =====
   {
     id: 'qm_double',
     name: 'QUANTUM: SUPERPOSITION',
@@ -264,8 +390,26 @@ const UPGRADE: CardDef[] = [
     description: 'QUANTUM shots ignore all enemy armor.',
     apply: (s) => { addEffect(s, 'quantum', 'phase'); },
   },
+  {
+    id: 'qm_collapse',
+    name: 'QUANTUM: WAVE COLLAPSE',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'quantum',
+    description: 'QUANTUM hits reduce the target\'s armor by 50% for 1.5s (quantum decoherence).',
+    apply: (s) => { addEffect(s, 'quantum', 'collapse'); },
+  },
+  {
+    id: 'qm_observer',
+    name: 'QUANTUM: OBSERVER EFFECT',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'quantum',
+    description: 'QUANTUM charges while idle — each 0.5s of inactivity adds +0.5 to next crit mult (max +3.0).',
+    apply: (s) => { addEffect(s, 'quantum', 'observer'); },
+  },
 
-  // --- RAILGUN ---
+  // ===== RAILGUN (5 upgrades) =====
   {
     id: 'rl_sabot',
     name: 'RAILGUN: SABOT ROUND',
@@ -290,11 +434,29 @@ const UPGRADE: CardDef[] = [
     rarity: 'legendary',
     category: 'upgrade',
     towerHint: 'railgun',
-    description: 'RAILGUN charges for 8s then auto-fires a 5\u00d7 damage mega shot.',
+    description: 'RAILGUN charges for 8s then auto-fires a 5× damage mega shot.',
     apply: (s) => { addEffect(s, 'railgun', 'capacitor'); },
   },
+  {
+    id: 'rl_feedback',
+    name: 'RAILGUN: KILL FEEDBACK',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'railgun',
+    description: 'Each enemy killed by RAILGUN reduces its next shot cooldown by 0.6s.',
+    apply: (s) => { addEffect(s, 'railgun', 'feedback'); },
+  },
+  {
+    id: 'rl_penetrator',
+    name: 'RAILGUN: PENETRATOR',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'railgun',
+    description: 'RAILGUN pierce angle threshold widens — it finds more targets in its path.',
+    apply: (s) => { addEffect(s, 'railgun', 'penetrator'); },
+  },
 
-  // --- MINE ---
+  // ===== LOGIC MINE (5 upgrades) =====
   {
     id: 'mn_wide',
     name: 'LOGIC MINE: WIDE BLAST',
@@ -321,6 +483,285 @@ const UPGRADE: CardDef[] = [
     towerHint: 'mine',
     description: '60% chance LOGIC MINE respawns after detonation.',
     apply: (s) => { addEffect(s, 'mine', 'resupply'); },
+  },
+  {
+    id: 'mn_stun',
+    name: 'LOGIC MINE: EMP CHARGE',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'mine',
+    description: 'LOGIC MINE detonation stuns all enemies in blast radius for 1.2s.',
+    apply: (s) => { addEffect(s, 'mine', 'stun'); },
+  },
+  {
+    id: 'mn_armor_strip',
+    name: 'LOGIC MINE: ARMOR CRACK',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'mine',
+    description: 'LOGIC MINE explosion strips 10 armor from all enemies in blast for 4s.',
+    apply: (s) => { addEffect(s, 'mine', 'armor_strip'); },
+  },
+
+  // ===== EMP ARRAY / PULSE (5 upgrades) =====
+  {
+    id: 'ps_overload',
+    name: 'EMP: OVERLOAD PULSE',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'pulse',
+    description: 'Every 4th EMP ARRAY burst is an overload dealing 3× damage.',
+    apply: (s) => { addEffect(s, 'pulse', 'overload'); },
+  },
+  {
+    id: 'ps_frequency',
+    name: 'EMP: HIGH FREQUENCY',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'pulse',
+    description: 'EMP ARRAY burst recharge reduced by 0.7s.',
+    apply: (s) => { addEffect(s, 'pulse', 'frequency'); },
+  },
+  {
+    id: 'ps_cascade',
+    name: 'EMP: CASCADE',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'pulse',
+    description: 'EMP ARRAY bursts push enemies 0.15 cells back toward the path entrance.',
+    apply: (s) => { addEffect(s, 'pulse', 'cascade'); },
+  },
+  {
+    id: 'ps_amplify',
+    name: 'EMP: AMPLIFIER',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'pulse',
+    description: 'EMP ARRAY range increases by 0.6 cells.',
+    apply: (s) => { addEffect(s, 'pulse', 'amplify'); },
+  },
+  {
+    id: 'ps_stun',
+    name: 'EMP: STUN BURST',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'pulse',
+    description: 'EMP ARRAY bursts stun every enemy hit for 0.5s.',
+    apply: (s) => { addEffect(s, 'pulse', 'stun'); },
+  },
+
+  // ===== OVERWATCH / SNIPER (5 upgrades) =====
+  {
+    id: 'sn_callout',
+    name: 'OVERWATCH: CALLOUT',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'sniper',
+    description: 'OVERWATCH marks targets on hit — marked enemies take +30% from all sources for 3s.',
+    apply: (s) => { addEffect(s, 'sniper', 'callout'); },
+  },
+  {
+    id: 'sn_execute',
+    name: 'OVERWATCH: EXECUTE',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'sniper',
+    description: 'OVERWATCH deals triple damage to enemies below 25% HP.',
+    apply: (s) => { addEffect(s, 'sniper', 'execute'); },
+  },
+  {
+    id: 'sn_rapidfire',
+    name: 'OVERWATCH: RAPID SCAN',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'sniper',
+    description: 'Each OVERWATCH kill reduces next shot cooldown by 0.8s.',
+    apply: (s) => { addEffect(s, 'sniper', 'rapidfire'); },
+  },
+  {
+    id: 'sn_reveal',
+    name: 'OVERWATCH: THERMAL SCOPE',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'sniper',
+    description: 'OVERWATCH reveals stealth enemies in its full range — they become permanently visible.',
+    apply: (s) => { addEffect(s, 'sniper', 'reveal'); },
+  },
+  {
+    id: 'sn_oneshot',
+    name: 'OVERWATCH: ONE SHOT',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'sniper',
+    description: 'OVERWATCH crits against marked enemies instantly kill non-boss targets below 40% HP.',
+    apply: (s) => { addEffect(s, 'sniper', 'oneshot'); },
+  },
+
+  // ===== DISRUPTOR / SCRAMBLER (5 upgrades) =====
+  {
+    id: 'sc_deep_scan',
+    name: 'DISRUPTOR: DEEP SCAN',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'scrambler',
+    description: 'DISRUPTOR strips 6 armor per hit instead of 3.',
+    apply: (s) => { addEffect(s, 'scrambler', 'deep_scan'); },
+  },
+  {
+    id: 'sc_broadcast',
+    name: 'DISRUPTOR: BROADCAST',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'scrambler',
+    description: 'DISRUPTOR pulses apply armor-strip to ALL enemies in range, not just the target.',
+    apply: (s) => { addEffect(s, 'scrambler', 'broadcast'); },
+  },
+  {
+    id: 'sc_cripple',
+    name: 'DISRUPTOR: CRIPPLE',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'scrambler',
+    description: 'DISRUPTOR-debuffed enemies also move 30% slower for the debuff duration.',
+    apply: (s) => { addEffect(s, 'scrambler', 'cripple'); },
+  },
+  {
+    id: 'sc_feedback',
+    name: 'DISRUPTOR: SIGNAL FEEDBACK',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'scrambler',
+    description: 'DISRUPTOR gets +0.5 fire rate for each debuffed enemy currently in range.',
+    apply: (s) => { addEffect(s, 'scrambler', 'feedback'); },
+  },
+  {
+    id: 'sc_overwrite',
+    name: 'DISRUPTOR: OVERWRITE',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'scrambler',
+    description: '20% chance each DISRUPTOR hit completely nullifies target armor for 2.5s.',
+    apply: (s) => { addEffect(s, 'scrambler', 'overwrite'); },
+  },
+
+  // ===== SENTINEL NODE (5 upgrades) =====
+  {
+    id: 'se_reinforced',
+    name: 'SENTINEL: REINFORCED FIELD',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'sentinel',
+    description: 'SENTINEL NODE field damage increases to 20 per second.',
+    apply: (s) => { addEffect(s, 'sentinel', 'reinforced'); },
+  },
+  {
+    id: 'se_expanded',
+    name: 'SENTINEL: EXPANDED GRID',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'sentinel',
+    description: 'SENTINEL NODE range increases by 0.8 cells.',
+    apply: (s) => { addEffect(s, 'sentinel', 'expanded'); },
+  },
+  {
+    id: 'se_thorns',
+    name: 'SENTINEL: THORN PROTOCOL',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'sentinel',
+    description: 'Enemies in SENTINEL field that attack towers receive 2× damage as retaliation.',
+    apply: (s) => { addEffect(s, 'sentinel', 'thorns'); },
+  },
+  {
+    id: 'se_anchor',
+    name: 'SENTINEL: ANCHOR FIELD',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'sentinel',
+    description: 'SENTINEL NODE slow increases to 45% and affects slow-immune enemies at 20%.',
+    apply: (s) => { addEffect(s, 'sentinel', 'anchor'); },
+  },
+  {
+    id: 'se_pulse_link',
+    name: 'SENTINEL: PULSE LINK',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'sentinel',
+    description: 'Every 5s SENTINEL NODE emits a pulse marking all enemies in range for 2s.',
+    apply: (s) => { addEffect(s, 'sentinel', 'pulse_link'); },
+  },
+
+  // ==================== SYNERGY CARDS (require both towers placed) ====================
+
+  {
+    id: 'syn_fw_hp',
+    name: 'NAPALM PROTOCOL',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'firewall',
+    towerHint2: 'honeypot',
+    description: '[FIREWALL + HONEYPOT] Honeypot puddles become napalm — they deal Firewall-scaled fire damage instead of acid.',
+    apply: (s) => { addEffect(s, 'honeypot', 'napalm'); addEffect(s, 'firewall', 'napalm_link'); },
+  },
+  {
+    id: 'syn_av_sn',
+    name: 'SURGICAL STRIKE',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'antivirus',
+    towerHint2: 'sniper',
+    description: '[ANTIVIRUS + OVERWATCH] Antivirus lockdown marks persist 2× longer; Overwatch deals +60% to marked targets.',
+    apply: (s) => { addEffect(s, 'antivirus', 'surgical'); addEffect(s, 'sniper', 'surgical'); },
+  },
+  {
+    id: 'syn_ch_ps',
+    name: 'STORM PULSE',
+    rarity: 'epic',
+    category: 'upgrade',
+    towerHint: 'chain',
+    towerHint2: 'pulse',
+    description: '[CHAIN + EMP ARRAY] EMP burst triggers a chain arc on every enemy it hits.',
+    apply: (s) => { addEffect(s, 'pulse', 'storm_pulse'); addEffect(s, 'chain', 'storm_pulse'); },
+  },
+  {
+    id: 'syn_ic_sc',
+    name: 'CRYO BREAK',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'ice',
+    towerHint2: 'scrambler',
+    description: '[ICE-BREAKER + DISRUPTOR] Armor-stripped enemies take 2× damage from ICE-BREAKER explosions.',
+    apply: (s) => { addEffect(s, 'ice', 'cryo_break'); addEffect(s, 'scrambler', 'cryo_break'); },
+  },
+  {
+    id: 'syn_rl_sn',
+    name: 'OVERWATCH PENETRATOR',
+    rarity: 'legendary',
+    category: 'upgrade',
+    towerHint: 'railgun',
+    towerHint2: 'sniper',
+    description: '[RAILGUN + OVERWATCH] Overwatch callout marks persist 4s; Railgun deals +100% to marked targets.',
+    apply: (s) => { addEffect(s, 'railgun', 'overwatch_pen'); addEffect(s, 'sniper', 'overwatch_pen'); },
+  },
+  {
+    id: 'syn_qm_sc',
+    name: 'QUANTUM DECOHERENCE',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'quantum',
+    towerHint2: 'scrambler',
+    description: '[QUANTUM + DISRUPTOR] Armor-stripped enemies are treated as having 0 armor by QUANTUM shots.',
+    apply: (s) => { addEffect(s, 'quantum', 'decoherence'); addEffect(s, 'scrambler', 'decoherence'); },
+  },
+  {
+    id: 'syn_hp_se',
+    name: 'CONTAMINATION FIELD',
+    rarity: 'rare',
+    category: 'upgrade',
+    towerHint: 'honeypot',
+    towerHint2: 'sentinel',
+    description: '[HONEYPOT + SENTINEL NODE] Sentinel field becomes a slow field — enemies inside get an extra 25% slow from Honeypot puddles.',
+    apply: (s) => { addEffect(s, 'sentinel', 'contamination'); addEffect(s, 'honeypot', 'contamination'); },
   },
 ];
 
@@ -405,10 +846,15 @@ export const CARDS: CardDef[] = [
 export const CARDS_BY_ID: Record<string, CardDef> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 
 export const STARTING_UNLOCKED_CARDS = [
-  // All deploy cards except railgun (legendary)
-  ...DEPLOY.filter((c) => c.rarity !== 'legendary').map((c) => c.id),
-  // Common/rare upgrades only
-  ...UPGRADE.filter((c) => c.rarity === 'common' || c.rarity === 'rare').map((c) => c.id),
+  // Deploy cards for basic towers (not epic/legendary)
+  'deploy_firewall', 'deploy_honeypot', 'deploy_antivirus', 'deploy_quantum',
+  'deploy_mine', 'deploy_pulse', 'deploy_scrambler',
+  // Common/rare upgrades for starter towers
+  ...UPGRADE.filter((c) =>
+    (c.rarity === 'common' || c.rarity === 'rare') &&
+    !c.towerHint2 &&  // exclude synergy cards from starter pool
+    ['firewall', 'honeypot', 'antivirus', 'mine', 'pulse', 'scrambler', 'sentinel'].includes(c.towerHint ?? '')
+  ).map((c) => c.id),
   // All heals except legendary
   ...HEAL.filter((c) => c.rarity !== 'legendary').map((c) => c.id),
   // One exotic starter
@@ -437,7 +883,11 @@ function categoryWeight(category: string, level: number, ctx: DraftContext): num
 export function drawDraft(level: number, unlockedIds: Set<string>, context: DraftContext, count = 3): string[] {
   const pool = CARDS.filter((c) => {
     if (!unlockedIds.has(c.id)) return false;
+    // Upgrade cards only appear if the relevant tower(s) are placed
     if (c.category === 'upgrade' && c.towerHint && !context.placedTowerTypes.has(c.towerHint)) return false;
+    if (c.category === 'upgrade' && c.towerHint2 && !context.placedTowerTypes.has(c.towerHint2)) return false;
+    // Deploy cards filtered out for already-placed singleton tower types
+    if (c.category === 'deploy' && c.towerHint && context.placedTowerTypes.has(c.towerHint)) return false;
     return true;
   });
   if (pool.length === 0) return [];

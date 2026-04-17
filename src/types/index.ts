@@ -12,7 +12,11 @@ export type TowerId =
   | 'ice'
   | 'mine'
   | 'chain'
-  | 'railgun';
+  | 'railgun'
+  | 'pulse'
+  | 'sniper'
+  | 'scrambler'
+  | 'sentinel';
 
 export type EnemyId =
   | 'worm'
@@ -29,7 +33,10 @@ export type EnemyId =
   | 'leviathan'
   | 'voidlord'
   | 'swarm'
-  | 'corruptor';
+  | 'corruptor'
+  | 'glitch'
+  | 'juggernaut'
+  | 'parasite';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -107,6 +114,7 @@ export interface CardDef {
   description: string;
   category: 'deploy' | 'upgrade' | 'buff' | 'heal' | 'exotic';
   towerHint?: TowerId;   // for styling deploy/upgrade cards by tower color
+  towerHint2?: TowerId;  // synergy cards: BOTH towers must be placed for card to appear
   apply: (state: RunState) => void;
 }
 
@@ -180,7 +188,8 @@ export interface EnemyInstance {
   invisTimer: number;
   hitFlash: number;
   angle: number;
-  debuffTimer?: number; // used by Rootkit to pace debuff application
+  debuffTimer?: number; // used by Rootkit to pace debuff application, -1 = signal has revived
+  marked?: number;      // seconds remaining on mark debuff (takes +30% from all sources)
 }
 
 export interface Projectile {
@@ -339,4 +348,6 @@ export interface RunState {
   cardsPicked: string[];
   // Countdown (seconds) until next wave auto-starts. null = not counting.
   autoStartTimer: number | null;
+  // Enemy types encountered this run (for intro popups)
+  seenThisRun: Set<EnemyId>;
 }

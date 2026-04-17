@@ -170,11 +170,14 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
   // Puddles (under towers/enemies)
   drawPuddles(ctx, vp, s);
 
+  // Sentinel aura (drawn below towers)
+  for (const t of s.towers) { if (t.def === 'sentinel') drawSentinelAura(ctx, vp, t, s); }
+
   // Towers
   for (const t of s.towers) { drawTower(ctx, vp, t); drawTowerDebuffs(ctx, vp, t, s.elapsed); }
 
-  // Enemies
-  for (const e of s.enemies) drawEnemy(ctx, vp, e, s.elapsed);
+  // Enemies (with mark overlay)
+  for (const e of s.enemies) { drawEnemy(ctx, vp, e, s.elapsed); if ((e.marked ?? 0) > 0) drawMark(ctx, vp, e); }
 
   // Projectiles
   for (const p of s.projectiles) drawProjectile(ctx, vp, p);
@@ -622,6 +625,71 @@ function drawProjectile(ctx: CanvasRenderingContext2D, vp: RenderViewport, p: Pr
     ctx.arc(cx, cy, 4, 0, Math.PI * 2);
     ctx.fill();
 
+  } else if (p.fromTower === 'sniper') {
+    // Long green laser beam — thinner than railgun, with green glow
+    if (p.trail.length > 0) {
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = p.trailColor;
+      ctx.globalAlpha = 0.4;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 20;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      const s0 = p.trail[0];
+      ctx.moveTo(s0.x * cs + cs / 2, s0.y * cs + cs / 2);
+      for (let i = 1; i < p.trail.length; i++) {
+        const sp = p.trail[i];
+        ctx.lineTo(sp.x * cs + cs / 2, sp.y * cs + cs / 2);
+      }
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.globalAlpha = 0.9;
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.moveTo(s0.x * cs + cs / 2, s0.y * cs + cs / 2);
+      for (let i = 1; i < p.trail.length; i++) {
+        const sp = p.trail[i];
+        ctx.lineTo(sp.x * cs + cs / 2, sp.y * cs + cs / 2);
+      }
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 22;
+    ctx.fillStyle = p.isCrit ? '#ffffff' : p.color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, p.isCrit ? 5 : 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+  } else if (p.fromTower === 'scrambler') {
+    // Fast pink disruption bolt with jagged crackle
+    if (p.trail.length > 0) {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = 0.65;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      const sc0 = p.trail[0];
+      ctx.moveTo(sc0.x * cs + cs / 2, sc0.y * cs + cs / 2);
+      for (let i = 1; i < p.trail.length; i++) {
+        const sp = p.trail[i];
+        ctx.lineTo(sp.x * cs + cs / 2 + (Math.random() - 0.5) * 5, sp.y * cs + cs / 2 + (Math.random() - 0.5) * 5);
+      }
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fill();
+
   } else if (p.fromTower === 'railgun') {
     // Long bright hyper-velocity streak with white-hot core
     if (p.trail.length > 0) {
@@ -746,6 +814,54 @@ function drawParticles(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: Run
     ctx.arc(cx, cy, p.size * a, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+function drawSentinelAura(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerInstance, s: RunState): void {
+  const cs = vp.cellSize;
+  const cx = t.grid.x * cs + cs / 2;
+  const cy = t.grid.y * cs + cs / 2;
+  const def = TOWERS[t.def];
+  const range = def.range * cs;
+  ctx.save();
+  const pulse = 0.35 + 0.15 * Math.sin(s.elapsed * 2.2 + t.id);
+  ctx.globalAlpha = pulse;
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, range);
+  grad.addColorStop(0, def.accentColor + '40');
+  grad.addColorStop(0.5, def.accentColor + '20');
+  grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, range, 0, Math.PI * 2);
+  ctx.fill();
+  // Pulsing border
+  ctx.globalAlpha = pulse * 0.6;
+  ctx.strokeStyle = def.accentColor;
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = def.accentColor;
+  ctx.shadowBlur = 10;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, range, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawMark(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyInstance): void {
+  const cs = vp.cellSize;
+  const cx = e.pos.x * cs + cs / 2;
+  const cy = e.pos.y * cs + cs / 2;
+  ctx.save();
+  ctx.globalAlpha = 0.8;
+  ctx.strokeStyle = '#ffdd00';
+  ctx.shadowColor = '#ffdd00';
+  ctx.shadowBlur = 8;
+  ctx.lineWidth = 1.5;
+  const r = e.size * cs * 0.45;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }
 

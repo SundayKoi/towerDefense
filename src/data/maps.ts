@@ -104,9 +104,9 @@ export const MAPS: MapDef[] = [
     secondaryColor: '#ff6600',
     difficulties: STANDARD_DIFFICULTIES,
     enemyPool: {
-      phase1: ['spider', 'trojan'],
+      phase1: ['spider', 'trojan', 'glitch'],
       phase2: ['trojan', 'phantom', 'bomber'],
-      phase3: ['rootkit', 'phantom', 'wraith'],
+      phase3: ['rootkit', 'phantom', 'wraith', 'parasite'],
     },
     bosses: {
       easy:   { 10: 'kernel', 20: 'leviathan' },
@@ -140,9 +140,9 @@ export const MAPS: MapDef[] = [
     secondaryColor: '#3eff9c',
     difficulties: STANDARD_DIFFICULTIES,
     enemyPool: {
-      phase1: ['worm', 'spider'],
+      phase1: ['worm', 'spider', 'glitch'],
       phase2: ['worm', 'trojan', 'leech'],
-      phase3: ['trojan', 'rootkit', 'leech'],
+      phase3: ['trojan', 'rootkit', 'leech', 'juggernaut'],
     },
     bosses: {
       easy:   { 10: 'kernel', 20: 'swarm' },
@@ -218,8 +218,8 @@ export const MAPS: MapDef[] = [
     difficulties: STANDARD_DIFFICULTIES,
     enemyPool: {
       phase1: ['worm', 'spider', 'trojan'],
-      phase2: ['trojan', 'rootkit', 'bomber'],
-      phase3: ['rootkit', 'wraith', 'bomber'],
+      phase2: ['trojan', 'rootkit', 'bomber', 'glitch'],
+      phase3: ['rootkit', 'wraith', 'bomber', 'juggernaut'],
     },
     bosses: {
       easy:   { 10: 'daemon', 20: 'swarm' },
@@ -343,8 +343,8 @@ export const MAPS: MapDef[] = [
     difficulties: STANDARD_DIFFICULTIES,
     enemyPool: {
       phase1: ['spider', 'trojan', 'bomber'],
-      phase2: ['bomber', 'phantom', 'wraith'],
-      phase3: ['wraith', 'rootkit', 'corruptor'],
+      phase2: ['bomber', 'phantom', 'wraith', 'parasite'],
+      phase3: ['wraith', 'rootkit', 'corruptor', 'juggernaut'],
     },
     bosses: {
       easy:   { 10: 'daemon', 20: 'corruptor' },

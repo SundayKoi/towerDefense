@@ -443,6 +443,180 @@ const towerSVG: Record<TowerId, () => string> = {
       <!-- Targeting sensor -->
       <circle cx='64' cy='76' r='4' fill='#ffd600' stroke='#fff' stroke-width='0.5' filter='url(#rg-glow)'/>
     </svg>`,
+
+  pulse: () => `
+    <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <radialGradient id='ps-core' cx='50%' cy='50%'>
+          <stop offset='0' stop-color='#ffcc44'/>
+          <stop offset='0.5' stop-color='#ff9900'/>
+          <stop offset='1' stop-color='#3d2000'/>
+        </radialGradient>
+        <filter id='ps-glow'><feGaussianBlur stdDeviation='3'/><feMerge><feMergeNode/><feMergeNode in='SourceGraphic'/></feMerge></filter>
+      </defs>
+      <ellipse cx='64' cy='116' rx='38' ry='5' fill='#000' opacity='0.5'/>
+      <!-- Base plate -->
+      <rect x='24' y='90' width='80' height='18' rx='4' fill='#1a0a00' stroke='#ff9900' stroke-width='1.5'/>
+      <!-- EMP dish array -->
+      <ellipse cx='64' cy='72' rx='38' ry='8' fill='#2a1400' stroke='#ff9900' stroke-width='2'/>
+      <!-- Dish ribs -->
+      <g stroke='#ff9900' stroke-width='1' opacity='0.7'>
+        <line x1='64' y1='72' x2='30' y2='56'/>
+        <line x1='64' y1='72' x2='98' y2='56'/>
+        <line x1='64' y1='72' x2='64' y2='50'/>
+        <line x1='64' y1='72' x2='42' y2='52'/>
+        <line x1='64' y1='72' x2='86' y2='52'/>
+      </g>
+      <!-- Emitter rings -->
+      <ellipse cx='64' cy='56' rx='28' ry='6' fill='none' stroke='#ff9900' stroke-width='2' filter='url(#ps-glow)'/>
+      <ellipse cx='64' cy='50' rx='20' ry='4' fill='none' stroke='#ffcc44' stroke-width='1.5' opacity='0.8'/>
+      <!-- Core charge ball -->
+      <circle cx='64' cy='56' r='10' fill='url(#ps-core)' filter='url(#ps-glow)'/>
+      <circle cx='64' cy='56' r='4' fill='#fff' opacity='0.9'/>
+      <!-- Pulse arcs -->
+      <g stroke='#ff9900' stroke-width='1' fill='none' opacity='0.6' filter='url(#ps-glow)'>
+        <path d='M36,56 Q64,30 92,56'/>
+        <path d='M42,56 Q64,36 86,56'/>
+      </g>
+      <!-- Status indicators -->
+      <g fill='#ff9900' filter='url(#ps-glow)'>
+        <rect x='28' y='95' width='6' height='6' rx='1'/>
+        <rect x='38' y='95' width='6' height='6' rx='1' opacity='0.7'/>
+        <rect x='84' y='95' width='6' height='6' rx='1' opacity='0.7'/>
+        <rect x='94' y='95' width='6' height='6' rx='1'/>
+      </g>
+    </svg>`,
+
+  sniper: () => `
+    <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <linearGradient id='sn-barrel' x1='0' y1='0' x2='0' y2='1'>
+          <stop offset='0' stop-color='#003311'/>
+          <stop offset='0.5' stop-color='#001a08'/>
+          <stop offset='1' stop-color='#002a10'/>
+        </linearGradient>
+        <filter id='sn-glow'><feGaussianBlur stdDeviation='2.5'/><feMerge><feMergeNode/><feMergeNode in='SourceGraphic'/></feMerge></filter>
+      </defs>
+      <ellipse cx='64' cy='116' rx='30' ry='5' fill='#000' opacity='0.5'/>
+      <!-- Base -->
+      <ellipse cx='64' cy='106' rx='32' ry='7' fill='#001a08' stroke='#00ff88' stroke-width='1.5'/>
+      <!-- Bipod legs -->
+      <line x1='48' y1='100' x2='38' y2='114' stroke='#00ff88' stroke-width='2'/>
+      <line x1='80' y1='100' x2='90' y2='114' stroke='#00ff88' stroke-width='2'/>
+      <!-- Body receiver -->
+      <rect x='50' y='74' width='28' height='30' rx='2' fill='url(#sn-barrel)' stroke='#00ff88' stroke-width='1.5'/>
+      <!-- Trigger guard -->
+      <path d='M56 96 Q64 108 72 96' fill='none' stroke='#00ff88' stroke-width='1.5'/>
+      <!-- Scope / optics rail -->
+      <rect x='58' y='70' width='12' height='8' fill='#002a10' stroke='#00ff88' stroke-width='1'/>
+      <rect x='60' y='66' width='8' height='6' rx='1' fill='#004422' stroke='#00ff88' stroke-width='0.5'/>
+      <!-- Scope lens glow -->
+      <circle cx='64' cy='69' r='3' fill='#00ff88' filter='url(#sn-glow)' opacity='0.7'/>
+      <!-- Long barrel -->
+      <rect x='61' y='4' width='6' height='70' fill='url(#sn-barrel)' stroke='#00ff88' stroke-width='0.8'/>
+      <!-- Barrel vents -->
+      <g fill='none' stroke='#00ff88' stroke-width='0.5' opacity='0.7'>
+        <line x1='59' y1='20' x2='69' y2='20'/>
+        <line x1='59' y1='30' x2='69' y2='30'/>
+        <line x1='59' y1='40' x2='69' y2='40'/>
+        <line x1='59' y1='50' x2='69' y2='50'/>
+      </g>
+      <!-- Muzzle suppressor -->
+      <rect x='58' y='2' width='12' height='6' rx='2' fill='#001a08' stroke='#00ff88' stroke-width='1'/>
+      <!-- Muzzle energy charge -->
+      <circle cx='64' cy='5' r='2.5' fill='#00ff88' filter='url(#sn-glow)' opacity='0.9'/>
+      <!-- Targeting reticle indicator -->
+      <circle cx='64' cy='84' r='5' fill='none' stroke='#00ff88' stroke-width='1' filter='url(#sn-glow)'/>
+      <circle cx='64' cy='84' r='1.5' fill='#00ff88'/>
+    </svg>`,
+
+  scrambler: () => `
+    <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <radialGradient id='sc-body' cx='50%' cy='60%'>
+          <stop offset='0' stop-color='#660033'/>
+          <stop offset='1' stop-color='#1a0010'/>
+        </radialGradient>
+        <filter id='sc-glow'><feGaussianBlur stdDeviation='2'/><feMerge><feMergeNode/><feMergeNode in='SourceGraphic'/></feMerge></filter>
+      </defs>
+      <ellipse cx='64' cy='116' rx='36' ry='5' fill='#000' opacity='0.5'/>
+      <!-- Base ring -->
+      <ellipse cx='64' cy='102' rx='36' ry='8' fill='#1a0010' stroke='#ff2d95' stroke-width='2'/>
+      <!-- Emitter array body -->
+      <rect x='44' y='62' width='40' height='42' rx='3' fill='url(#sc-body)' stroke='#ff2d95' stroke-width='1.5'/>
+      <!-- Signal dish cluster (4 small dishes) -->
+      <g stroke='#ff2d95' stroke-width='1.5' fill='none' filter='url(#sc-glow)'>
+        <ellipse cx='52' cy='52' rx='10' ry='4'/>
+        <ellipse cx='76' cy='52' rx='10' ry='4'/>
+        <ellipse cx='52' cy='36' rx='7' ry='3'/>
+        <ellipse cx='76' cy='36' rx='7' ry='3'/>
+      </g>
+      <!-- Dish spines -->
+      <g stroke='#ff2d95' stroke-width='1' opacity='0.7'>
+        <line x1='52' y1='52' x2='52' y2='30'/>
+        <line x1='76' y1='52' x2='76' y2='30'/>
+        <line x1='48' y1='52' x2='40' y2='44'/>
+        <line x1='80' y1='52' x2='88' y2='44'/>
+      </g>
+      <!-- Signal burst arcs -->
+      <g stroke='#ff2d95' stroke-width='0.8' fill='none' opacity='0.5' filter='url(#sc-glow)'>
+        <path d='M42,44 Q52,28 62,44'/>
+        <path d='M66,44 Q76,28 86,44'/>
+      </g>
+      <!-- Core emitter glows -->
+      <circle cx='52' cy='36' r='4' fill='#ff2d95' filter='url(#sc-glow)' opacity='0.8'/>
+      <circle cx='76' cy='36' r='4' fill='#ff2d95' filter='url(#sc-glow)' opacity='0.8'/>
+      <!-- Status panel -->
+      <rect x='50' y='70' width='28' height='20' rx='2' fill='#0d0008' stroke='#ff2d95' stroke-width='0.5'/>
+      <g fill='#ff2d95' opacity='0.9'>
+        <rect x='53' y='73' width='4' height='3' rx='0.5'/>
+        <rect x='60' y='73' width='4' height='3' rx='0.5'/>
+        <rect x='67' y='73' width='4' height='3' rx='0.5'/>
+        <rect x='53' y='80' width='18' height='2' rx='0.5'/>
+      </g>
+    </svg>`,
+
+  sentinel: () => `
+    <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <radialGradient id='se-core' cx='50%' cy='50%'>
+          <stop offset='0' stop-color='#cc88ff'/>
+          <stop offset='0.5' stop-color='#b847ff'/>
+          <stop offset='1' stop-color='#1a0029'/>
+        </radialGradient>
+        <filter id='se-glow'><feGaussianBlur stdDeviation='3'/><feMerge><feMergeNode/><feMergeNode in='SourceGraphic'/></feMerge></filter>
+      </defs>
+      <ellipse cx='64' cy='116' rx='40' ry='5' fill='#000' opacity='0.5'/>
+      <!-- Outer field projector ring -->
+      <circle cx='64' cy='64' r='52' fill='none' stroke='#b847ff' stroke-width='0.5' opacity='0.4'/>
+      <circle cx='64' cy='64' r='46' fill='none' stroke='#b847ff' stroke-width='1' opacity='0.3'/>
+      <!-- Base pillar -->
+      <rect x='52' y='82' width='24' height='28' rx='2' fill='#0d0018' stroke='#b847ff' stroke-width='1.5'/>
+      <!-- Pillar accents -->
+      <g stroke='#b847ff' stroke-width='0.5' opacity='0.7'>
+        <line x1='56' y1='86' x2='56' y2='106'/>
+        <line x1='64' y1='86' x2='64' y2='106'/>
+        <line x1='72' y1='86' x2='72' y2='106'/>
+      </g>
+      <!-- Main emitter node -->
+      <circle cx='64' cy='64' r='24' fill='#0d0018' stroke='#b847ff' stroke-width='2' filter='url(#se-glow)'/>
+      <!-- Inner hexagonal field grid -->
+      <polygon points='64,46 78,55 78,73 64,82 50,73 50,55' fill='none' stroke='#b847ff' stroke-width='1.5' opacity='0.7'/>
+      <!-- Core energy orb -->
+      <circle cx='64' cy='64' r='14' fill='url(#se-core)' filter='url(#se-glow)'/>
+      <circle cx='64' cy='64' r='6' fill='#fff' opacity='0.9'/>
+      <!-- Field emanation lines -->
+      <g stroke='#b847ff' stroke-width='1' opacity='0.5' filter='url(#se-glow)'>
+        <line x1='64' y1='40' x2='64' y2='30'/>
+        <line x1='64' y1='88' x2='64' y2='98'/>
+        <line x1='40' y1='64' x2='30' y2='64'/>
+        <line x1='88' y1='64' x2='98' y2='64'/>
+        <line x1='47' y1='47' x2='40' y2='40'/>
+        <line x1='81' y1='47' x2='88' y2='40'/>
+        <line x1='47' y1='81' x2='40' y2='88'/>
+        <line x1='81' y1='81' x2='88' y2='88'/>
+      </g>
+    </svg>`,
 };
 
 // ---------- ENEMY SPRITES ----------
@@ -1211,6 +1385,120 @@ const enemySVG: Record<EnemyId, () => string> = {
         <rect x='26' y='68' width='2' height='1'/>
         <rect x='96' y='80' width='3' height='1'/>
       </g>
+    </svg>`,
+
+  glitch: () => `
+    <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <radialGradient id='gl-body' cx='50%' cy='50%'>
+          <stop offset='0' stop-color='#66ffdd'/>
+          <stop offset='0.6' stop-color='#00ffcc'/>
+          <stop offset='1' stop-color='#003322'/>
+        </radialGradient>
+        <filter id='gl-g'><feGaussianBlur stdDeviation='2'/><feMerge><feMergeNode/><feMergeNode in='SourceGraphic'/></feMerge></filter>
+      </defs>
+      <ellipse cx='64' cy='110' rx='36' ry='5' fill='#000' opacity='0.4'/>
+      <!-- Glitch body — slightly angular/distorted circle -->
+      <polygon points='64,18 96,38 108,72 90,104 38,104 20,72 32,38' fill='url(#gl-body)' stroke='#00ffcc' stroke-width='2' filter='url(#gl-g)'/>
+      <!-- Data corruption stripes -->
+      <g opacity='0.6'>
+        <rect x='28' y='50' width='72' height='3' fill='#00ffcc'/>
+        <rect x='20' y='66' width='88' height='2' fill='#00ff88'/>
+        <rect x='32' y='82' width='64' height='2' fill='#00ffcc'/>
+      </g>
+      <!-- Glitch artifacts (offset squares) -->
+      <rect x='24' y='56' width='8' height='4' fill='#66ffdd' opacity='0.8'/>
+      <rect x='96' y='60' width='6' height='3' fill='#66ffdd' opacity='0.8'/>
+      <rect x='30' y='76' width='5' height='3' fill='#00ff88' opacity='0.7'/>
+      <!-- Core split indicator -->
+      <line x1='64' y1='30' x2='64' y2='100' stroke='#fff' stroke-width='1' stroke-dasharray='4,4' opacity='0.5'/>
+      <!-- Eyes (glitchy — asymmetric) -->
+      <circle cx='50' cy='62' r='5' fill='#fff' filter='url(#gl-g)'/>
+      <circle cx='78' cy='60' r='4' fill='#fff' filter='url(#gl-g)'/>
+      <circle cx='50' cy='62' r='2' fill='#003322'/>
+      <circle cx='78' cy='60' r='1.5' fill='#003322'/>
+      <!-- Error indicator -->
+      <text x='64' y='90' text-anchor='middle' font-size='10' font-family='monospace' fill='#fff' opacity='0.8'>ERR</text>
+    </svg>`,
+
+  juggernaut: () => `
+    <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <linearGradient id='jg-body' x1='0' y1='0' x2='0' y2='1'>
+          <stop offset='0' stop-color='#884422'/>
+          <stop offset='0.5' stop-color='#cc4400'/>
+          <stop offset='1' stop-color='#331500'/>
+        </linearGradient>
+        <filter id='jg-g'><feGaussianBlur stdDeviation='2'/><feMerge><feMergeNode/><feMergeNode in='SourceGraphic'/></feMerge></filter>
+      </defs>
+      <ellipse cx='64' cy='118' rx='50' ry='6' fill='#000' opacity='0.5'/>
+      <!-- Armored legs -->
+      <rect x='30' y='88' width='22' height='28' rx='2' fill='#331500' stroke='#cc4400' stroke-width='2'/>
+      <rect x='76' y='88' width='22' height='28' rx='2' fill='#331500' stroke='#cc4400' stroke-width='2'/>
+      <!-- Heavy torso armor plates -->
+      <rect x='24' y='40' width='80' height='54' rx='4' fill='url(#jg-body)' stroke='#cc4400' stroke-width='2.5' filter='url(#jg-g)'/>
+      <!-- Chest plate bolts -->
+      <g fill='#cc4400' stroke='#331500' stroke-width='0.5'>
+        <circle cx='34' cy='52' r='3'/>
+        <circle cx='94' cy='52' r='3'/>
+        <circle cx='34' cy='82' r='3'/>
+        <circle cx='94' cy='82' r='3'/>
+      </g>
+      <!-- Armor ridge lines -->
+      <g stroke='#884422' stroke-width='1.5' opacity='0.6'>
+        <line x1='24' y1='60' x2='104' y2='60'/>
+        <line x1='24' y1='74' x2='104' y2='74'/>
+      </g>
+      <!-- Shoulder pauldrons -->
+      <ellipse cx='22' cy='52' rx='14' ry='18' fill='#cc4400' stroke='#ff6600' stroke-width='2'/>
+      <ellipse cx='106' cy='52' rx='14' ry='18' fill='#cc4400' stroke='#ff6600' stroke-width='2'/>
+      <!-- Head/visor -->
+      <rect x='42' y='12' width='44' height='32' rx='4' fill='#331500' stroke='#cc4400' stroke-width='2'/>
+      <rect x='46' y='18' width='36' height='16' rx='2' fill='#ff4400' opacity='0.3'/>
+      <!-- Visor slit -->
+      <rect x='46' y='24' width='36' height='6' rx='1' fill='#ff6600' filter='url(#jg-g)'/>
+      <!-- Core energy vent -->
+      <rect x='50' y='56' width='28' height='12' rx='2' fill='#ff4400' opacity='0.4' filter='url(#jg-g)'/>
+    </svg>`,
+
+  parasite: () => `
+    <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <radialGradient id='pa-body' cx='50%' cy='45%'>
+          <stop offset='0' stop-color='#aaffaa'/>
+          <stop offset='0.5' stop-color='#88ff00'/>
+          <stop offset='1' stop-color='#1a2d00'/>
+        </radialGradient>
+        <filter id='pa-g'><feGaussianBlur stdDeviation='2'/><feMerge><feMergeNode/><feMergeNode in='SourceGraphic'/></feMerge></filter>
+      </defs>
+      <ellipse cx='64' cy='112' rx='28' ry='4' fill='#000' opacity='0.4'/>
+      <!-- Trailing tendrils -->
+      <g stroke='#88ff00' stroke-width='1.5' fill='none' opacity='0.6'>
+        <path d='M44 90 Q30 100 20 108'/>
+        <path d='M54 94 Q46 106 38 114'/>
+        <path d='M74 94 Q82 106 90 114'/>
+        <path d='M84 90 Q98 100 108 108'/>
+      </g>
+      <!-- Main body — teardrop/leech shape -->
+      <ellipse cx='64' cy='60' rx='30' ry='40' fill='url(#pa-body)' stroke='#88ff00' stroke-width='2' filter='url(#pa-g)'/>
+      <!-- Infection probe (sharp front appendage) -->
+      <polygon points='64,16 70,30 58,30' fill='#44aa00' stroke='#88ff00' stroke-width='1.5'/>
+      <!-- Suction pads along body -->
+      <g fill='#44aa00' stroke='#88ff00' stroke-width='0.5'>
+        <circle cx='48' cy='55' r='4'/>
+        <circle cx='80' cy='55' r='4'/>
+        <circle cx='44' cy='70' r='3.5'/>
+        <circle cx='84' cy='70' r='3.5'/>
+        <circle cx='50' cy='84' r='3'/>
+        <circle cx='78' cy='84' r='3'/>
+      </g>
+      <!-- Neural eye cluster -->
+      <circle cx='60' cy='44' r='5' fill='#fff' filter='url(#pa-g)'/>
+      <circle cx='68' cy='44' r='5' fill='#fff' filter='url(#pa-g)'/>
+      <circle cx='60' cy='44' r='2' fill='#1a2d00'/>
+      <circle cx='68' cy='44' r='2' fill='#1a2d00'/>
+      <!-- Infection pulse indicator -->
+      <circle cx='64' cy='64' r='8' fill='none' stroke='#aaffaa' stroke-width='1' opacity='0.6' filter='url(#pa-g)'/>
     </svg>`,
 };
 
