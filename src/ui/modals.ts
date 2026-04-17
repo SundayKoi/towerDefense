@@ -26,9 +26,10 @@ export function openBuildStats(r: _RS): HTMLElement {
       </div>`;
     }).join('');
 
-  // Group placed towers by type.
+  // Group placed towers by type, with damage dealt stats.
   const towerCounts = new Map<_TID, number>();
   for (const t of r.towers) towerCounts.set(t.def, (towerCounts.get(t.def) ?? 0) + 1);
+  const totalDmg = Object.values(r.damageDealt).reduce((a, b) => a + (b ?? 0), 0) || 1;
   const towerRows = Array.from(towerCounts.entries()).map(([id, count]) => {
     const def = TOWERS[id];
     const dmgMod = 1 + r.mods.globalDamagePct + (r.mods.towerDmg[id] ?? 0);
@@ -36,14 +37,26 @@ export function openBuildStats(r: _RS): HTMLElement {
     const rateMod = 1 + r.mods.globalRatePct + (r.mods.towerRate[id] ?? 0);
     const critChance = (def.crit?.chance ?? 0) + r.mods.globalCritChance + (r.mods.towerCrit[id] ?? 0);
     const critPct = Math.round(critChance * 100);
+    const dealt = r.damageDealt[id] ?? 0;
+    const pct = Math.round((dealt / totalDmg) * 100);
+    const dealtLabel = dealt >= 1000 ? `${(dealt / 1000).toFixed(1)}k` : Math.round(dealt).toString();
     return `<div class="bs-tower" style="--accent:${def.accentColor}">
-      <span class="bs-tower-name">${def.name} \u00d7${count}</span>
-      <span class="bs-tower-stats">
-        <span>DMG ${Math.round(def.damage * dmgMod)}</span>
-        <span>RNG ${(def.range * rngMod).toFixed(1)}</span>
-        <span>RATE ${(def.fireRate * rateMod).toFixed(2)}/s</span>
-        ${critChance > 0 ? `<span>CRIT ${critPct}%</span>` : ''}
-      </span>
+      <div class="bs-tower-header">
+        <span class="bs-tower-name">${def.name}</span>
+        <span class="bs-tower-stats">
+          <span>DMG ${Math.round(def.damage * dmgMod)}</span>
+          <span>RNG ${(def.range * rngMod).toFixed(1)}</span>
+          <span>RATE ${(def.fireRate * rateMod).toFixed(2)}/s</span>
+          ${critChance > 0 ? `<span>CRIT ${critPct}%</span>` : ''}
+        </span>
+      </div>
+      ${dealt > 0 ? `
+      <div class="bs-dmg-row">
+        <div class="bs-dmg-bar-wrap">
+          <div class="bs-dmg-bar" style="width:${pct}%;background:${def.accentColor}"></div>
+        </div>
+        <span class="bs-dmg-label">${dealtLabel} dmg &nbsp;<b>${pct}%</b></span>
+      </div>` : ''}
     </div>`;
   }).join('');
 

@@ -157,6 +157,7 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     autoStartTimer: null,
     puddles: [],
     towerEffects: {},
+    damageDealt: {},
     seenThisRun: new Set(),
   };
 }

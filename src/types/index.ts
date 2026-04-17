@@ -59,6 +59,7 @@ export interface Puddle {
   slowDuration: number;
   damagePerSec?: number; // acid/fire damage to enemies standing in puddle
   color?: string;        // override for non-honeypot puddles
+  fromTower?: TowerId;   // source tower for damage tracking
 }
 export const TARGET_MODES: readonly TargetMode[] = ['first', 'strong', 'weak', 'close'] as const;
 
@@ -365,6 +366,8 @@ export interface RunState {
   cardsPicked: string[];
   // Countdown (seconds) until next wave auto-starts. null = not counting.
   autoStartTimer: number | null;
+  // Cumulative damage dealt this run, per tower type
+  damageDealt: Partial<Record<TowerId, number>>;
   // Enemy types encountered this run (for intro popups)
   seenThisRun: Set<EnemyId>;
 }

@@ -1397,15 +1397,21 @@ html.pixel-mode .map-row {
   font-style: italic;
   padding: 4px 0;
 }
-.bs-towers { display: flex; flex-direction: column; gap: 4px; }
+.bs-towers { display: flex; flex-direction: column; gap: 6px; }
 .bs-tower {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   padding: 8px 10px;
   background: rgba(10, 14, 24, 0.6);
   border-left: 3px solid var(--accent, var(--cyan));
+}
+.bs-tower-header {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .bs-tower-name {
   font-family: 'Orbitron', sans-serif;
@@ -1423,6 +1429,32 @@ html.pixel-mode .map-row {
   flex-wrap: wrap;
 }
 .bs-tower .bs-tower-stats span { white-space: nowrap; }
+.bs-dmg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bs-dmg-bar-wrap {
+  flex: 1;
+  height: 5px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.bs-dmg-bar {
+  height: 100%;
+  border-radius: 2px;
+  opacity: 0.85;
+  transition: width 0.4s ease;
+}
+.bs-dmg-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 80px;
+  text-align: right;
+}
+.bs-dmg-label b { color: var(--accent, var(--cyan)); }
 .bs-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

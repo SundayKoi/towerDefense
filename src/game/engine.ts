@@ -130,7 +130,7 @@ function updatePuddles(s: RunState, dt: number): void {
           e.slowTimer = Math.max(e.slowTimer, pu.slowDuration);
         }
         if (pu.damagePerSec) {
-          damageEnemy(s, e, pu.damagePerSec * dt, false, 'energy', true);
+          damageEnemy(s, e, pu.damagePerSec * dt, false, 'energy', true, pu.fromTower);
         }
       }
     }
@@ -174,7 +174,7 @@ function updateSentinelTower(s: RunState, t: TowerInstance, dt: number): void {
     }
 
     // Damage (silent — DoT numbers are visual noise)
-    damageEnemy(s, e, baseDps * dt, false, 'energy', true);
+    damageEnemy(s, e, baseDps * dt, false, 'energy', true, 'sentinel');
   }
 
   // Gentle fireFlash pulse for visual
@@ -785,10 +785,10 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
   if (phaseShift) {
     const saved = target.armor;
     target.armor = 0;
-    damageEnemy(s, target, p.damage * markedBonus, p.isCrit ?? false, p.damageType);
+    damageEnemy(s, target, p.damage * markedBonus, p.isCrit ?? false, p.damageType, false, p.fromTower);
     if (target.alive) target.armor = saved;
   } else {
-    damageEnemy(s, target, p.damage * markedBonus, p.isCrit ?? false, p.damageType);
+    damageEnemy(s, target, p.damage * markedBonus, p.isCrit ?? false, p.damageType, false, p.fromTower);
   }
 
   if (p.slow && !ENEMIES[target.def].slowImmune) {
@@ -930,12 +930,12 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       dps = fw ? effectiveDamage(s, fw) * 0.4 : 15;
       puddleColor = '#ff6b00';
     }
-    s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: rad, timeLeft: dur, maxTime: dur, slowPct: 0.4, slowDuration: 0.6, damagePerSec: dps, color: puddleColor });
+    s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: rad, timeLeft: dur, maxTime: dur, slowPct: 0.4, slowDuration: 0.6, damagePerSec: dps, color: puddleColor, fromTower: p.fromTower });
   }
 
   // Firewall incendiary: leave a small fire damage zone
   if (p.fromTower === 'firewall' && hasEffect(s, 'firewall', 'incendiary')) {
-    s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 0.6, timeLeft: 1.5, maxTime: 1.5, slowPct: 0, slowDuration: 0, damagePerSec: 18, color: '#ff6b00' });
+    s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 0.6, timeLeft: 1.5, maxTime: 1.5, slowPct: 0, slowDuration: 0, damagePerSec: 18, color: '#ff6b00', fromTower: 'firewall' });
   }
 
   // Ice effects
@@ -1101,25 +1101,18 @@ function applyResistanceAndArmor(e: EnemyInstance, raw: number, type: DamageType
   return final;
 }
 
-export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: boolean, type: DamageType, silent = false): void {
-  const def = ENEMIES[e.def];
+export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: boolean, type: DamageType, silent = false, source?: TowerId): number {
   const final = applyResistanceAndArmor(e, dmg, type, isCrit);
   if (final <= 0) {
     if (!silent) s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'IMMUNE', vy: -18, life: 0.8, maxLife: 0.8, color: '#6b8090', size: 12 });
     e.hitFlash = 0.12;
-    return;
+    return 0;
   }
   e.hp -= final;
-  e.hitFlash = 0.18;
-  if (!silent) {
-    const resist = def.resistances?.[type] ?? 1;
-    const isResisted = resist < 1 && !(isCrit && def.critIgnoresResist);
-    const isWeakness = resist > 1;
-    const text = isCrit ? `${Math.round(final)}!` : `${Math.round(final)}`;
-    const color = isCrit ? '#ffd600' : isWeakness ? '#00ff88' : isResisted ? '#6b8090' : '#ff2d95';
-    s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text, vy: -26, life: 0.8, maxLife: 0.8, color, size: isCrit ? 22 : isWeakness ? 18 : 16 });
-  }
+  e.hitFlash = isCrit ? 0.25 : 0.18;
+  if (source) s.damageDealt[source] = (s.damageDealt[source] ?? 0) + final;
   if (e.hp <= 0) killEnemy(s, e);
+  return final;
 }
 
 function killEnemy(s: RunState, e: EnemyInstance): void {
