@@ -15,7 +15,10 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     accent: '#00ff88',
     description: 'Basic self-replicating probe. Common swarm unit.',
     counterTip: 'Anything kills worms. Economy matters more than tower choice.',
-    size: 0.9,
+    // Bumped from 0.9 — the pixel-sheet worm sprite sits smaller inside its
+    // 32x32 frame than the other enemy sprites, so the same size multiplier
+    // read as visibly tiny next to spiders/trojans. 1.15 brings it in line.
+    size: 1.15,
   },
   spider: {
     id: 'spider',
