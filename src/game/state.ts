@@ -49,6 +49,7 @@ export function defaultSave(): SaveData {
       bossProtocolBonus: 0,
     },
     quests: { completed: [] },
+    tutorial: { seen: [] },
     contracts: {
       daily:   { period: '', offered: [], claimed: [], stats: emptyPeriodStats() },
       weekly:  { period: '', offered: [], claimed: [], stats: emptyPeriodStats() },
@@ -83,6 +84,7 @@ export function loadSave(): SaveData {
       metaBoosts: { ...d.metaBoosts, ...(parsed.metaBoosts ?? {}) },
       shopPurchased: parsed.shopPurchased ?? {},
       quests: parsed.quests ?? { completed: [] },
+      tutorial: parsed.tutorial ?? { seen: [] },
       contracts: parsed.contracts ?? d.contracts,
       stats: { ...d.stats, ...(parsed.stats ?? {}) },
       settings: { ...d.settings, ...(parsed.settings ?? {}) },

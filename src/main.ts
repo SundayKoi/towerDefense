@@ -12,6 +12,7 @@ import { gameScreen, renderPalette, renderSelectedTower, renderTokensBar, type G
 import { openBuildStats, openCardDraft, openEnemyIntel, openGameOver, openPauseMenu, openSettingsModal } from '@/ui/modals';
 import { openShopScreen } from '@/ui/shop';
 import { openDatabankScreen } from '@/ui/databank';
+import { openHowToPlayScreen, showTutorialIfNew } from '@/ui/tutorial';
 import { mount } from '@/ui/screens';
 import { audio } from '@/audio/sfx';
 import { addToAllPeriods } from '@/data/contracts';
@@ -95,6 +96,7 @@ function showStart() {
     () => openSettingsModal(save, applySettings),
     () => openShopScreen(save, () => writeSave(save), showStart),
     () => openDatabankScreen(save, showStart),
+    () => openHowToPlayScreen(showStart),
   ));
 }
 
@@ -131,6 +133,8 @@ function startRun(mapId: string, difficulty: Difficulty) {
   startLoop();
   audio.stopAmbient();
   audio.startAmbient('game');
+  // Tutorial: very first run ever — explain the basics before they tap anything.
+  showTutorialIfNew(save, () => writeSave(save), 'first_run');
   // If meta-boosts gave us an opening level, let player draft immediately.
   if (save.metaBoosts.extraDraftCards > 0 || save.metaBoosts.startingLevel > 0) {
     // No auto-draft at start unless pending level-ups accrued — keep it predictable.
@@ -202,6 +206,18 @@ function wireGameScreen() {
     if (!save.stats.towersEverDeployed.includes(tid)) {
       save.stats.towersEverDeployed.push(tid);
       writeSave(save);
+    }
+    // Tutorial: explain the selected-tower panel after the first ever placement.
+    showTutorialIfNew(save, () => writeSave(save), 'first_place');
+    // Tutorial: subnet bonus tip fires the first time a placement creates a link.
+    if (run && run.towers.length >= 2) {
+      const placed = run.towers[run.towers.length - 1];
+      const linked = run.towers.some((t) =>
+        t.id !== placed.id &&
+        Math.abs(t.grid.x - placed.grid.x) <= 1 &&
+        Math.abs(t.grid.y - placed.grid.y) <= 1
+      );
+      if (linked) showTutorialIfNew(save, () => writeSave(save), 'first_subnet');
     }
     return true;
   };
@@ -439,6 +455,8 @@ function startLoop() {
           if (protoBonus > 0) run.protocolsEarned += protoBonus;
           const hpRegen = save.metaBoosts.hpRegenPerWave ?? 0;
           if (hpRegen > 0) run.hp = Math.min(run.maxHp, run.hp + hpRegen);
+          // Tutorial: explain XP / protocols / progression on first ever wave clear.
+          showTutorialIfNew(save, () => writeSave(save), 'first_wave_clear');
         },
         onNewEnemy: (defId) => showEnemyIntroBanner(defId),
         onAutoStart: () => {
@@ -505,6 +523,8 @@ function openLevelUpDraft() {
   r.pendingLevelUps = Math.max(0, r.pendingLevelUps - 1);
   const prevPhase = r.phase;
   r.phase = 'draft';
+  // Tutorial: explain card drafts on the player's first ever level-up.
+  showTutorialIfNew(save, () => writeSave(save), 'first_levelup');
   const unlocked = new Set(save.unlockedCards);
   const cardCount = 3 + (save.metaBoosts.extraDraftCards ?? 0);
   const ctx = buildDraftContext(r);

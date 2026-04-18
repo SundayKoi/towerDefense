@@ -299,6 +299,7 @@ export interface SaveData {
   shopPurchased: Record<string, number>;    // upgradeId -> stack count
   metaBoosts: MetaBoosts;                   // derived from shop, cached for quick apply
   quests: { completed: string[] };          // quest IDs claimed
+  tutorial: { seen: string[] };             // first-time popup IDs already shown
   contracts: {
     daily:   { period: string; offered: string[]; claimed: string[]; stats: PeriodStats };
     weekly:  { period: string; offered: string[]; claimed: string[]; stats: PeriodStats };
