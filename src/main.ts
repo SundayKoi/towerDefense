@@ -2,7 +2,7 @@ import '@/css/main.css';
 import { loadSave, writeSave, createRun, defaultSave } from '@/game/state';
 import { CARDS, CARDS_BY_ID, drawDraft } from '@/data/cards';
 import { TOWERS } from '@/data/towers';
-import { cycleTargetMode, placeTower, removeTower, startWave, updateRun } from '@/game/engine';
+import { cycleTargetMode, placeTower, removeTower, startWave, triggerOverdrive, updateRun } from '@/game/engine';
 import { applyBloom, applyPixelate, canPlaceAt, createViewport, renderRun, resizeViewport } from '@/render/canvas';
 import { preloadSprites } from '@/render/sprites';
 import { initBackground } from '@/render/background';
@@ -111,6 +111,9 @@ let lastFrame = 0;
 let rafId = 0;
 // Cleanup callbacks registered by wireGameScreen — run on finishRun to release listeners/observers.
 let runCleanups: Array<() => void> = [];
+// Set when a tower is selected so updateHud can refresh its panel each frame
+// (so overdrive timers tick visibly). Cleared when no tower is selected.
+let selectedRerender: (() => void) | null = null;
 
 function runRunCleanups() {
   for (const fn of runCleanups) { try { fn(); } catch {} }
@@ -340,9 +343,12 @@ function wireGameScreen() {
     if (t) {
       run.selection = { kind: 'tower', towerId: t.id };
       const rerenderSel = () => renderSelectedTower(h, run!,
-        () => { removeTower(run!, t); h.selectedEl.classList.remove('open'); updateHud(); },
+        () => { removeTower(run!, t); h.selectedEl.classList.remove('open'); updateHud(); selectedRerender = null; },
         () => { cycleTargetMode(t); rerenderSel(); },
+        () => { triggerOverdrive(run!, t); rerenderSel(); },
       );
+      // Expose to updateHud so the overdrive timers tick visibly while the panel is open.
+      selectedRerender = rerenderSel;
       rerenderSel();
       return;
     }
@@ -407,6 +413,12 @@ function updateHud() {
     runHandles.startBtn.classList.remove('btn-boss');
   }
   runHandles.startBtn.disabled = run.phase !== 'prep';
+  // Refresh the selected tower panel so overdrive countdowns tick.
+  if (selectedRerender && run.selection.kind === 'tower') {
+    selectedRerender();
+  } else if (selectedRerender && run.selection.kind !== 'tower') {
+    selectedRerender = null;
+  }
 }
 
 function startLoop() {

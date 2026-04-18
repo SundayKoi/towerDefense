@@ -522,6 +522,17 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
 .sel-tower-name { font-family: 'Orbitron', sans-serif; font-weight: 700; letter-spacing: 2px; color: var(--accent, var(--cyan)); }
 .sel-tower-level { color: var(--text-dim); font-size: 12px; margin-left: 8px; }
 .sel-tower-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+.sel-subnet {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--cyan);
+  background: rgba(0, 255, 240, 0.08);
+  border-left: 3px solid var(--cyan);
+}
+.sel-subnet b { color: var(--yellow); font-size: 11px; }
 .sel-tower-actions { display: flex; gap: 8px; }
 .sel-tower-actions .btn { flex: 1; }
 

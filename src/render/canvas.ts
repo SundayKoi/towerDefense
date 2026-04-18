@@ -187,6 +187,9 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
   // Sentinel aura (drawn below towers)
   for (const t of s.towers) { if (t.def === 'sentinel') drawSentinelAura(ctx, vp, t, s); }
 
+  // Subnet links — connecting glow lines between adjacent turrets, drawn under towers.
+  drawSubnetLinks(ctx, vp, s);
+
   // Towers
   for (const t of s.towers) { drawTower(ctx, vp, t); drawTowerDebuffs(ctx, vp, t, s.elapsed); }
 
@@ -414,6 +417,44 @@ export function canPlaceAt(s: RunState, g: Vec2): boolean {
   return true;
 }
 
+// Subnet links: glowing connection lines between adjacent turrets. Color and
+// thickness scale with the subnet's diversity so a stronger subnet reads at a glance.
+function drawSubnetLinks(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: RunState): void {
+  if (s.towers.length < 2) return;
+  const cs = vp.cellSize;
+  const pulse = 0.65 + 0.35 * Math.sin(performance.now() / 320);
+  ctx.save();
+  for (let i = 0; i < s.towers.length; i++) {
+    const a = s.towers[i];
+    for (let j = i + 1; j < s.towers.length; j++) {
+      const b = s.towers[j];
+      if (Math.abs(a.grid.x - b.grid.x) > 1 || Math.abs(a.grid.y - b.grid.y) > 1) continue;
+      const mult = a.extras.subnetMult ?? 1;
+      const types = a.extras.subnetTypes ?? 1;
+      // Color shifts cyan → magenta as the subnet gets more diverse.
+      const t = Math.min(1, (types - 1) / 4);
+      const r = Math.round(0 + t * 255);
+      const g = Math.round(255 - t * 210);
+      const blue = Math.round(240 - t * 90);
+      const color = `rgba(${r},${g},${blue},${0.5 * pulse})`;
+      const width = 1.5 + (mult - 1) * 4;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10 + (mult - 1) * 18;
+      const ax = a.grid.x * cs + cs / 2;
+      const ay = a.grid.y * cs + cs / 2;
+      const bx = b.grid.x * cs + cs / 2;
+      const by = b.grid.y * cs + cs / 2;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerInstance): void {
   const cs = vp.cellSize;
   const cx = t.grid.x * cs + cs / 2;
@@ -422,6 +463,23 @@ function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerIn
   const sprite = getTowerSprite(t.def);
 
   ctx.save();
+  // Overdrive state ring — drawn under the halo so it reads as a status indicator.
+  const odActive = (t.extras.overdriveActive ?? 0) > 0;
+  const odOffline = (t.extras.overdriveOffline ?? 0) > 0;
+  if (odActive || odOffline) {
+    const ringColor = odActive ? '#ffd600' : '#ff3355';
+    const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 90);
+    ctx.save();
+    ctx.globalAlpha = (odActive ? 0.85 : 0.55) * pulse;
+    ctx.strokeStyle = ringColor;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = ringColor;
+    ctx.shadowBlur = odActive ? 22 : 10;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cs * 0.48, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   // Glow halo underneath
   ctx.globalAlpha = 0.4;
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cs * 0.55);

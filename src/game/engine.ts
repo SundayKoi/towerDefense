@@ -160,6 +160,8 @@ function updatePuddles(s: RunState, dt: number): void {
 // ======================= Sentinel passive field =======================
 
 function updateSentinelTower(s: RunState, t: TowerInstance, dt: number): void {
+  // Overdrive ticks even on sentinel — when offline the field shuts off entirely.
+  if (!tickOverdrive(t, dt)) return;
   const def = TOWERS[t.def];
   const range = effectiveRange(s, t)
     + (hasEffect(s, 'sentinel', 'expanded') ? 0.8 : 0)
@@ -226,6 +228,7 @@ function updateSentinelTower(s: RunState, t: TowerInstance, dt: number): void {
 // ======================= Pulse (EMP) burst =======================
 
 function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
+  if (!tickOverdrive(t, dt)) { t.cooldown = Math.max(0, t.cooldown - dt); return; }
   t.cooldown = Math.max(0, t.cooldown - dt);
 
   const rechargeTime = 2.5
@@ -534,6 +537,11 @@ function effectiveDamage(s: RunState, t: TowerInstance): number {
   const specific = s.mods.towerDmg[t.def] ?? 0;
   let dmg = def.damage * (1 + s.mods.globalDamagePct + specific);
   if (t.debuffs.some((d) => d.kind === 'infected')) dmg *= 0.55;
+  // Subnet bonus: damage multiplier from being adjacent to other turrets.
+  // Cached per tower in extras.subnetMult; recomputed on place/remove.
+  dmg *= (t.extras.subnetMult ?? 1);
+  // Overdrive: +200% damage for the boost duration.
+  if ((t.extras.overdriveActive ?? 0) > 0) dmg *= 3;
   // Exotic redundancy: 4+ different tower types placed = +20% global damage
   // Count unique tower types without allocating a Set.
   if (s.cardsPicked.includes('exotic_redundancy') && s.towers.length >= 4) {
@@ -578,7 +586,94 @@ function effectiveFireRate(s: RunState, t: TowerInstance, dt = 0): number {
     }
     if ((t.extras.blazingActive ?? 0) > 0) rate *= 1.25;
   }
+  // Overdrive: +100% fire rate for the boost duration.
+  if ((t.extras.overdriveActive ?? 0) > 0) rate *= 2;
   return rate;
+}
+
+// ======================= Subnet Links =======================
+// Adjacent turrets (≤1 cell, including diagonals) form a connected subnet.
+// Each subnet grants its members a damage multiplier scaled by size + diversity.
+// Cached per tower in extras.subnetMult — recomputed on place/remove.
+export function computeSubnets(s: RunState): void {
+  const visited = new Set<number>();
+  for (const t of s.towers) {
+    if (visited.has(t.id)) continue;
+    // BFS for the connected component containing t.
+    const cluster: TowerInstance[] = [];
+    const queue: TowerInstance[] = [t];
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur.id)) continue;
+      visited.add(cur.id);
+      cluster.push(cur);
+      for (const other of s.towers) {
+        if (visited.has(other.id) || other.id === cur.id) continue;
+        if (Math.abs(cur.grid.x - other.grid.x) <= 1 && Math.abs(cur.grid.y - other.grid.y) <= 1) {
+          queue.push(other);
+        }
+      }
+    }
+    // Mult = base 1 + 8% per extra node + 12% per extra unique type, capped at 1.6×.
+    const size = cluster.length;
+    const types = new Set(cluster.map((c) => c.def));
+    const mult = Math.min(1.6, 1 + 0.08 * (size - 1) + 0.12 * (types.size - 1));
+    for (const c of cluster) {
+      c.extras.subnetMult = mult;
+      c.extras.subnetSize = size;
+      c.extras.subnetTypes = types.size;
+    }
+  }
+}
+
+// ======================= Overdrive =======================
+// Player-triggered burst: 4s of 3× damage / 2× rate, then 6s offline (no firing),
+// then a 30s recharge before it can be triggered again. State is stored in extras:
+//   overdriveActive: seconds remaining of the boost
+//   overdriveOffline: seconds remaining of the disabled phase (after boost ends)
+//   overdriveCharge:  seconds remaining until ready to trigger again
+const OVERDRIVE_ACTIVE = 4;
+const OVERDRIVE_OFFLINE = 6;
+const OVERDRIVE_RECHARGE = 30;
+
+export function overdriveState(t: TowerInstance): 'ready' | 'active' | 'offline' | 'charging' {
+  if ((t.extras.overdriveActive ?? 0) > 0) return 'active';
+  if ((t.extras.overdriveOffline ?? 0) > 0) return 'offline';
+  if ((t.extras.overdriveCharge ?? 0) > 0) return 'charging';
+  return 'ready';
+}
+
+export function overdriveTimeLeft(t: TowerInstance): number {
+  if ((t.extras.overdriveActive ?? 0) > 0) return t.extras.overdriveActive;
+  if ((t.extras.overdriveOffline ?? 0) > 0) return t.extras.overdriveOffline;
+  if ((t.extras.overdriveCharge ?? 0) > 0) return t.extras.overdriveCharge;
+  return 0;
+}
+
+export function triggerOverdrive(s: RunState, t: TowerInstance): boolean {
+  if (overdriveState(t) !== 'ready') return false;
+  t.extras.overdriveActive = OVERDRIVE_ACTIVE;
+  t.extras.overdriveCharge = OVERDRIVE_RECHARGE;
+  t.fireFlash = 0.4;
+  s.floaters.push({ pos: { x: t.pos.x, y: t.pos.y - 0.6 }, text: 'OVERDRIVE', vy: -28, life: 1.2, maxLife: 1.2, color: '#ffd600', size: 16 });
+  audio.play('upgrade');
+  return true;
+}
+
+// Tick overdrive timers. Returns true if tower can fire this frame.
+function tickOverdrive(t: TowerInstance, dt: number): boolean {
+  if ((t.extras.overdriveActive ?? 0) > 0) {
+    t.extras.overdriveActive = Math.max(0, t.extras.overdriveActive - dt);
+    if (t.extras.overdriveActive <= 0) t.extras.overdriveOffline = OVERDRIVE_OFFLINE;
+  }
+  if ((t.extras.overdriveOffline ?? 0) > 0) {
+    t.extras.overdriveOffline = Math.max(0, t.extras.overdriveOffline - dt);
+  }
+  if ((t.extras.overdriveCharge ?? 0) > 0) {
+    t.extras.overdriveCharge = Math.max(0, t.extras.overdriveCharge - dt);
+  }
+  // Tower can't fire while offline.
+  return (t.extras.overdriveOffline ?? 0) <= 0;
 }
 
 export function applyTowerDebuff(s: RunState, t: TowerInstance, kind: 'jammed' | 'infected', duration: number): void {
@@ -600,6 +695,8 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
   for (const d of t.debuffs) d.timeLeft -= dt;
   // In-place splice to avoid per-frame array allocation per tower
   for (let i = t.debuffs.length - 1; i >= 0; i--) { if (t.debuffs[i].timeLeft <= 0) t.debuffs.splice(i, 1); }
+  // Overdrive timers — when offline, skip firing entirely.
+  if (!tickOverdrive(t, dt)) { t.cooldown = Math.max(0, t.cooldown - dt); return; }
   t.cooldown = Math.max(0, t.cooldown - dt);
 
   // Quantum observer: charge idle time for extra crit mult
@@ -1778,6 +1875,7 @@ export function placeTower(s: RunState, defId: keyof typeof TOWERS, grid: Vec2):
     extras: {},
   };
   s.towers.push(t);
+  computeSubnets(s);
   audio.play('place');
   return t;
 }
@@ -1791,6 +1889,7 @@ export function cycleTargetMode(t: TowerInstance): void {
 
 export function removeTower(s: RunState, t: TowerInstance): void {
   s.towers = s.towers.filter((x) => x.id !== t.id);
+  computeSubnets(s);
   s.selection = { kind: 'none' };
   audio.play('sell');
 }

@@ -199,6 +199,7 @@ export function renderSelectedTower(
   s: RunState,
   onRemove: () => void,
   onCycleTarget: () => void,
+  onOverdrive: () => void,
 ): void {
   const box = handles.selectedEl;
   const sel = s.selection;
@@ -212,6 +213,23 @@ export function renderSelectedTower(
   const effDmg = Math.round(def.damage * dmgMod);
   const effRange = (def.range * rangeMod).toFixed(1);
   const effRate = (def.fireRate * rateMod).toFixed(2);
+  // Subnet bonus readout (only show when the tower is actually linked).
+  const subnetMult = t.extras.subnetMult ?? 1;
+  const subnetSize = t.extras.subnetSize ?? 1;
+  const subnetTypes = t.extras.subnetTypes ?? 1;
+  const subnetHtml = subnetSize > 1
+    ? `<div class="sel-subnet">SUBNET: ${subnetSize} nodes / ${subnetTypes} types &nbsp;<b>+${Math.round((subnetMult - 1) * 100)}% DMG</b></div>`
+    : '';
+  // Overdrive button state.
+  const odActive = (t.extras.overdriveActive ?? 0) > 0;
+  const odOffline = (t.extras.overdriveOffline ?? 0) > 0;
+  const odCharge = t.extras.overdriveCharge ?? 0;
+  let odLabel = 'OVERDRIVE';
+  let odClass = 'btn btn-primary';
+  let odDisabled = false;
+  if (odActive) { odLabel = `BURNING (${(t.extras.overdriveActive).toFixed(1)}s)`; odClass = 'btn btn-primary'; odDisabled = true; }
+  else if (odOffline) { odLabel = `OFFLINE (${(t.extras.overdriveOffline).toFixed(1)}s)`; odClass = 'btn btn-danger'; odDisabled = true; }
+  else if (odCharge > 0) { odLabel = `CHARGING (${odCharge.toFixed(0)}s)`; odClass = 'btn btn-ghost'; odDisabled = true; }
   box.innerHTML = `
     <div class="sel-tower-header" style="--accent:${def.accentColor}">
       <div class="sel-tower-name">${def.name} <span class="sel-tower-type">${def.damageType.toUpperCase()}</span></div>
@@ -222,6 +240,7 @@ export function renderSelectedTower(
       <span>RNG <b>${effRange}</b></span>
       <span>RATE <b>${effRate}/s</b></span>
     </div>
+    ${subnetHtml}
     <button class="target-mode-btn" id="sel-target">
       <span class="tm-glyph">${TARGET_MODE_GLYPH[t.targetMode]}</span>
       <span class="tm-body">
@@ -230,11 +249,13 @@ export function renderSelectedTower(
       </span>
     </button>
     <div class="sel-tower-actions">
-      <button class="btn btn-danger" id="sel-remove">REMOVE TOWER</button>
+      <button class="${odClass}" id="sel-overdrive" ${odDisabled ? 'disabled' : ''}>${odLabel}</button>
+      <button class="btn btn-danger" id="sel-remove">REMOVE</button>
     </div>
   `;
   box.classList.add('open');
   (box.querySelector('#sel-close') as HTMLButtonElement).onclick = () => { s.selection = { kind: 'none' }; box.classList.remove('open'); };
   (box.querySelector('#sel-target') as HTMLButtonElement).onclick = () => { onCycleTarget(); };
   (box.querySelector('#sel-remove') as HTMLButtonElement).onclick = () => { audio.play('ui_click'); onRemove(); };
+  (box.querySelector('#sel-overdrive') as HTMLButtonElement).onclick = () => { if (!odDisabled) onOverdrive(); };
 }
