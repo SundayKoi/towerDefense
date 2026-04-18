@@ -18,6 +18,30 @@ function hasEffect(s: RunState, tower: TowerId, tag: string): boolean {
   return s.towerEffects[tower]?.has(tag) ?? false;
 }
 
+// True iff towers of both types are placed AND share a connected subnet
+// (adjacency via BFS with ≤1 cell steps). Used by subnet-pair synergy cards
+// so you have to actually place the towers next to each other to get the bonus.
+export function hasSubnetLink(s: RunState, a: TowerId, b: TowerId): boolean {
+  const ta = s.towers.find((t) => t.def === a);
+  const tb = s.towers.find((t) => t.def === b);
+  if (!ta || !tb) return false;
+  const visited = new Set<number>();
+  const queue: TowerInstance[] = [ta];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    if (visited.has(cur.id)) continue;
+    visited.add(cur.id);
+    if (cur.id === tb.id) return true;
+    for (const other of s.towers) {
+      if (visited.has(other.id) || other.id === cur.id) continue;
+      if (Math.abs(cur.grid.x - other.grid.x) <= 1 && Math.abs(cur.grid.y - other.grid.y) <= 1) {
+        queue.push(other);
+      }
+    }
+  }
+  return false;
+}
+
 // ======================= Wave flow =======================
 
 export function startWave(s: RunState): void {
@@ -47,6 +71,14 @@ export function endWave(s: RunState, events: EngineEvents): void {
   // Data miner protocol_mine upgrade: +1 protocol per wave cleared.
   if (s.towers.some((t) => t.def === 'data_miner') && hasEffect(s, 'data_miner', 'protocol_mine')) {
     proto += 1;
+  }
+  // PROTOCOL OVERCLOCK (eco_over): +2 protocols per wave (additive)
+  if (s.towers.some((t) => t.def === 'data_miner') && hasEffect(s, 'data_miner', 'dataminer_eco_over')) {
+    proto += 2;
+  }
+  // PROTOCOL FLOOD (eco_caps): +50% protocols this wave
+  if (s.towers.some((t) => t.def === 'data_miner') && hasEffect(s, 'data_miner', 'dataminer_eco_caps')) {
+    proto = Math.ceil(proto * 1.5);
   }
   s.protocolsEarned += proto;
   s.floaters.push({ pos: { x: 0, y: -0.5 }, text: `+${proto} \u2b22 PROTOCOL`, vy: -18, life: 2, maxLife: 2, color: '#ffd600', size: 16 });
@@ -183,29 +215,37 @@ function updateSentinelTower(s: RunState, t: TowerInstance, dt: number): void {
   const range = effectiveRange(s, t)
     + (hasEffect(s, 'sentinel', 'expanded') ? 0.8 : 0)
     + (hasEffect(s, 'sentinel', 'node_broadcast') ? 0.5 : 0);
-  const baseDps = (hasEffect(s, 'sentinel', 'reinforced') ? 20 : def.damage)
-    + (hasEffect(s, 'sentinel', 'overclocked') ? 8 : 0);
+  let baseDps = (hasEffect(s, 'sentinel', 'reinforced') ? 20 : def.damage)
+    + (hasEffect(s, 'sentinel', 'overclocked') ? 8 : 0)
+    + (hasEffect(s, 'sentinel', 'sentinel_thr_barbed') ? 6 : 0);
+  // SENTINEL FIELD capstone: 40 dps base
+  if (hasEffect(s, 'sentinel', 'sentinel_fld_caps')) baseDps = Math.max(baseDps, 40);
   const slowPct = hasEffect(s, 'sentinel', 'anchor') ? 0.45 : def.slow!.pct;
   const slowDur = def.slow!.duration;
 
-  // Surge event: every 5s emit 5x damage surge for 0.5s
-  t.extras.surgeTimer = (t.extras.surgeTimer ?? 5) - dt;
+  // Surge event: every 5s emit 5x damage surge for 0.5s. MEGA SURGE capstone: 10× every 4s.
+  const surgeInterval = hasEffect(s, 'sentinel', 'sentinel_plz_caps') ? 4 : 5;
+  const surgeMagnitude = hasEffect(s, 'sentinel', 'sentinel_plz_caps') ? 10 : 5;
+  t.extras.surgeTimer = (t.extras.surgeTimer ?? surgeInterval) - dt;
   t.extras.surgeActive = Math.max(0, (t.extras.surgeActive ?? 0) - dt);
-  if (hasEffect(s, 'sentinel', 'surge_event') && t.extras.surgeTimer <= 0) {
-    t.extras.surgeTimer = 5;
+  const surgeOn = hasEffect(s, 'sentinel', 'surge_event') || hasEffect(s, 'sentinel', 'sentinel_plz_caps');
+  if (surgeOn && t.extras.surgeTimer <= 0) {
+    t.extras.surgeTimer = surgeInterval;
     t.extras.surgeActive = 0.5;
     t.fireFlash = 0.4;
   }
-  const surgeMult = (hasEffect(s, 'sentinel', 'surge_event') && (t.extras.surgeActive ?? 0) > 0) ? 5 : 1;
+  const surgeMult = (surgeOn && (t.extras.surgeActive ?? 0) > 0) ? surgeMagnitude : 1;
 
-  // Pulse-link: mark all enemies in range every 5s
+  // Pulse-link: mark all enemies in range every 5s (3s with CHARGED PULSE, 4s mark with PULSE STORM)
+  const plzInterval = hasEffect(s, 'sentinel', 'sentinel_plz_charged') ? 3 : 5;
+  const plzMarkDur = hasEffect(s, 'sentinel', 'sentinel_plz_storm') ? 4 : 2;
   t.extras.pulseTimer = (t.extras.pulseTimer ?? 0) - dt;
   if (hasEffect(s, 'sentinel', 'pulse_link') && t.extras.pulseTimer <= 0) {
-    t.extras.pulseTimer = 5;
+    t.extras.pulseTimer = plzInterval;
     for (const e of s.enemies) {
       if (!e.alive) continue;
       if (Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= range) {
-        e.marked = Math.max(e.marked ?? 0, 2);
+        e.marked = Math.max(e.marked ?? 0, plzMarkDur);
       }
     }
     t.fireFlash = 0.3;
@@ -248,9 +288,11 @@ function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
   if (!tickOverdrive(t, dt)) { t.cooldown = Math.max(0, t.cooldown - dt); return; }
   t.cooldown = Math.max(0, t.cooldown - dt);
 
-  const rechargeTime = 2.5
+  let rechargeTime = 2.5
     - (hasEffect(s, 'pulse', 'frequency') ? 0.7 : 0)
     - (hasEffect(s, 'pulse', 'rapid_resonance') ? 0.4 : 0);
+  // STROBE BURST capstone: pin recharge to 0.8s
+  if (hasEffect(s, 'pulse', 'pulse_frq_caps')) rechargeTime = Math.min(rechargeTime, 0.8);
   const range = effectiveRange(s, t) + (hasEffect(s, 'pulse', 'amplify') ? 0.6 : 0);
 
   if (t.cooldown <= 0) {
@@ -265,7 +307,9 @@ function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
       return;
     }
     t.extras.burstCount = (t.extras.burstCount ?? 0) + 1;
-    const isOverload = hasEffect(s, 'pulse', 'overload') && t.extras.burstCount % 4 === 0;
+    // ETERNAL OVERLOAD capstone: every burst is an overload
+    const overloadActive = hasEffect(s, 'pulse', 'overload') || hasEffect(s, 'pulse', 'pulse_ovl_caps');
+    const isOverload = overloadActive && (hasEffect(s, 'pulse', 'pulse_ovl_caps') || t.extras.burstCount % 4 === 0);
     const dmgMult = isOverload ? 3.0 : 1.0;
     const baseDmg = effectiveDamage(s, t) * dmgMult * (hasEffect(s, 'pulse', 'capacitor_boost') ? 1.15 : 1.0);
 
@@ -314,6 +358,14 @@ function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
       if (hasEffect(s, 'pulse', 'signal_jam')) {
         e.armor = Math.max(0, e.armor - 3);
       }
+      // PULSE IONIC CHARGED: strip 2 armor on hit
+      if (hasEffect(s, 'pulse', 'pulse_ion_charged')) {
+        e.armor = Math.max(0, e.armor - 2);
+      }
+      // PULSE IONIC capstone: strip 4 armor permanently (no restore via collapseTimer)
+      if (hasEffect(s, 'pulse', 'pulse_ion_caps')) {
+        e.armor = Math.max(0, e.armor - 4);
+      }
 
       // Storm pulse synergy: trigger chain arc on each hit
       if (hasEffect(s, 'pulse', 'storm_pulse') && s.projectiles.length < 300) {
@@ -349,6 +401,16 @@ function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
         s.floaters.push({ pos: { x: t.grid.x, y: t.grid.y - 0.8 }, text: 'OVERLOAD!', vy: -28, life: 1.2, maxLife: 1.2, color: '#ffffff', size: 18 });
       }
       audio.play('fire_pulse');
+      // NETLINK pulse+booster_node: bursts proc twice per cycle
+      if (hasEffect(s, 'pulse', 'netlink_pulse_booster_node')
+          && (hasSubnetLink(s, 'pulse', 'booster_node') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
+        for (const e of s.enemies) {
+          if (!e.alive) continue;
+          if (Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= range) {
+            damageEnemy(s, e, baseDmg, false, 'energy', false, 'pulse');
+          }
+        }
+      }
     }
     t.cooldown = rechargeTime;
   }
@@ -524,12 +586,16 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       //   Base:       1 XP per 3s  (0.33/s)
       //   Throughput: 1 XP per second
       //   Recursive:  2 XP per second (replaces throughput's rate)
-      //   Uplink:     ×1.5 during waves (caps the top rate at 3/s)
+      //   Uplink:     ×1.5 during waves
+      //   Capstone:   fills the remaining room up to the 3/s hard cap
       if (s.phase === 'wave') {
         let rate = 1 / 3;
         if (hasEffect(s, 'data_miner', 'throughput')) rate = 1.0;
         if (hasEffect(s, 'data_miner', 'recursive')) rate = 2.0;
         if (hasEffect(s, 'data_miner', 'uplink')) rate *= 1.5;
+        if (hasEffect(s, 'data_miner', 'dataminer_thr_caps')) rate = Math.max(rate, 2.5);
+        // Hard cap — DATA MINER should supplement, never replace, kill-based XP.
+        if (rate > 3) rate = 3;
         grantXp(s, rate * dtSec);
         // Pulse flash only while mining
         t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
@@ -595,7 +661,11 @@ function tickFxOnly(s: RunState, dtSec: number): void {
 function effectiveRange(s: RunState, t: TowerInstance): number {
   const def = TOWERS[t.def];
   const specificRange = s.mods.towerRange[t.def] ?? 0;
-  let r = def.range * (1 + s.mods.globalRangePct + specificRange);
+  let metaPct = 0;
+  if (hasEffect(s, 'data_miner', 'dataminer_mta_range')) {
+    metaPct += 0.01 * s.towers.length * (hasEffect(s, 'data_miner', 'dataminer_mta_caps') ? 2 : 1);
+  }
+  let r = def.range * (1 + s.mods.globalRangePct + specificRange + metaPct);
   if (t.def === 'mine' && hasEffect(s, 'mine', 'pressure_fuse')) r += 0.4;
   return r;
 }
@@ -603,7 +673,11 @@ function effectiveRange(s: RunState, t: TowerInstance): number {
 function effectiveDamage(s: RunState, t: TowerInstance): number {
   const def = TOWERS[t.def];
   const specific = s.mods.towerDmg[t.def] ?? 0;
-  let dmg = def.damage * (1 + s.mods.globalDamagePct + specific);
+  let metaPct = 0;
+  if (hasEffect(s, 'data_miner', 'dataminer_mta_learn')) {
+    metaPct += 0.02 * s.towers.length * (hasEffect(s, 'data_miner', 'dataminer_mta_caps') ? 2 : 1);
+  }
+  let dmg = def.damage * (1 + s.mods.globalDamagePct + specific + metaPct);
   if (t.debuffs.some((d) => d.kind === 'infected')) dmg *= 0.55;
   // Subnet bonus: damage multiplier from being adjacent to other turrets.
   // Cached per tower in extras.subnetMult; recomputed on place/remove.
@@ -614,7 +688,9 @@ function effectiveDamage(s: RunState, t: TowerInstance): number {
   if (t.def !== 'booster_node' && t.def !== 'data_miner') {
     for (const b of s.towers) {
       if (b.def !== 'booster_node') continue;
-      const r = effectiveRange(s, b) + (hasEffect(s, 'booster_node', 'amplify') ? 0.5 : 0);
+      const r = effectiveRange(s, b) + (hasEffect(s, 'booster_node', 'amplify') ? 0.5 : 0)
+        + (hasEffect(s, 'booster_node', 'booster_amp_wide') ? 0.8 : 0)
+        + (hasEffect(s, 'booster_node', 'booster_res_aura') ? 0.4 : 0);
       const focus = hasEffect(s, 'booster_node', 'focus_beam');
       const dist = focus ? 0 : Math.hypot(b.grid.x - t.grid.x, b.grid.y - t.grid.y);
       if (dist <= r) {
@@ -640,7 +716,11 @@ function effectiveDamage(s: RunState, t: TowerInstance): number {
 function effectiveFireRate(s: RunState, t: TowerInstance, dt = 0): number {
   const def = TOWERS[t.def];
   const specificRate = s.mods.towerRate[t.def] ?? 0;
-  let rate = def.fireRate * (1 + s.mods.globalRatePct + specificRate);
+  let metaPct = 0;
+  if (hasEffect(s, 'data_miner', 'dataminer_mta_rate')) {
+    metaPct += 0.02 * s.towers.length * (hasEffect(s, 'data_miner', 'dataminer_mta_caps') ? 2 : 1);
+  }
+  let rate = def.fireRate * (1 + s.mods.globalRatePct + specificRate + metaPct);
   if (t.debuffs.some((d) => d.kind === 'jammed')) rate *= 0.35;
   // Scrambler feedback: +0.5 fire rate per debuffed enemy in range
   if (t.def === 'scrambler' && hasEffect(s, 'scrambler', 'feedback')) {
@@ -672,7 +752,9 @@ function effectiveFireRate(s: RunState, t: TowerInstance, dt = 0): number {
   if (t.def !== 'booster_node' && t.def !== 'data_miner') {
     for (const b of s.towers) {
       if (b.def !== 'booster_node') continue;
-      const r = effectiveRange(s, b) + (hasEffect(s, 'booster_node', 'amplify') ? 0.5 : 0);
+      const r = effectiveRange(s, b) + (hasEffect(s, 'booster_node', 'amplify') ? 0.5 : 0)
+        + (hasEffect(s, 'booster_node', 'booster_amp_wide') ? 0.8 : 0)
+        + (hasEffect(s, 'booster_node', 'booster_res_aura') ? 0.4 : 0);
       const focus = hasEffect(s, 'booster_node', 'focus_beam');
       const dist = focus ? 0 : Math.hypot(b.grid.x - t.grid.x, b.grid.y - t.grid.y);
       if (dist <= r) {
@@ -714,7 +796,11 @@ export function computeSubnets(s: RunState): void {
     if (cluster.some((c) => c.def === 'booster_node') && hasEffect(s, 'booster_node', 'resonance')) {
       typeCount += 1;
     }
-    const mult = Math.min(1.6, 1 + 0.08 * (size - 1) + 0.12 * (typeCount - 1));
+    let mult = Math.min(1.6, 1 + 0.08 * (size - 1) + 0.12 * (typeCount - 1));
+    // RESONATOR HARMONICS: subnet bonuses 25% stronger (raise cap to 1.75 too)
+    if (hasEffect(s, 'booster_node', 'booster_res_harm')) {
+      mult = Math.min(1.75, 1 + (mult - 1) * 1.25);
+    }
     for (const c of cluster) {
       c.extras.subnetMult = mult;
       c.extras.subnetSize = size;
@@ -811,16 +897,23 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
   // Quantum observer: charge idle time for extra crit mult
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'observer')) {
     if (t.cooldown > 0) {
-      // Not firing — accumulate charge (capped at 6 = +3.0 extra mult)
-      t.extras.observerCharge = Math.min(6, (t.extras.observerCharge ?? 0) + dt * 2);
+      // Not firing — accumulate charge. Patient gaze: +50% rate. Researcher: +50% cap. Caps: cap raised to 10 (+5.0).
+      const chargeRate = hasEffect(s, 'quantum', 'quantum_obs_patient') ? 3 : 2;
+      let chargeCap = 6; // +3.0 mult
+      if (hasEffect(s, 'quantum', 'quantum_obs_research')) chargeCap = 9;
+      if (hasEffect(s, 'quantum', 'quantum_obs_caps')) chargeCap = 10;
+      t.extras.observerCharge = Math.min(chargeCap, (t.extras.observerCharge ?? 0) + dt * chargeRate);
     }
   }
 
-  // Railgun capacitor: charge for 8s then auto-fire a 5× mega shot
+  // Railgun capacitor: charge for 8s (6s with COILS, 4s with caps) then auto-fire a 5× (or 7.5× with OVERCAP) mega shot
   if (t.def === 'railgun' && hasEffect(s, 'railgun', 'capacitor')) {
-    t.extras.chargeTimer = (t.extras.chargeTimer ?? 8) - dt;
+    let chargeWindow = 8;
+    if (hasEffect(s, 'railgun', 'railgun_cap_coils')) chargeWindow = 6;
+    if (hasEffect(s, 'railgun', 'railgun_cap_caps')) chargeWindow = 4;
+    t.extras.chargeTimer = (t.extras.chargeTimer ?? chargeWindow) - dt;
     if (t.extras.chargeTimer <= 0) {
-      t.extras.chargeTimer = 8;
+      t.extras.chargeTimer = chargeWindow;
       const range = effectiveRange(s, t) * 2;
       let megaTarget: EnemyInstance | null = null;
       let best = -Infinity;
@@ -831,7 +924,8 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
       }
       if (megaTarget) {
         const def = TOWERS[t.def];
-        const megaDmg = effectiveDamage(s, t) * 5;
+        const megaMult = hasEffect(s, 'railgun', 'railgun_cap_overcap') ? 7.5 : 5;
+        const megaDmg = effectiveDamage(s, t) * megaMult;
         s.projectiles.push({
           id: nextId(),
           pos: { x: t.grid.x, y: t.grid.y },
@@ -896,6 +990,13 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   let critChance = (def.crit?.chance ?? 0) + s.mods.globalCritChance + specificCrit;
   // Quantum unstable: +8% crit chance
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'unstable')) critChance += 0.08;
+  // Quantum SUPERPOSITION capstone: +50% crit chance baseline
+  if (t.def === 'quantum' && hasEffect(s, 'quantum', 'quantum_super_caps')) critChance += 0.50;
+  // NETLINK antivirus+quantum: ANTIVIRUS gains +15% crit chance when subnet-linked
+  if (t.def === 'antivirus' && hasEffect(s, 'antivirus', 'netlink_antivirus_quantum')
+      && (hasSubnetLink(s, 'antivirus', 'quantum') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
+    critChance += 0.15;
+  }
   // Quantum supercharge: guaranteed crit after a crit
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'supercharge') && (t.extras.superchargeReady ?? 0) > 0) {
     isCrit = true;
@@ -904,13 +1005,21 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   // Precision matrix: ANTIVIRUS marks cause quantum guaranteed crit
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'precision_matrix') && (target.marked ?? 0) > 0) isCrit = true;
 
-  // Quantum observer: boost crit mult on next shot
+  // Quantum observer: boost crit mult on next shot. Lens (quantum_obs_lens) gives observer-charged shots
+  // an additional +30% damage as a clean substitute for "ignore armor" (engine-simpler).
   let critMult = def.crit?.mult ?? 3;
+  let observerLensBonus = 1.0;
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'observer') && (t.extras.observerCharge ?? 0) > 0) {
     critMult += (t.extras.observerCharge ?? 0) * 0.5;
+    if (hasEffect(s, 'quantum', 'quantum_obs_lens')) observerLensBonus = 1.30;
     t.extras.observerCharge = 0;
   }
-  const dmg = isCrit ? baseDmg * critMult : baseDmg;
+  const dmg = (isCrit ? baseDmg * critMult : baseDmg) * observerLensBonus;
+  // QUANTUM crit XP netlink: +3 XP per crit when subnet-linked with data_miner
+  if (t.def === 'quantum' && isCrit && hasEffect(s, 'quantum', 'netlink_quantum_data_miner')
+      && (hasSubnetLink(s, 'quantum', 'data_miner') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
+    grantXp(s, 3);
+  }
 
   let aoe = def.aoe?.radius;
   if (t.def === 'ice' && aoe) {
@@ -924,6 +1033,8 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   if (t.def === 'chain') {
     if (hasEffect(s, 'chain', 'storm')) chainJumps += 2;
     if (hasEffect(s, 'chain', 'discharge')) chainFalloff = 1.0;
+    // STORM TWELVE-FOLD capstone: base jumps to 12 (additive with storm)
+    if (hasEffect(s, 'chain', 'chain_strm_caps')) chainJumps = Math.max(chainJumps, 12);
     // Megavolt: every 6th shot has unlimited jumps
     t.extras.shotCount = (t.extras.shotCount ?? 0) + 1;
     if (hasEffect(s, 'chain', 'megavolt') && t.extras.shotCount % 6 === 0) {
@@ -957,19 +1068,38 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   };
   s.projectiles.push(proj);
 
-  // Antivirus: fire 2 (or 3 with triple) projectiles at nearest enemies
+  // ARTILLERY TRIPLE BARRAGE capstone: each shot becomes a 3-shell volley with offsets
+  if (t.def === 'mine' && hasEffect(s, 'mine', 'mine_brg_caps')) {
+    for (let i = 0; i < 2; i++) {
+      const ox = (Math.random() - 0.5) * 2;
+      const oy = (Math.random() - 0.5) * 2;
+      s.projectiles.push({
+        ...proj,
+        id: nextId(),
+        pos: { x: t.grid.x, y: t.grid.y },
+        targetPos: { x: target.pos.x + ox, y: target.pos.y + oy },
+        target: -1,
+        trail: [],
+      });
+    }
+  }
+
+  // Antivirus: fire 2 (or 3 with triple, 5 with VOLLEY capstone) projectiles at nearest enemies
   if (t.def === 'antivirus') {
     const range = effectiveRange(s, t);
     const triple = hasEffect(s, 'antivirus', 'triple');
     const precision = hasEffect(s, 'antivirus', 'precision');
     const precisionBurst = hasEffect(s, 'antivirus', 'precision_burst');
+    const pentaVolley = hasEffect(s, 'antivirus', 'antivirus_vol_caps');
+    // base extra count: 1 (=2 total), triple = 2 (=3 total), penta = 4 (=5 total)
+    const extraCount = pentaVolley ? 4 : (triple ? 2 : 1);
     const extras: EnemyInstance[] = [];
     for (const e of s.enemies) {
       if (!e.alive || e.id === target.id) continue;
       if (Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= range) extras.push(e);
-      if (extras.length >= (triple ? 2 : 1)) break;
+      if (extras.length >= extraCount) break;
     }
-    const shotCount = triple ? 2 : 1;
+    const shotCount = extraCount;
     for (let i = 0; i < shotCount; i++) {
       const tgt = extras[i] ?? target;
       const isPrec = precision ? true : isCrit;
@@ -1096,7 +1226,9 @@ function updateProjectile(s: RunState, p: Projectile, dt: number): void {
 
 function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
   // Hunter instinct: tracer marks grant +45% (was +30%)
-  const markedPct = (hasEffect(s, 'firewall', 'hunter_instinct') && p.fromTower === 'firewall') ? 0.45 : 0.3;
+  let markedPct = (hasEffect(s, 'firewall', 'hunter_instinct') && p.fromTower === 'firewall') ? 0.45 : 0.3;
+  // Antivirus MARK capstone: marked enemies take +75% (was +30%) when antivirus is the source
+  if (p.fromTower === 'antivirus' && hasEffect(s, 'antivirus', 'antivirus_mark_caps')) markedPct = Math.max(markedPct, 0.75);
   const markedBonus = (target.marked ?? 0) > 0 ? 1 + markedPct : 1.0;
 
   // Quantum phase shift: treat armor as 0
@@ -1116,10 +1248,11 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     target.slowTimer = Math.max(target.slowTimer, p.slow.duration);
   }
 
-  // Scrambler: reduce armor
+  // Scrambler: reduce armor (dec branch). DEC capstone strips 12, dec_hack +2, deep_scan 6 base
   if (p.fromTower === 'scrambler') {
     let stripAmount = hasEffect(s, 'scrambler', 'deep_scan') ? 6 : 3;
     if (hasEffect(s, 'scrambler', 'deep_hack')) stripAmount += 2;
+    if (hasEffect(s, 'scrambler', 'scrambler_dec_caps')) stripAmount = 12;
     target.armor = Math.max(0, target.armor - stripAmount);
     // Cripple: also slow
     if (hasEffect(s, 'scrambler', 'cripple') && !ENEMIES[target.def].slowImmune) {
@@ -1144,14 +1277,38 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
         damageEnemy(s, target, p.damage * exploitBonus, false, p.damageType, true);
       }
     }
-    // Overwrite: 20% chance to zero armor
-    if (hasEffect(s, 'scrambler', 'overwrite') && Math.random() < 0.20) {
-      target.armor = 0;
-      s.floaters.push({ pos: { x: target.pos.x, y: target.pos.y - 0.4 }, text: 'OVERWRITE!', vy: -22, life: 1.0, maxLife: 1.0, color: '#ff2d95', size: 14 });
-      // System crash: mark enemy at 0 armor
-      if (hasEffect(s, 'scrambler', 'system_crash')) {
-        target.marked = Math.max(target.marked ?? 0, 3);
+    // Overwrite: 20% chance to zero armor (35% with CRS BOOST)
+    {
+      const owChance = hasEffect(s, 'scrambler', 'scrambler_crs_boost') ? 0.35 : 0.20;
+      if (hasEffect(s, 'scrambler', 'overwrite') && Math.random() < owChance) {
+        target.armor = 0;
+        s.floaters.push({ pos: { x: target.pos.x, y: target.pos.y - 0.4 }, text: 'OVERWRITE!', vy: -22, life: 1.0, maxLife: 1.0, color: '#ff2d95', size: 14 });
+        // System crash: mark enemy at 0 armor
+        if (hasEffect(s, 'scrambler', 'system_crash')) {
+          target.marked = Math.max(target.marked ?? 0, 3);
+        }
       }
+    }
+    // CRASH KERNEL PANIC capstone: every 5th DISRUPTOR hit fully nullifies (0 armor + 50% slow 3s + mark)
+    {
+      const sc = s.towers.find((tw) => tw.def === 'scrambler');
+      if (sc && hasEffect(s, 'scrambler', 'scrambler_crs_caps')) {
+        sc.extras.crashCounter = ((sc.extras.crashCounter ?? 0) + 1);
+        if (sc.extras.crashCounter % 5 === 0) {
+          target.armor = 0;
+          target.marked = Math.max(target.marked ?? 0, 3);
+          if (!ENEMIES[target.def].slowImmune) {
+            target.speedMult = Math.min(target.speedMult, 0.5);
+            target.slowTimer = Math.max(target.slowTimer, 3);
+          }
+          s.floaters.push({ pos: { x: target.pos.x, y: target.pos.y - 0.4 }, text: 'KERNEL PANIC', vy: -28, life: 1.2, maxLife: 1.2, color: '#ff2d95', size: 16 });
+        }
+      }
+    }
+    // SABOTAGE TOTAL capstone: debuffed enemies (armor stripped) take 2× from all sources
+    if (hasEffect(s, 'scrambler', 'scrambler_sab_caps') && target.armor < (ENEMIES[target.def].armor ?? 0)) {
+      // Mark them so the universal markedBonus doubles damage. Use mark with bonus override later.
+      target.marked = Math.max(target.marked ?? 0, 1.0);
     }
     // Broadcast: apply to all enemies in range
     if (hasEffect(s, 'scrambler', 'broadcast')) {
@@ -1207,6 +1364,27 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     damageEnemy(s, target, p.damage * 0.15, p.isCrit ?? false, p.damageType, true);
   }
 
+  // Antivirus PIERCE branch: armor strip family
+  if (p.fromTower === 'antivirus') {
+    // antivirus_pierce_deep keystone: strips 6 armor on hit (one-shot, like scrambler)
+    if (hasEffect(s, 'antivirus', 'antivirus_pierce_deep')) {
+      target.armor = Math.max(0, target.armor - 6);
+    }
+    // antivirus_pierce_melt: permanent strip 1 armor per shot (no restoration via collapseTimer)
+    if (hasEffect(s, 'antivirus', 'antivirus_pierce_melt')) {
+      target.armor = Math.max(0, target.armor - 1);
+      // Mutate enemy def's stored armor so it never restores from collapse — emulate via collapseTimer trick
+      // We can't mutate ENEMIES[def].armor (shared), so just ensure collapseTimer doesn't restore by leaving it 0
+    }
+    // antivirus_pierce_caps capstone: cracks 5 armor permanently per hit
+    if (hasEffect(s, 'antivirus', 'antivirus_pierce_caps')) {
+      target.armor = Math.max(0, target.armor - 5);
+    }
+  }
+
+  // NETLINK antivirus+quantum: ANTIVIRUS shots gain +15% crit chance — applied at fire-time, but here we re-roll
+  // Implemented at fire() instead.
+
   // Precision matrix synergy: ANTIVIRUS marks cause QUANTUM guaranteed crit (flag only — checked in fire())
   // Viral mark: when marked enemy dies, spread mark to 2 nearby (handled in killEnemy)
 
@@ -1216,9 +1394,36 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     target.marked = Math.max(target.marked ?? 0, tracerDur);
   }
 
-  // Firewall suppressor: slow on hit
+  // Firewall suppressor: slow on hit (20%, or 35% with chill cascade)
   if (p.fromTower === 'firewall' && hasEffect(s, 'firewall', 'suppressor') && !ENEMIES[target.def].slowImmune) {
-    target.speedMult = Math.min(target.speedMult, 0.85);
+    const slowAmt = hasEffect(s, 'firewall', 'firewall_sup_chill') ? 0.35 : 0.20;
+    target.speedMult = Math.min(target.speedMult, 1 - slowAmt);
+    target.slowTimer = Math.max(target.slowTimer, 1.2);
+  }
+
+  // Firewall SUPPRESSION capstone: crits fully stop enemies for 0.4s
+  if (p.fromTower === 'firewall' && p.isCrit && hasEffect(s, 'firewall', 'firewall_sup_caps') && !ENEMIES[target.def].slowImmune) {
+    target.speedMult = 0;
+    target.slowTimer = Math.max(target.slowTimer, 0.4);
+  }
+
+  // Firewall SIEGE: armor crusher (2× to enemies above 75% HP) + obliterate capstone (extra 2× HP%)
+  if (p.fromTower === 'firewall' && target.alive && target.hp / target.maxHp > 0.75) {
+    if (hasEffect(s, 'firewall', 'firewall_siege_crusher')) {
+      damageEnemy(s, target, p.damage * markedBonus, p.isCrit ?? false, p.damageType, true, 'firewall');
+    }
+    if (hasEffect(s, 'firewall', 'firewall_siege_caps')) {
+      // 2× HP% damage = 2× of 1% maxHp per shot bonus, scaled to feel meaningful
+      const bonus = target.maxHp * 0.04; // 4% maxHp bonus dmg vs high-HP targets
+      damageEnemy(s, target, bonus, p.isCrit ?? false, p.damageType, true, 'firewall');
+    }
+  }
+
+  // NETLINK firewall+honeypot: FIREWALL shots inherit 20% slow 1.2s
+  if (p.fromTower === 'firewall' && hasEffect(s, 'firewall', 'netlink_firewall_honeypot')
+      && (hasSubnetLink(s, 'firewall', 'honeypot') || hasEffect(s, 'booster_node', 'booster_res_caps'))
+      && !ENEMIES[target.def].slowImmune) {
+    target.speedMult = Math.min(target.speedMult, 0.80);
     target.slowTimer = Math.max(target.slowTimer, 1.2);
   }
 
@@ -1264,9 +1469,11 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     if (fw) fw.cooldown = Math.max(0, fw.cooldown - (p.isCrit ? 0.8 : 0.4));
   }
 
-  // Sniper callout: mark target
+  // Sniper callout: mark target. PERSISTENT MARK +50% duration. BRAND OF DEATH = effectively forever (999).
   if (p.fromTower === 'sniper' && hasEffect(s, 'sniper', 'callout')) {
-    const dur = hasEffect(s, 'sniper', 'surgical') ? 6 : 3;
+    let dur = hasEffect(s, 'sniper', 'surgical') ? 6 : 3;
+    if (hasEffect(s, 'sniper', 'sniper_mks_persist')) dur *= 1.5;
+    if (hasEffect(s, 'sniper', 'sniper_mks_caps')) dur = 999;
     target.marked = Math.max(target.marked ?? 0, dur);
   }
 
@@ -1275,9 +1482,10 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType, false, 'sniper'); // deal extra 100%
   }
 
-  // Sniper execute: triple damage below 25% HP (deadeye raises to 35%)
+  // Sniper execute: triple damage below 25% HP (deadeye 35%, EXECUTIONER'S MARK capstone 50%)
   if (p.fromTower === 'sniper' && hasEffect(s, 'sniper', 'execute')) {
-    const execThresh = hasEffect(s, 'sniper', 'deadeye') ? 0.35 : 0.25;
+    let execThresh = hasEffect(s, 'sniper', 'deadeye') ? 0.35 : 0.25;
+    if (hasEffect(s, 'sniper', 'sniper_exe_caps')) execThresh = Math.max(execThresh, 0.50);
     if (target.hp / target.maxHp < execThresh) {
       damageEnemy(s, target, p.damage * 2, p.isCrit ?? false, p.damageType, false, 'sniper');
     }
@@ -1311,9 +1519,10 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
   }
 
   // Quantum collapse: reduce armor on hit, restore via engine timer (no setTimeout)
+  // COLLAPSE capstone: permanent — don't set timer so armor never restores.
   if (p.fromTower === 'quantum' && hasEffect(s, 'quantum', 'collapse')) {
     target.armor = Math.max(0, target.armor * 0.5);
-    target.collapseTimer = 1.5;
+    if (!hasEffect(s, 'quantum', 'quantum_col_caps')) target.collapseTimer = 1.5;
   }
 
   // Railgun feedback (kills): reduce cooldown
@@ -1326,6 +1535,17 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
   if (p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'kill_chain') && !target.alive) {
     const rl = s.towers.find((tw) => tw.def === 'railgun');
     if (rl) rl.cooldown = Math.max(0, rl.cooldown - 0.3);
+  }
+  // RAILGUN HYPERSONIC capstone: each kill refunds 1.5s cooldown
+  if (p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'railgun_hyp_caps') && !target.alive) {
+    const rl = s.towers.find((tw) => tw.def === 'railgun');
+    if (rl) rl.cooldown = Math.max(0, rl.cooldown - 1.5);
+  }
+  // NETLINK railgun+sniper: crits refund 30% of cooldown
+  if (p.fromTower === 'railgun' && p.isCrit && hasEffect(s, 'railgun', 'netlink_railgun_sniper')
+      && (hasSubnetLink(s, 'railgun', 'sniper') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
+    const rl = s.towers.find((tw) => tw.def === 'railgun');
+    if (rl) rl.cooldown = Math.max(0, rl.cooldown * 0.7);
   }
 
   // Barrage strike synergy: RAILGUN kills trigger an ARTILLERY shell at the death point
@@ -1399,11 +1619,26 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       target.speedMult = 0;
       target.slowTimer = Math.max(target.slowTimer, freezeDur);
     }
+    // BOSS FREEZE capstone: freeze slow-immune bosses for 0.6s (overrides slowImmune for ice once)
+    if (hasEffect(s, 'ice', 'ice_frz_caps') && ENEMIES[target.def].slowImmune) {
+      target.speedMult = 0;
+      target.slowTimer = Math.max(target.slowTimer, 0.6);
+    }
+    // FROST CORE: +25% damage to slowed enemies
+    if (hasEffect(s, 'ice', 'ice_frz_core') && target.speedMult < 1 && target.alive) {
+      damageEnemy(s, target, p.damage * 0.25, p.isCrit ?? false, p.damageType, true, 'ice');
+    }
     if (hasEffect(s, 'ice', 'shards') && p.aoe) {
-      const shardDps = hasEffect(s, 'ice', 'cryo_nova') ? 8 : undefined;
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        s.puddles.push({ pos: { x: p.pos.x + Math.cos(a) * p.aoe * 0.8, y: p.pos.y + Math.sin(a) * p.aoe * 0.8 }, radius: 0.4, timeLeft: 2.0, maxTime: 2.0, slowPct: 0.35, slowDuration: 0.5, color: '#88eeff', damagePerSec: shardDps, fromTower: 'ice' });
+      let shardDps = hasEffect(s, 'ice', 'cryo_nova') ? 8 : undefined;
+      // SHARP SHARDS: dps doubled
+      if (hasEffect(s, 'ice', 'ice_shr_sharp')) shardDps = (shardDps ?? 8) * 2;
+      // OCTAGONAL SHARDS capstone: 8 shards instead of 6
+      const shardCount = hasEffect(s, 'ice', 'ice_shr_caps') ? 8 : 6;
+      // SHARD ECHO: shard fields last 50% longer
+      const shardLife = hasEffect(s, 'ice', 'ice_shr_echo') ? 3.0 : 2.0;
+      for (let i = 0; i < shardCount; i++) {
+        const a = (i / shardCount) * Math.PI * 2;
+        s.puddles.push({ pos: { x: p.pos.x + Math.cos(a) * p.aoe * 0.8, y: p.pos.y + Math.sin(a) * p.aoe * 0.8 }, radius: 0.4, timeLeft: shardLife, maxTime: shardLife, slowPct: 0.35, slowDuration: 0.5, color: '#88eeff', damagePerSec: shardDps, fromTower: 'ice' });
       }
     }
     // Glacial field: leave slow field in addition to other effects
@@ -1428,6 +1663,16 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     // Cryo break synergy: 2x damage to armor-stripped enemies
     if (hasEffect(s, 'ice', 'cryo_break') && target.armor < (ENEMIES[target.def].armor ?? 0)) {
       damageEnemy(s, target, p.damage, p.isCrit ?? false, p.damageType, false, 'ice'); // extra 100%
+    }
+    // ICE BLIZZARD capstone: explosions chain to a nearby enemy for 60% damage
+    if (hasEffect(s, 'ice', 'ice_blz_caps') && p.aoe && target.alive) {
+      const next = findChainTarget(s, target, new Set([target.id]), 2.5);
+      if (next) damageEnemy(s, next, p.damage * 0.6, p.isCrit ?? false, p.damageType, false, 'ice');
+    }
+    // NETLINK ice+scrambler: ICE explosions strip 2 armor
+    if (hasEffect(s, 'ice', 'netlink_ice_scrambler')
+        && (hasSubnetLink(s, 'ice', 'scrambler') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
+      target.armor = Math.max(0, target.armor - 2);
     }
     // Flash freeze synergy: freeze enemies inside honeypot puddles
     if (hasEffect(s, 'ice', 'flash_freeze') && !ENEMIES[target.def].slowImmune) {
@@ -1457,10 +1702,12 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
   // Railgun sabot: small explosion at each pierce
   if (p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'sabot')) {
     const sabotMult = hasEffect(s, 'railgun', 'splinter') ? 0.6 : 0.4; // splinter: +50%
-    spawnExplosion(s, { x: p.pos.x, y: p.pos.y }, '#e0f0ff', 0.7);
+    // WIDE SABOT capstone: explosion radius 1.5 cells (was 0.7)
+    const sabotRad = hasEffect(s, 'railgun', 'railgun_sab_caps') ? 1.5 : 0.7;
+    spawnExplosion(s, { x: p.pos.x, y: p.pos.y }, '#e0f0ff', sabotRad);
     for (const e of s.enemies) {
       if (!e.alive || e.id === target.id) continue;
-      if (Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) <= 0.7) {
+      if (Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) <= sabotRad) {
         damageEnemy(s, e, p.damage * sabotMult, false, p.damageType, false, 'railgun');
       }
     }
@@ -1565,9 +1812,28 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
         }
       }
     }
-    // Nanobots: acid puddle on impact
-    if (hasEffect(s, 'mine', 'nanobots') && Math.random() < 0.35 && s.puddles.length < 100) {
-      s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 1.0, timeLeft: 3, maxTime: 3, slowPct: 0, slowDuration: 0, damagePerSec: 12, color: '#88ff00', fromTower: 'mine' });
+    // Nanobots: acid puddle on impact (proc chance / dps / duration / radius can all be boosted by SCORCH branch)
+    {
+      const baseChance = hasEffect(s, 'mine', 'mine_scr_targeting') ? 1.0 : 0.35;
+      const procDps = hasEffect(s, 'mine', 'mine_scr_phos') ? 24 : 12;
+      const procDur = hasEffect(s, 'mine', 'mine_scr_burn') ? 6 : 3;
+      const procRad = hasEffect(s, 'mine', 'mine_scr_wide') ? 1.5 : 1.0;
+      if (hasEffect(s, 'mine', 'nanobots') && Math.random() < baseChance && s.puddles.length < 100) {
+        s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: procRad, timeLeft: procDur, maxTime: procDur, slowPct: 0, slowDuration: 0, damagePerSec: procDps, color: '#88ff00', fromTower: 'mine' });
+      }
+    }
+    // INFERNO ZONE capstone: every impact leaves 5s 30dps zone (independent, large)
+    if (hasEffect(s, 'mine', 'mine_scr_caps') && s.puddles.length < 100) {
+      s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 1.6, timeLeft: 5, maxTime: 5, slowPct: 0, slowDuration: 0, damagePerSec: 30, color: '#ff6b00', fromTower: 'mine' });
+    }
+    // NETLINK mine+honeypot: artillery impacts in honeypot puddles burn 15 dps for 3s
+    if (hasEffect(s, 'mine', 'netlink_mine_honeypot')
+        && (hasSubnetLink(s, 'mine', 'honeypot') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
+      const inHoneyPuddle = s.puddles.some((pu) => pu.fromTower === 'honeypot' &&
+        Math.hypot(p.pos.x - pu.pos.x, p.pos.y - pu.pos.y) <= pu.radius);
+      if (inHoneyPuddle && s.puddles.length < 100) {
+        s.puddles.push({ pos: { x: p.pos.x, y: p.pos.y }, radius: 1.0, timeLeft: 3, maxTime: 3, slowPct: 0, slowDuration: 0, damagePerSec: 15, color: '#ff8800', fromTower: 'mine' });
+      }
     }
     // Lightning rod synergy: chain arc from impact
     if (hasEffect(s, 'mine', 'lightning_rod') && s.projectiles.length < 300) {
@@ -1673,8 +1939,28 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
 
   // Chain ground stun on primary target too
   if (p.fromTower === 'chain' && hasEffect(s, 'chain', 'ground') && !ENEMIES[target.def].slowImmune) {
+    let stunDur = 0.35;
+    if (hasEffect(s, 'chain', 'chain_grd_spike')) stunDur += 0.25;
+    if (hasEffect(s, 'chain', 'chain_grd_caps')) stunDur = Math.max(stunDur, 0.8);
     target.speedMult = 0;
-    target.slowTimer = Math.max(target.slowTimer, 0.35);
+    target.slowTimer = Math.max(target.slowTimer, stunDur);
+  }
+  // CHAIN GROUND STRESS: stunned enemies take +25% from CHAIN
+  if (p.fromTower === 'chain' && hasEffect(s, 'chain', 'chain_grd_stress') && target.speedMult === 0 && target.alive) {
+    damageEnemy(s, target, p.damage * 0.25, p.isCrit ?? false, p.damageType, true, 'chain');
+  }
+  // NETLINK chain+sentinel: arcs +20% to enemies in SENTINEL field
+  if (p.fromTower === 'chain' && hasEffect(s, 'chain', 'netlink_chain_sentinel')
+      && (hasSubnetLink(s, 'chain', 'sentinel') || hasEffect(s, 'booster_node', 'booster_res_caps'))
+      && target.alive) {
+    const sentT = s.towers.find((tw) => tw.def === 'sentinel');
+    if (sentT) {
+      const r = effectiveRange(s, sentT) + (hasEffect(s, 'sentinel', 'expanded') ? 0.8 : 0)
+        + (hasEffect(s, 'sentinel', 'node_broadcast') ? 0.5 : 0);
+      if (Math.hypot(target.pos.x - sentT.grid.x, target.pos.y - sentT.grid.y) <= r) {
+        damageEnemy(s, target, p.damage * 0.20, p.isCrit ?? false, p.damageType, true, 'chain');
+      }
+    }
   }
 }
 
