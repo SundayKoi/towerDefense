@@ -37,7 +37,7 @@ export const MAPS: MapDef[] = [
       hard:   { 10: 'kernel', 20: 'daemon', 30: 'leviathan', 40: 'daemon', 50: 'voidlord' },
     },
     rewards: {
-      easyClear:   { type: 'unlock-tower', id: 'honeypot' },
+      easyClear:   { type: 'unlock-tower', id: 'quantum' },
       mediumClear: { type: 'unlock-tower', id: 'antivirus' },
       hardClear:   { type: 'unlock-card',  id: 'heal_max' },
     },
@@ -80,8 +80,8 @@ export const MAPS: MapDef[] = [
       hard:   { 10: 'daemon', 20: 'kernel', 30: 'leviathan', 40: 'swarm', 50: 'voidlord' },
     },
     rewards: {
-      easyClear:   { type: 'unlock-tower', id: 'quantum' },
-      mediumClear: { type: 'unlock-tower', id: 'scrambler' },
+      easyClear:   { type: 'unlock-tower', id: 'scrambler' },
+      mediumClear: { type: 'unlock-tower', id: 'pulse' },
       hardClear:   { type: 'unlock-card',  id: 'exotic_kill_feed' },
     },
   },
@@ -114,7 +114,7 @@ export const MAPS: MapDef[] = [
       hard:   { 10: 'kernel', 20: 'daemon', 30: 'leviathan', 40: 'corruptor', 50: 'voidlord' },
     },
     rewards: {
-      easyClear:   { type: 'unlock-tower', id: 'pulse' },
+      easyClear:   { type: 'unlock-tower', id: 'chain' },
       mediumClear: { type: 'unlock-tower', id: 'ice' },
       hardClear:   { type: 'unlock-card',  id: 'exotic_redundancy' },
     },
@@ -150,7 +150,7 @@ export const MAPS: MapDef[] = [
       hard:   { 10: 'kernel', 20: 'daemon', 30: 'swarm', 40: 'leviathan', 50: 'voidlord' },
     },
     rewards: {
-      easyClear:   { type: 'unlock-tower', id: 'chain' },
+      easyClear:   { type: 'unlock-tower', id: 'sniper' },
       mediumClear: { type: 'unlock-tower', id: 'mine' },
       hardClear:   { type: 'unlock-card',  id: 'syn_fw_hp' },
     },
@@ -191,8 +191,8 @@ export const MAPS: MapDef[] = [
       hard:   { 10: 'leviathan', 20: 'daemon', 30: 'corruptor', 40: 'swarm', 50: 'voidlord' },
     },
     rewards: {
-      easyClear:   { type: 'unlock-tower', id: 'sniper' },
-      mediumClear: { type: 'unlock-tower', id: 'sentinel' },
+      easyClear:   { type: 'unlock-tower', id: 'sentinel' },
+      mediumClear: { type: 'unlock-tower', id: 'railgun' },
       hardClear:   { type: 'unlock-card',  id: 'syn_hp_se' },
     },
   },
@@ -227,9 +227,9 @@ export const MAPS: MapDef[] = [
       hard:   { 10: 'daemon', 20: 'swarm', 30: 'corruptor', 40: 'leviathan', 50: 'voidlord' },
     },
     rewards: {
-      easyClear:   { type: 'unlock-tower', id: 'railgun' },
-      mediumClear: { type: 'unlock-card',  id: 'syn_av_sn' },
-      hardClear:   { type: 'unlock-card',  id: 'exotic_time_dilation' },
+      easyClear:   { type: 'unlock-card', id: 'syn_av_sn' },
+      mediumClear: { type: 'unlock-card', id: 'syn_av_qm' },
+      hardClear:   { type: 'unlock-card', id: 'exotic_time_dilation' },
     },
   },
 

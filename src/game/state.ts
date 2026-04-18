@@ -23,7 +23,9 @@ export function defaultSave(): SaveData {
     version: 3,
     completed: {},
     unlockedCards: STARTING_UNLOCKED_CARDS.slice(),
-    unlockedTowers: ['firewall'],
+    // Two starter towers — firewall provides damage, honeypot provides slow+puddles.
+    // A single turret type per run (singleton rule) wasn't enough to beat Map 1 easy.
+    unlockedTowers: ['firewall', 'honeypot'],
     seenEnemies: [],
     challengesCompleted: [],
     protocols: 0,
@@ -98,6 +100,11 @@ export function loadSave(): SaveData {
       const existing = new Set(s.unlockedCards);
       for (const id of starters) if (!existing.has(id)) s.unlockedCards.push(id);
     }
+    // Also ensure default starter towers are present (forward-compat — adding a
+    // new starter tower like honeypot retroactively grants it to existing saves).
+    const starterT = new Set(d.unlockedTowers);
+    const existingT = new Set(s.unlockedTowers);
+    for (const id of starterT) if (!existingT.has(id)) s.unlockedTowers.push(id);
     // Migrate pre-v3 saves: before the map reward overhaul, the starter card pool
     // included deploy + upgrade cards for 7 towers regardless of whether the player
     // had actually unlocked them. Trim the card list to only cards that belong to
