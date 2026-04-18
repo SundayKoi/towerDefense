@@ -71,12 +71,13 @@ export const MAPS: MapDef[] = [
     name: 'GRID.01',
     fullName: 'TRAINING SUBNET',
     order: 1,
-    cols: 9,
-    rows: 13,
+    cols: 18,
+    rows: 10,
+    // ACT 1 SHAPE: simple single S-curve. Teaches the player how to read paths.
     paths: [{
       points: [
-        { x: 0, y: 1 }, { x: 3, y: 1 }, { x: 3, y: 4 }, { x: 6, y: 4 },
-        { x: 6, y: 7 }, { x: 2, y: 7 }, { x: 2, y: 10 }, { x: 8, y: 10 }, { x: 8, y: 12 },
+        { x: 0, y: 5 }, { x: 5, y: 5 }, { x: 5, y: 2 }, { x: 12, y: 2 },
+        { x: 12, y: 8 }, { x: 18, y: 8 },
       ],
     }],
     bgColor: '#020a14',
@@ -106,18 +107,15 @@ export const MAPS: MapDef[] = [
     name: 'NEXUS HUB',
     fullName: 'CORPORATE BACKBONE',
     order: 2,
-    cols: 9,
-    rows: 13,
-    paths: [
-      { points: [
-        { x: 0, y: 2 }, { x: 4, y: 2 }, { x: 4, y: 6 },
-        { x: 4, y: 10 }, { x: 8, y: 10 }, { x: 8, y: 12 },
-      ]},
-      { points: [
-        { x: 8, y: 0 }, { x: 8, y: 6 }, { x: 4, y: 6 },
-        { x: 4, y: 10 }, { x: 8, y: 10 }, { x: 8, y: 12 },
-      ]},
-    ],
+    cols: 18,
+    rows: 10,
+    // ACT 1 SHAPE: zigzag with three turns. Introduces longer travel time.
+    paths: [{
+      points: [
+        { x: 0, y: 2 }, { x: 4, y: 2 }, { x: 4, y: 7 }, { x: 10, y: 7 },
+        { x: 10, y: 3 }, { x: 15, y: 3 }, { x: 15, y: 8 }, { x: 18, y: 8 },
+      ],
+    }],
     bgColor: '#0a0218',
     accentColor: '#b847ff',
     secondaryColor: '#ff2d95',
@@ -145,13 +143,14 @@ export const MAPS: MapDef[] = [
     name: 'MAINFRAME',
     fullName: 'LEGACY TERMINAL',
     order: 3,
-    cols: 9,
-    rows: 15,
+    cols: 20,
+    rows: 11,
+    // ACT 1 SHAPE: long horizontal serpentine — the "legacy mainframe" tape-reader
+    // feel. Three sweeps left-right with vertical jumps.
     paths: [{
       points: [
-        { x: 0, y: 1 }, { x: 7, y: 1 }, { x: 7, y: 4 }, { x: 1, y: 4 },
-        { x: 1, y: 7 }, { x: 7, y: 7 }, { x: 7, y: 10 }, { x: 1, y: 10 },
-        { x: 1, y: 13 }, { x: 7, y: 13 }, { x: 7, y: 14 },
+        { x: 0, y: 1 }, { x: 16, y: 1 }, { x: 16, y: 4 }, { x: 3, y: 4 },
+        { x: 3, y: 7 }, { x: 16, y: 7 }, { x: 16, y: 9 }, { x: 20, y: 9 },
       ],
     }],
     bgColor: '#020a02',
@@ -181,14 +180,16 @@ export const MAPS: MapDef[] = [
     name: 'DATA LAKE',
     fullName: 'AQUATIC ARCHIVE',
     order: 4,
-    cols: 11,
-    rows: 13,
+    cols: 19,
+    rows: 10,
+    // ACT 1 SHAPE: two streams converging at a central junction, then a single
+    // exit. Introduces multi-path before the dual-lane Act 2.
     paths: [
       { points: [
-        { x: 0, y: 3 }, { x: 4, y: 3 }, { x: 4, y: 9 }, { x: 10, y: 9 }, { x: 10, y: 12 },
+        { x: 0, y: 2 }, { x: 8, y: 2 }, { x: 8, y: 5 }, { x: 14, y: 5 }, { x: 19, y: 5 },
       ]},
       { points: [
-        { x: 10, y: 0 }, { x: 10, y: 5 }, { x: 6, y: 5 }, { x: 6, y: 9 }, { x: 10, y: 9 }, { x: 10, y: 12 },
+        { x: 0, y: 8 }, { x: 8, y: 8 }, { x: 8, y: 5 }, { x: 14, y: 5 }, { x: 19, y: 5 },
       ]},
     ],
     bgColor: '#001a24',
@@ -222,16 +223,18 @@ export const MAPS: MapDef[] = [
     name: 'NEON DISTRICT',
     fullName: 'STREET GRID',
     order: 5,
-    cols: 11,
-    rows: 13,
+    cols: 18,
+    rows: 10,
+    // ACT 2 SHAPE: dual parallel lanes with mirrored zigzags. Packet bursts
+    // mean both lanes spawn density bursts simultaneously.
     paths: [
       { points: [
-        { x: 0, y: 2 }, { x: 7, y: 2 }, { x: 7, y: 6 }, { x: 3, y: 6 },
-        { x: 3, y: 10 }, { x: 10, y: 10 }, { x: 10, y: 12 },
+        { x: 0, y: 2 }, { x: 5, y: 2 }, { x: 5, y: 4 }, { x: 12, y: 4 },
+        { x: 12, y: 2 }, { x: 18, y: 2 },
       ]},
       { points: [
-        { x: 10, y: 0 }, { x: 10, y: 4 }, { x: 3, y: 4 }, { x: 3, y: 8 },
-        { x: 8, y: 8 }, { x: 8, y: 10 }, { x: 10, y: 10 }, { x: 10, y: 12 },
+        { x: 0, y: 8 }, { x: 5, y: 8 }, { x: 5, y: 6 }, { x: 12, y: 6 },
+        { x: 12, y: 8 }, { x: 18, y: 8 },
       ]},
     ],
     bgColor: '#120020',
@@ -262,15 +265,20 @@ export const MAPS: MapDef[] = [
     name: 'CRYPTO VAULT',
     fullName: 'COLD STORAGE',
     order: 6,
-    cols: 11,
-    rows: 13,
-    paths: [{
-      points: [
-        { x: 0, y: 6 }, { x: 9, y: 6 }, { x: 9, y: 1 }, { x: 1, y: 1 },
-        { x: 1, y: 11 }, { x: 8, y: 11 }, { x: 8, y: 4 }, { x: 4, y: 4 },
-        { x: 4, y: 8 }, { x: 6, y: 8 }, { x: 6, y: 9 },
-      ],
-    }],
+    cols: 18,
+    rows: 10,
+    // ACT 2 SHAPE: vault-mirror — two lanes meeting at a central choke (x=14)
+    // before separating again. Forces a hot-zone of overlap.
+    paths: [
+      { points: [
+        { x: 0, y: 1 }, { x: 4, y: 1 }, { x: 4, y: 5 }, { x: 14, y: 5 },
+        { x: 14, y: 1 }, { x: 18, y: 1 },
+      ]},
+      { points: [
+        { x: 0, y: 9 }, { x: 4, y: 9 }, { x: 4, y: 5 }, { x: 14, y: 5 },
+        { x: 14, y: 9 }, { x: 18, y: 9 },
+      ]},
+    ],
     bgColor: '#1a1000',
     accentColor: '#ffd600',
     secondaryColor: '#ffae00',
@@ -299,12 +307,21 @@ export const MAPS: MapDef[] = [
     name: 'ORBITAL',
     fullName: 'LAGRANGE STATION',
     order: 7,
-    cols: 11,
-    rows: 13,
+    cols: 20,
+    rows: 11,
+    // ACT 2 SHAPE: three orbital approaches converging on a central station,
+    // then a single shared exit. Top, middle, and bottom approach lanes.
     paths: [
-      { points: [{ x: 0, y: 6 }, { x: 4, y: 6 }, { x: 4, y: 10 }, { x: 5, y: 10 }, { x: 5, y: 12 }] },
-      { points: [{ x: 10, y: 6 }, { x: 6, y: 6 }, { x: 6, y: 10 }, { x: 5, y: 10 }, { x: 5, y: 12 }] },
-      { points: [{ x: 5, y: 0 }, { x: 5, y: 4 }, { x: 5, y: 10 }, { x: 5, y: 12 }] },
+      { points: [
+        { x: 0, y: 2 }, { x: 10, y: 2 }, { x: 10, y: 5 }, { x: 20, y: 5 },
+      ]},
+      { points: [
+        { x: 0, y: 5 }, { x: 5, y: 5 }, { x: 5, y: 8 }, { x: 15, y: 8 },
+        { x: 15, y: 5 }, { x: 20, y: 5 },
+      ]},
+      { points: [
+        { x: 0, y: 9 }, { x: 10, y: 9 }, { x: 10, y: 5 }, { x: 20, y: 5 },
+      ]},
     ],
     bgColor: '#050818',
     accentColor: '#00fff0',
@@ -334,12 +351,19 @@ export const MAPS: MapDef[] = [
     name: 'INFERNET',
     fullName: 'CORRUPTED SECTOR',
     order: 8,
-    cols: 11,
-    rows: 13,
+    cols: 20,
+    rows: 11,
+    // ACT 2 SHAPE: dual lanes hugging the top and bottom edges with a hot
+    // central choke at x=14 where both squeeze inward before exiting.
     paths: [
-      { points: [{ x: 0, y: 3 }, { x: 5, y: 3 }, { x: 5, y: 8 }, { x: 5, y: 12 }] },
-      { points: [{ x: 10, y: 3 }, { x: 5, y: 3 }, { x: 5, y: 8 }, { x: 5, y: 12 }] },
-      { points: [{ x: 5, y: 0 }, { x: 5, y: 12 }] },
+      { points: [
+        { x: 0, y: 2 }, { x: 6, y: 2 }, { x: 6, y: 5 }, { x: 14, y: 5 },
+        { x: 14, y: 2 }, { x: 20, y: 2 },
+      ]},
+      { points: [
+        { x: 0, y: 9 }, { x: 6, y: 9 }, { x: 6, y: 7 }, { x: 14, y: 7 },
+        { x: 14, y: 9 }, { x: 20, y: 9 },
+      ]},
     ],
     bgColor: '#200800',
     accentColor: '#ff6600',
@@ -373,14 +397,21 @@ export const MAPS: MapDef[] = [
     name: 'HARDLOCK',
     fullName: 'SEALED VAULT',
     order: 9,
-    cols: 10,
-    rows: 13,
-    paths: [{
-      points: [
-        { x: 0, y: 2 }, { x: 6, y: 2 }, { x: 6, y: 5 }, { x: 2, y: 5 },
-        { x: 2, y: 9 }, { x: 9, y: 9 }, { x: 9, y: 12 },
-      ],
-    }],
+    cols: 18,
+    rows: 10,
+    // ACT 3 SHAPE: three entries on the left collapse to a single choke point
+    // at the right. The choke is where shield-stripping turrets earn their pay.
+    paths: [
+      { points: [
+        { x: 0, y: 2 }, { x: 10, y: 2 }, { x: 10, y: 5 }, { x: 18, y: 5 },
+      ]},
+      { points: [
+        { x: 0, y: 5 }, { x: 8, y: 5 }, { x: 10, y: 5 }, { x: 18, y: 5 },
+      ]},
+      { points: [
+        { x: 0, y: 8 }, { x: 10, y: 8 }, { x: 10, y: 5 }, { x: 18, y: 5 },
+      ]},
+    ],
     bgColor: '#100400',
     accentColor: '#ff3355',
     secondaryColor: '#ff6600',
@@ -409,14 +440,18 @@ export const MAPS: MapDef[] = [
     name: 'IRONFRAME',
     fullName: 'REINFORCED LATTICE',
     order: 10,
-    cols: 11,
-    rows: 14,
-    paths: [{
-      points: [
-        { x: 0, y: 3 }, { x: 4, y: 3 }, { x: 4, y: 7 }, { x: 8, y: 7 },
-        { x: 8, y: 2 }, { x: 10, y: 2 }, { x: 10, y: 11 }, { x: 5, y: 11 }, { x: 5, y: 13 },
-      ],
-    }],
+    cols: 19,
+    rows: 10,
+    // ACT 3 SHAPE: parallel converging lanes — top and bottom feed a central
+    // long stretch where stacked turrets shred the shield-regen enemies.
+    paths: [
+      { points: [
+        { x: 0, y: 3 }, { x: 8, y: 3 }, { x: 8, y: 5 }, { x: 19, y: 5 },
+      ]},
+      { points: [
+        { x: 0, y: 7 }, { x: 8, y: 7 }, { x: 8, y: 5 }, { x: 19, y: 5 },
+      ]},
+    ],
     bgColor: '#100400',
     accentColor: '#ff3355',
     secondaryColor: '#ff6600',
@@ -445,14 +480,18 @@ export const MAPS: MapDef[] = [
     name: 'BASTION',
     fullName: 'OUTER WARD',
     order: 11,
-    cols: 11,
-    rows: 14,
-    paths: [{
-      points: [
-        { x: 0, y: 6 }, { x: 3, y: 6 }, { x: 3, y: 2 }, { x: 7, y: 2 },
-        { x: 7, y: 9 }, { x: 1, y: 9 }, { x: 1, y: 12 }, { x: 10, y: 12 }, { x: 10, y: 13 },
-      ],
-    }],
+    cols: 20,
+    rows: 11,
+    // ACT 3 SHAPE: two diagonal approaches converging into a central column.
+    // Diagonals cover lots of cells, leaving a wide tower zone in the middle.
+    paths: [
+      { points: [
+        { x: 0, y: 1 }, { x: 5, y: 1 }, { x: 10, y: 5 }, { x: 20, y: 5 },
+      ]},
+      { points: [
+        { x: 0, y: 9 }, { x: 5, y: 9 }, { x: 10, y: 5 }, { x: 20, y: 5 },
+      ]},
+    ],
     bgColor: '#100400',
     accentColor: '#ff3355',
     secondaryColor: '#ff6600',
@@ -481,16 +520,19 @@ export const MAPS: MapDef[] = [
     name: 'KEEPSAKE',
     fullName: 'INNER SANCTUM',
     order: 12,
-    cols: 12,
-    rows: 15,
+    cols: 20,
+    rows: 11,
+    // ACT 3 SHAPE: triple convergence — three lanes feed a sanctum corridor
+    // on the right. Final shield-wall stand before the stealth act.
     paths: [
       { points: [
-        { x: 0, y: 2 }, { x: 4, y: 2 }, { x: 4, y: 7 }, { x: 8, y: 7 },
-        { x: 8, y: 11 }, { x: 6, y: 11 }, { x: 6, y: 14 },
+        { x: 0, y: 2 }, { x: 12, y: 2 }, { x: 15, y: 5 }, { x: 20, y: 5 },
       ]},
       { points: [
-        { x: 0, y: 13 }, { x: 2, y: 13 }, { x: 2, y: 9 }, { x: 4, y: 9 },
-        { x: 4, y: 12 }, { x: 6, y: 12 }, { x: 6, y: 14 },
+        { x: 0, y: 5 }, { x: 12, y: 5 }, { x: 15, y: 5 }, { x: 20, y: 5 },
+      ]},
+      { points: [
+        { x: 0, y: 8 }, { x: 12, y: 8 }, { x: 15, y: 5 }, { x: 20, y: 5 },
       ]},
     ],
     bgColor: '#100400',
@@ -525,14 +567,14 @@ export const MAPS: MapDef[] = [
     name: 'GLITCHWIRE',
     fullName: 'UNSTABLE MESH',
     order: 13,
-    cols: 10,
-    rows: 13,
-    paths: [{
-      points: [
-        { x: 0, y: 4 }, { x: 3, y: 4 }, { x: 3, y: 1 }, { x: 7, y: 1 },
-        { x: 7, y: 6 }, { x: 2, y: 6 }, { x: 2, y: 10 }, { x: 9, y: 10 }, { x: 9, y: 12 },
-      ],
-    }],
+    cols: 18,
+    rows: 10,
+    // ACT 4 SHAPE: clean X-cross. Two diagonals through the middle.
+    // Stealth enemies on crossing paths force AOE coverage of the center.
+    paths: [
+      { points: [{ x: 0, y: 1 }, { x: 9, y: 5 }, { x: 18, y: 9 }] },
+      { points: [{ x: 0, y: 9 }, { x: 9, y: 5 }, { x: 18, y: 1 }] },
+    ],
     bgColor: '#0e0014',
     accentColor: '#ff2d95',
     secondaryColor: '#b847ff',
@@ -561,15 +603,18 @@ export const MAPS: MapDef[] = [
     name: 'CHROME ALLEY',
     fullName: 'BACK-DOOR RUN',
     order: 14,
-    cols: 11,
-    rows: 14,
-    paths: [{
-      points: [
-        { x: 0, y: 5 }, { x: 3, y: 5 }, { x: 3, y: 2 }, { x: 8, y: 2 },
-        { x: 8, y: 8 }, { x: 5, y: 8 }, { x: 5, y: 11 }, { x: 10, y: 11 },
-        { x: 10, y: 13 },
-      ],
-    }],
+    cols: 19,
+    rows: 10,
+    // ACT 4 SHAPE: zigzag X — two paths swap sides midway. Stealth spawns
+    // hide in the swap region.
+    paths: [
+      { points: [
+        { x: 0, y: 2 }, { x: 5, y: 2 }, { x: 10, y: 7 }, { x: 15, y: 7 }, { x: 19, y: 2 },
+      ]},
+      { points: [
+        { x: 0, y: 8 }, { x: 5, y: 8 }, { x: 10, y: 3 }, { x: 15, y: 3 }, { x: 19, y: 8 },
+      ]},
+    ],
     bgColor: '#0e0014',
     accentColor: '#ff2d95',
     secondaryColor: '#b847ff',
@@ -598,17 +643,14 @@ export const MAPS: MapDef[] = [
     name: 'BLACKMARKET',
     fullName: 'SHADOW BAZAAR',
     order: 15,
-    cols: 12,
-    rows: 14,
+    cols: 20,
+    rows: 11,
+    // ACT 4 SHAPE: triple cross — three paths swap rows at the center.
+    // Maximum stealth-overlap at x=10.
     paths: [
-      { points: [
-        { x: 0, y: 3 }, { x: 4, y: 3 }, { x: 4, y: 6 }, { x: 8, y: 6 },
-        { x: 8, y: 10 }, { x: 5, y: 10 }, { x: 5, y: 13 },
-      ]},
-      { points: [
-        { x: 0, y: 11 }, { x: 2, y: 11 }, { x: 2, y: 8 }, { x: 6, y: 8 },
-        { x: 6, y: 12 }, { x: 5, y: 12 }, { x: 5, y: 13 },
-      ]},
+      { points: [{ x: 0, y: 2 }, { x: 10, y: 9 }, { x: 20, y: 2 }] },
+      { points: [{ x: 0, y: 5 }, { x: 10, y: 5 }, { x: 20, y: 5 }] },
+      { points: [{ x: 0, y: 9 }, { x: 10, y: 2 }, { x: 20, y: 9 }] },
     ],
     bgColor: '#0e0014',
     accentColor: '#ff2d95',
@@ -638,17 +680,13 @@ export const MAPS: MapDef[] = [
     name: 'GHOST.RUN',
     fullName: 'SILENT PROTOCOL',
     order: 16,
-    cols: 12,
-    rows: 15,
+    cols: 20,
+    rows: 11,
+    // ACT 4 SHAPE: diamond cross — paths converge to a single midpoint then
+    // diverge again. The midpoint is the only safe-coverage zone vs stealth.
     paths: [
-      { points: [
-        { x: 0, y: 2 }, { x: 5, y: 2 }, { x: 5, y: 6 }, { x: 9, y: 6 },
-        { x: 9, y: 11 }, { x: 4, y: 11 }, { x: 4, y: 14 },
-      ]},
-      { points: [
-        { x: 0, y: 9 }, { x: 2, y: 9 }, { x: 2, y: 13 }, { x: 6, y: 13 },
-        { x: 6, y: 12 }, { x: 4, y: 12 }, { x: 4, y: 14 },
-      ]},
+      { points: [{ x: 0, y: 1 }, { x: 10, y: 5 }, { x: 20, y: 9 }] },
+      { points: [{ x: 0, y: 9 }, { x: 10, y: 5 }, { x: 20, y: 1 }] },
     ],
     bgColor: '#0e0014',
     accentColor: '#ff2d95',
@@ -682,16 +720,19 @@ export const MAPS: MapDef[] = [
     name: 'VOIDREACH',
     fullName: 'OUTER NULL',
     order: 17,
-    cols: 11,
-    rows: 14,
+    cols: 18,
+    rows: 10,
+    // ACT 5 SHAPE: single entry diverges into three exits — branching tree.
+    // Replicating swarms force you to cover all three exits.
     paths: [
       { points: [
-        { x: 0, y: 2 }, { x: 4, y: 2 }, { x: 4, y: 6 }, { x: 8, y: 6 },
-        { x: 8, y: 10 }, { x: 5, y: 10 }, { x: 5, y: 13 },
+        { x: 0, y: 5 }, { x: 5, y: 5 }, { x: 10, y: 2 }, { x: 18, y: 2 },
       ]},
       { points: [
-        { x: 0, y: 11 }, { x: 2, y: 11 }, { x: 2, y: 7 }, { x: 6, y: 7 },
-        { x: 6, y: 12 }, { x: 5, y: 12 }, { x: 5, y: 13 },
+        { x: 0, y: 5 }, { x: 5, y: 5 }, { x: 10, y: 5 }, { x: 18, y: 5 },
+      ]},
+      { points: [
+        { x: 0, y: 5 }, { x: 5, y: 5 }, { x: 10, y: 8 }, { x: 18, y: 8 },
       ]},
     ],
     bgColor: '#040010',
@@ -722,17 +763,14 @@ export const MAPS: MapDef[] = [
     name: 'NULL SECTOR',
     fullName: 'DEAD ZONE',
     order: 18,
-    cols: 12,
-    rows: 14,
+    cols: 19,
+    rows: 10,
+    // ACT 5 SHAPE: 2-into-2 fork — twin entries cross at center then split
+    // again into twin exits. Maximum spawn dispersion for replication waves.
     paths: [
-      { points: [
-        { x: 0, y: 3 }, { x: 3, y: 3 }, { x: 3, y: 7 }, { x: 7, y: 7 },
-        { x: 7, y: 10 }, { x: 10, y: 10 }, { x: 10, y: 13 },
-      ]},
-      { points: [
-        { x: 0, y: 9 }, { x: 5, y: 9 }, { x: 5, y: 11 }, { x: 8, y: 11 },
-        { x: 8, y: 12 }, { x: 10, y: 12 }, { x: 10, y: 13 },
-      ]},
+      { points: [{ x: 0, y: 2 }, { x: 10, y: 5 }, { x: 19, y: 2 }] },
+      { points: [{ x: 0, y: 2 }, { x: 10, y: 5 }, { x: 19, y: 8 }] },
+      { points: [{ x: 0, y: 8 }, { x: 10, y: 5 }, { x: 19, y: 8 }] },
     ],
     bgColor: '#040010',
     accentColor: '#5a00aa',
@@ -762,17 +800,19 @@ export const MAPS: MapDef[] = [
     name: 'FRACTAL DEPTH',
     fullName: 'RECURSIVE VOID',
     order: 19,
-    cols: 12,
-    rows: 15,
+    cols: 20,
+    rows: 11,
+    // ACT 5 SHAPE: recursive split — each path branches at the middle into a
+    // sub-path. Recursive feel: 1 → 2 → 3 effective endpoints.
     paths: [
       { points: [
-        { x: 0, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 5 }, { x: 7, y: 5 },
-        { x: 7, y: 8 }, { x: 4, y: 8 }, { x: 4, y: 11 }, { x: 9, y: 11 },
-        { x: 9, y: 14 },
+        { x: 0, y: 5 }, { x: 8, y: 5 }, { x: 8, y: 2 }, { x: 14, y: 2 }, { x: 20, y: 2 },
       ]},
       { points: [
-        { x: 0, y: 10 }, { x: 2, y: 10 }, { x: 2, y: 13 }, { x: 6, y: 13 },
-        { x: 6, y: 12 }, { x: 9, y: 12 }, { x: 9, y: 14 },
+        { x: 0, y: 5 }, { x: 8, y: 5 }, { x: 8, y: 8 }, { x: 14, y: 8 }, { x: 20, y: 8 },
+      ]},
+      { points: [
+        { x: 0, y: 5 }, { x: 8, y: 5 }, { x: 15, y: 5 }, { x: 20, y: 5 },
       ]},
     ],
     bgColor: '#040010',
@@ -803,17 +843,14 @@ export const MAPS: MapDef[] = [
     name: 'BREACH POINT',
     fullName: 'COLLAPSING NODE',
     order: 20,
-    cols: 12,
-    rows: 15,
+    cols: 20,
+    rows: 11,
+    // ACT 5 SHAPE: triple divergence from a left-side junction. The collapsing
+    // node spawns enemies that scatter to all three exits.
     paths: [
-      { points: [
-        { x: 0, y: 2 }, { x: 4, y: 2 }, { x: 4, y: 6 }, { x: 9, y: 6 },
-        { x: 9, y: 10 }, { x: 6, y: 10 }, { x: 6, y: 14 },
-      ]},
-      { points: [
-        { x: 0, y: 12 }, { x: 3, y: 12 }, { x: 3, y: 8 }, { x: 7, y: 8 },
-        { x: 7, y: 13 }, { x: 6, y: 13 }, { x: 6, y: 14 },
-      ]},
+      { points: [{ x: 0, y: 2 }, { x: 5, y: 5 }, { x: 12, y: 2 }, { x: 20, y: 2 }] },
+      { points: [{ x: 0, y: 5 }, { x: 5, y: 5 }, { x: 12, y: 5 }, { x: 20, y: 5 }] },
+      { points: [{ x: 0, y: 8 }, { x: 5, y: 5 }, { x: 12, y: 8 }, { x: 20, y: 8 }] },
     ],
     bgColor: '#040010',
     accentColor: '#5a00aa',
@@ -847,13 +884,17 @@ export const MAPS: MapDef[] = [
     name: 'BLACK ICE',
     fullName: 'DEEP SYSTEM CORE',
     order: 21,
-    cols: 11,
-    rows: 13,
-    paths: [
-      { points: [{ x: 0, y: 3 }, { x: 3, y: 3 }, { x: 3, y: 7 }, { x: 5, y: 7 }, { x: 5, y: 12 }] },
-      { points: [{ x: 10, y: 3 }, { x: 7, y: 3 }, { x: 7, y: 7 }, { x: 5, y: 7 }, { x: 5, y: 12 }] },
-      { points: [{ x: 5, y: 0 }, { x: 5, y: 7 }, { x: 5, y: 12 }] },
-    ],
+    cols: 20,
+    rows: 11,
+    // ACT 6 SHAPE: tight serpentine — three sweeps with rootkit jam zones.
+    // Long path means more time for towers to fire, but also more turret
+    // exposure to rootkit jams.
+    paths: [{
+      points: [
+        { x: 0, y: 1 }, { x: 15, y: 1 }, { x: 15, y: 4 }, { x: 4, y: 4 },
+        { x: 4, y: 7 }, { x: 15, y: 7 }, { x: 15, y: 9 }, { x: 20, y: 9 },
+      ],
+    }],
     bgColor: '#140202',
     accentColor: '#ff3355',
     secondaryColor: '#ff6600',
@@ -882,18 +923,16 @@ export const MAPS: MapDef[] = [
     name: 'APEX',
     fullName: 'SUMMIT NODE',
     order: 22,
-    cols: 12,
-    rows: 15,
-    paths: [
-      { points: [
-        { x: 0, y: 2 }, { x: 4, y: 2 }, { x: 4, y: 6 }, { x: 8, y: 6 },
-        { x: 8, y: 10 }, { x: 5, y: 10 }, { x: 5, y: 14 },
-      ]},
-      { points: [
-        { x: 0, y: 12 }, { x: 3, y: 12 }, { x: 3, y: 8 }, { x: 7, y: 8 },
-        { x: 7, y: 13 }, { x: 5, y: 13 }, { x: 5, y: 14 },
-      ]},
-    ],
+    cols: 19,
+    rows: 10,
+    // ACT 6 SHAPE: single longest path of the campaign — full back-and-forth
+    // serpentine touching all three rows.
+    paths: [{
+      points: [
+        { x: 0, y: 2 }, { x: 14, y: 2 }, { x: 14, y: 5 }, { x: 3, y: 5 },
+        { x: 3, y: 8 }, { x: 15, y: 8 }, { x: 19, y: 8 },
+      ],
+    }],
     bgColor: '#0a0a05',
     accentColor: '#ffd600',
     secondaryColor: '#ffffff',
@@ -922,16 +961,16 @@ export const MAPS: MapDef[] = [
     name: 'OMEGA',
     fullName: 'LAST CIPHER',
     order: 23,
-    cols: 12,
-    rows: 16,
+    cols: 20,
+    rows: 11,
+    // ACT 6 SHAPE: dual winding paths — twin serpents weaving through the cipher.
     paths: [
       { points: [
-        { x: 0, y: 2 }, { x: 4, y: 2 }, { x: 4, y: 6 }, { x: 9, y: 6 },
-        { x: 9, y: 10 }, { x: 6, y: 10 }, { x: 6, y: 15 },
+        { x: 0, y: 1 }, { x: 12, y: 1 }, { x: 12, y: 4 }, { x: 5, y: 4 },
+        { x: 5, y: 7 }, { x: 15, y: 7 }, { x: 20, y: 7 },
       ]},
       { points: [
-        { x: 0, y: 13 }, { x: 3, y: 13 }, { x: 3, y: 8 }, { x: 7, y: 8 },
-        { x: 7, y: 14 }, { x: 6, y: 14 }, { x: 6, y: 15 },
+        { x: 0, y: 9 }, { x: 17, y: 9 }, { x: 20, y: 9 },
       ]},
     ],
     bgColor: '#0a0a05',
@@ -962,19 +1001,17 @@ export const MAPS: MapDef[] = [
     name: 'FINAL CASCADE',
     fullName: 'TERMINAL FALL',
     order: 24,
-    cols: 12,
-    rows: 16,
-    paths: [
-      { points: [
-        { x: 0, y: 3 }, { x: 3, y: 3 }, { x: 3, y: 6 }, { x: 7, y: 6 },
-        { x: 7, y: 2 }, { x: 10, y: 2 }, { x: 10, y: 9 }, { x: 5, y: 9 },
-        { x: 5, y: 13 }, { x: 8, y: 13 }, { x: 8, y: 15 },
-      ]},
-      { points: [
-        { x: 0, y: 11 }, { x: 2, y: 11 }, { x: 2, y: 14 }, { x: 6, y: 14 },
-        { x: 6, y: 12 }, { x: 8, y: 12 }, { x: 8, y: 15 },
-      ]},
-    ],
+    cols: 20,
+    rows: 11,
+    // ACT 6 SHAPE: cascading falls — the path tiers down through four levels
+    // like a waterfall, each tier sweeping the opposite direction.
+    paths: [{
+      points: [
+        { x: 0, y: 1 }, { x: 8, y: 1 }, { x: 8, y: 3 }, { x: 16, y: 3 },
+        { x: 16, y: 5 }, { x: 4, y: 5 }, { x: 4, y: 7 }, { x: 13, y: 7 },
+        { x: 13, y: 9 }, { x: 20, y: 9 },
+      ],
+    }],
     bgColor: '#0a0a05',
     accentColor: '#ffd600',
     secondaryColor: '#ffffff',
@@ -1008,20 +1045,22 @@ export const MAPS: MapDef[] = [
     name: 'DEEP ROOT',
     fullName: 'RHIZOMAL NETWORK',
     order: 25,
-    cols: 11,
-    rows: 15,
+    cols: 20,
+    rows: 11,
+    // ACT 7 SHAPE: rhizomal network — three left entries + one top entry
+    // converge through a central junction then diverge to three exits.
     paths: [
       { points: [
-        { x: 0, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 7 }, { x: 5, y: 7 }, { x: 5, y: 11 }, { x: 5, y: 14 },
+        { x: 0, y: 1 }, { x: 8, y: 1 }, { x: 10, y: 5 }, { x: 20, y: 3 },
       ]},
       { points: [
-        { x: 10, y: 2 }, { x: 7, y: 2 }, { x: 7, y: 7 }, { x: 5, y: 7 }, { x: 5, y: 11 }, { x: 5, y: 14 },
+        { x: 0, y: 5 }, { x: 8, y: 5 }, { x: 10, y: 5 }, { x: 20, y: 5 },
       ]},
       { points: [
-        { x: 2, y: 0 }, { x: 2, y: 5 }, { x: 5, y: 5 }, { x: 5, y: 11 }, { x: 5, y: 14 },
+        { x: 0, y: 9 }, { x: 8, y: 9 }, { x: 10, y: 5 }, { x: 20, y: 7 },
       ]},
       { points: [
-        { x: 8, y: 0 }, { x: 8, y: 5 }, { x: 5, y: 5 }, { x: 5, y: 11 }, { x: 5, y: 14 },
+        { x: 10, y: 0 }, { x: 10, y: 5 }, { x: 20, y: 9 },
       ]},
     ],
     bgColor: '#020a00',
@@ -1052,15 +1091,21 @@ export const MAPS: MapDef[] = [
     name: 'RAMPART',
     fullName: 'CRIMSON BULWARK',
     order: 26,
-    cols: 12,
-    rows: 14,
-    paths: [{
-      points: [
-        { x: 0, y: 1 }, { x: 5, y: 1 }, { x: 5, y: 5 }, { x: 2, y: 5 },
-        { x: 2, y: 9 }, { x: 9, y: 9 }, { x: 9, y: 4 }, { x: 11, y: 4 },
-        { x: 11, y: 12 }, { x: 3, y: 12 }, { x: 3, y: 13 },
-      ],
-    }],
+    cols: 20,
+    rows: 11,
+    // ACT 7 SHAPE: crossing + winding — two long paths swap rows then merge.
+    // Combines Act 4 + Act 6 patterns.
+    paths: [
+      { points: [
+        { x: 0, y: 2 }, { x: 8, y: 2 }, { x: 12, y: 8 }, { x: 20, y: 8 },
+      ]},
+      { points: [
+        { x: 0, y: 8 }, { x: 8, y: 8 }, { x: 12, y: 2 }, { x: 20, y: 2 },
+      ]},
+      { points: [
+        { x: 0, y: 5 }, { x: 10, y: 5 }, { x: 20, y: 5 },
+      ]},
+    ],
     bgColor: '#100400',
     accentColor: '#ff3355',
     secondaryColor: '#ff6600',
@@ -1089,17 +1134,21 @@ export const MAPS: MapDef[] = [
     name: 'ANTIMATTER',
     fullName: 'REVERSED CORE',
     order: 27,
-    cols: 12,
-    rows: 16,
+    cols: 20,
+    rows: 11,
+    // ACT 7 SHAPE: reversed flow — paths enter from top AND right edges (atypical),
+    // wind through the core, exit bottom + left. The "antimatter" theme = inverted
+    // direction of travel.
     paths: [
       { points: [
-        { x: 0, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 6 }, { x: 8, y: 6 },
-        { x: 8, y: 2 }, { x: 11, y: 2 }, { x: 11, y: 10 }, { x: 5, y: 10 },
-        { x: 5, y: 15 },
+        { x: 5, y: 0 }, { x: 5, y: 5 }, { x: 15, y: 5 }, { x: 15, y: 10 },
       ]},
       { points: [
-        { x: 0, y: 13 }, { x: 2, y: 13 }, { x: 2, y: 8 }, { x: 7, y: 8 },
-        { x: 7, y: 12 }, { x: 5, y: 12 }, { x: 5, y: 15 },
+        { x: 15, y: 0 }, { x: 15, y: 3 }, { x: 5, y: 3 }, { x: 5, y: 8 },
+        { x: 15, y: 8 }, { x: 15, y: 10 },
+      ]},
+      { points: [
+        { x: 0, y: 5 }, { x: 10, y: 5 }, { x: 20, y: 5 },
       ]},
     ],
     bgColor: '#040010',
@@ -1130,17 +1179,23 @@ export const MAPS: MapDef[] = [
     name: 'RUIN.PROTOCOL',
     fullName: 'FINAL INTRUSION',
     order: 28,
-    cols: 12,
-    rows: 16,
+    cols: 20,
+    rows: 11,
+    // ACT 7 SHAPE: the maze finale — four entries (left top/bottom + top + bottom)
+    // all funnel through the central column to a single right-side exit.
+    // Final intrusion: every angle of attack at once.
     paths: [
       { points: [
-        { x: 0, y: 2 }, { x: 5, y: 2 }, { x: 5, y: 5 }, { x: 2, y: 5 },
-        { x: 2, y: 9 }, { x: 9, y: 9 }, { x: 9, y: 4 }, { x: 11, y: 4 },
-        { x: 11, y: 12 }, { x: 6, y: 12 }, { x: 6, y: 15 },
+        { x: 0, y: 1 }, { x: 5, y: 1 }, { x: 5, y: 5 }, { x: 15, y: 5 }, { x: 20, y: 5 },
       ]},
       { points: [
-        { x: 0, y: 13 }, { x: 3, y: 13 }, { x: 3, y: 10 }, { x: 7, y: 10 },
-        { x: 7, y: 14 }, { x: 6, y: 14 }, { x: 6, y: 15 },
+        { x: 0, y: 9 }, { x: 5, y: 9 }, { x: 5, y: 5 }, { x: 15, y: 5 }, { x: 20, y: 5 },
+      ]},
+      { points: [
+        { x: 5, y: 0 }, { x: 5, y: 5 }, { x: 15, y: 5 }, { x: 20, y: 5 },
+      ]},
+      { points: [
+        { x: 5, y: 10 }, { x: 5, y: 5 }, { x: 15, y: 5 }, { x: 20, y: 5 },
       ]},
     ],
     bgColor: '#0a0a05',
@@ -1174,13 +1229,14 @@ export const MAPS: MapDef[] = [
     name: 'SURVIVAL.EXE',
     fullName: 'NULL ZONE',
     order: 99,
-    cols: 9,
-    rows: 15,
+    cols: 20,
+    rows: 11,
+    // SURVIVAL: extra-long serpentine for maximum tower-coverage opportunity.
+    // Endless waves need every shooting frame they can get.
     paths: [{
       points: [
-        { x: 0, y: 2 }, { x: 6, y: 2 }, { x: 6, y: 5 }, { x: 2, y: 5 },
-        { x: 2, y: 8 }, { x: 6, y: 8 }, { x: 6, y: 11 }, { x: 2, y: 11 },
-        { x: 2, y: 14 },
+        { x: 0, y: 1 }, { x: 17, y: 1 }, { x: 17, y: 4 }, { x: 3, y: 4 },
+        { x: 3, y: 7 }, { x: 17, y: 7 }, { x: 17, y: 9 }, { x: 20, y: 9 },
       ],
     }],
     bgColor: '#0a0014',
