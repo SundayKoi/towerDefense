@@ -745,11 +745,11 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
   }
   ctx.globalAlpha = alpha;
 
-  // Shadow / footprint
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + size * 0.35, size * 0.4, size * 0.15, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // Shadow is baked into each enemy's SVG sprite (varies per enemy — worm shadow
+  // is long+thin, spider's is round, etc.) and rotates with the sprite. A
+  // canvas-level shadow used to be drawn here at a fixed world offset, but it
+  // didn't rotate with the sprite, producing a visible mismatch whenever an
+  // enemy turned — especially on vertical path segments.
 
   // Hit flash glow
   if (e.hitFlash > 0) {
