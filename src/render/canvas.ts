@@ -154,7 +154,6 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
   drawPacketTraces(ctx, vp, map, s.elapsed);
   drawScanningRing(ctx, vp, map, s.elapsed);
   drawGrid(ctx, vp, map);
-  drawGridEnergize(ctx, vp, s);
   drawPaths(ctx, vp, map, s.elapsed);
   drawEndPortal(ctx, vp, map, s.elapsed);
 
@@ -348,28 +347,9 @@ function drawScanningRing(ctx: CanvasRenderingContext2D, vp: RenderViewport, map
   ctx.restore();
 }
 
-// Grid energize — a firing tower lights up its 8 neighboring cells with a faint
-// pulse driven by its fireFlash timer. Ties combat events to the world surface.
-function drawGridEnergize(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: RunState): void {
-  const cs = vp.cellSize;
-  ctx.save();
-  for (const t of s.towers) {
-    if (t.fireFlash <= 0) continue;
-    const intensity = Math.min(1, t.fireFlash / 0.18);
-    ctx.globalAlpha = 0.18 * intensity;
-    ctx.fillStyle = TOWERS[t.def].accentColor;
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const gx = t.grid.x + dx;
-        const gy = t.grid.y + dy;
-        if (gx < 0 || gy < 0) continue;
-        ctx.fillRect(gx * cs, gy * cs, cs, cs);
-      }
-    }
-  }
-  ctx.restore();
-}
+// Grid energize removed — the 3x3 cell halo around firing towers read as
+// massive colored blocks at gameplay scale and obscured the path. The sprite
+// itself already has a shadowBlur glow driven by fireFlash in drawTower.
 
 function drawBackgroundPattern(ctx: CanvasRenderingContext2D, vp: RenderViewport, map: MapDef, t: number): void {
   ctx.save();
