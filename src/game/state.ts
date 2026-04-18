@@ -4,7 +4,14 @@ import { CARDS_BY_ID, STARTING_UNLOCKED_CARDS } from '@/data/cards';
 import { recomputeMetaBoosts } from '@/data/shop';
 import { emptyPeriodStats } from '@/data/contracts';
 
-export const SAVE_KEY = 'netrunner_meta_v1';
+// Bumped from netrunner_meta_v1 to v2 to wipe everyone's progress as a clean slate
+// after the progression overhaul (new map-reward tree, unlock notifications, the
+// contracts system, and the starter-card-pool cleanup). Old v1 data is explicitly
+// removed below so it doesn't sit abandoned in the browser's localStorage.
+export const SAVE_KEY = 'netrunner_meta_v2';
+
+// Purge any pre-reset save data. Safe no-op if the key doesn't exist.
+try { localStorage.removeItem('netrunner_meta_v1'); } catch { /* storage disabled */ }
 
 // XP threshold for reaching (level+1). Exponential-ish so early levels come fast, late ones earn more.
 export function xpForLevel(level: number): number {

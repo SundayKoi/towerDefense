@@ -35,6 +35,9 @@ class AudioEngine {
   private musicNodes: { stop: () => void }[] = [];
   private musicActive = false;
   private pendingMusicKind: 'menu' | 'game' | null = null;
+  // Rate-limit buckets: last-play timestamp per sound id. Prevents "wall of
+  // explosions" when an artillery shell + cluster + frag all fire on one frame.
+  private lastPlay: Record<string, number> = {};
 
   setEnabled(on: boolean) { this.enabled = on; }
 
@@ -64,7 +67,16 @@ class AudioEngine {
     if (!this.enabled) return;
     const ctx = this.ensure();
     if (!ctx || !this.master) return;
-    const now = ctx.currentTime;
+    // Rate-limit loud / overlapping sounds so an artillery shell + cluster + frag
+    // + secondary chain hits don't stack into a painful wall of noise.
+    const cooldowns: Record<string, number> = { explode: 0.10, fire_mine: 0.08, boss_die: 0.2 };
+    const cd = cooldowns[id];
+    if (cd != null) {
+      const now = ctx.currentTime;
+      const last = this.lastPlay[id] ?? -Infinity;
+      if (now - last < cd) return;
+      this.lastPlay[id] = now;
+    }
     switch (id as SoundId) {
       case 'ui_click':      this.blip(ctx, 440, 0.04, 'square', 0.15); break;
       case 'ui_hover':      this.blip(ctx, 780, 0.02, 'sine', 0.08); break;
@@ -79,11 +91,14 @@ class AudioEngine {
       case 'fire_ice':      this.noise(ctx, 0.15, 0.22, 800); break;
       case 'fire_chain':    this.sweep(ctx, 2000, 1000, 0.06, 'sawtooth', 0.12); break;
       case 'fire_railgun':  this.sweep(ctx, 2200, 200, 0.25, 'sawtooth', 0.22); this.noise(ctx, 0.2, 0.12, 300); break;
-      case 'fire_mine':     this.blip(ctx, 200, 0.1, 'square', 0.15); break;
+      // Artillery cannon report — soft muffled thud, not the high-pitched square blip.
+      case 'fire_mine':     this.sweep(ctx, 140, 50, 0.18, 'triangle', 0.09); this.noise(ctx, 0.08, 0.05, 180); break;
       case 'enemy_die':     this.noise(ctx, 0.08, 0.12, 600); this.blip(ctx, 180, 0.08, 'square', 0.1); break;
       case 'boss_die':      this.sweep(ctx, 400, 40, 1.2, 'sawtooth', 0.3); this.noise(ctx, 0.6, 0.3, 300); break;
       case 'damage':        this.sweep(ctx, 180, 60, 0.3, 'square', 0.25); break;
-      case 'explode':       this.noise(ctx, 0.4, 0.2, 200); this.sweep(ctx, 300, 80, 0.25, 'sawtooth', 0.2); break;
+      // Explosion thud — low-pass noise + gentle triangle sweep. Was a sawtooth sweep
+      // at 0.2 gain (piercing). Now triangle at 0.08 with noise at 0.06.
+      case 'explode':       this.noise(ctx, 0.28, 0.06, 150); this.sweep(ctx, 180, 55, 0.22, 'triangle', 0.08); break;
       case 'mine':          this.noise(ctx, 0.3, 0.25, 150); break;
       case 'card_reveal':   this.chord(ctx, [523, 659], 0.15, 'triangle', 0.12); break;
       case 'card_legendary':this.chord(ctx, [523, 659, 784, 988], 0.6, 'triangle', 0.18); break;
