@@ -322,14 +322,20 @@ function drawPacketTraces(ctx: CanvasRenderingContext2D, vp: RenderViewport, map
 // Scanning ring pulse — every ~7s a concentric ring expands from the map center.
 // Signals "system is alive" without stealing attention from combat.
 function drawScanningRing(ctx: CanvasRenderingContext2D, vp: RenderViewport, map: MapDef, t: number): void {
+  // Guard: on the very first frame s.elapsed can be slightly negative due to
+  // raf timing jitter, which makes `t % 7` negative → negative radius → arc
+  // throws IndexSizeError and the rest of renderRun is skipped, leaving the
+  // canvas transparent. Clamp phase to [0, period) and skip when out of the
+  // 1.6s active window.
   const period = 7;
-  const phase = t % period;
+  const phase = ((t % period) + period) % period;
   if (phase > 1.6) return;
   const progress = phase / 1.6;
   const cx = vp.width / 2;
   const cy = vp.height / 2;
   const maxR = Math.hypot(vp.width, vp.height) * 0.55;
-  const r = progress * maxR;
+  const r = Math.max(0, progress * maxR);
+  if (r <= 0) return;
   ctx.save();
   ctx.globalAlpha = 0.35 * (1 - progress);
   ctx.strokeStyle = map.secondaryColor;
