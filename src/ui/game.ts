@@ -1,7 +1,7 @@
 // Game screen: HUD overlay + canvas + action bar.
 // Post-pivot: credits removed. HUD shows HP, LEVEL, XP bar, deploy tokens, and map name.
 
-import type { RunState, SaveData, TargetMode, TowerId } from '@/types';
+import type { RunState, SaveData, TargetMode, TowerId, TowerInstance } from '@/types';
 import { TOWERS } from '@/data/towers';
 import { getMap } from '@/data/maps';
 import { audio } from '@/audio/sfx';
@@ -193,6 +193,44 @@ export function renderPalette(handles: GameScreenHandles, s: RunState, onPick: (
 }
 
 // Selected tower detail panel. No upgrade button — upgrades come from cards.
+function overdriveDisplay(t: TowerInstance): { label: string; cls: string; disabled: boolean } {
+  const odActive = (t.extras.overdriveActive ?? 0) > 0;
+  const odOffline = (t.extras.overdriveOffline ?? 0) > 0;
+  const odCharge = t.extras.overdriveCharge ?? 0;
+  if (odActive) return { label: `BURNING (${(t.extras.overdriveActive).toFixed(1)}s)`, cls: 'btn btn-primary', disabled: true };
+  if (odOffline) return { label: `OFFLINE (${(t.extras.overdriveOffline).toFixed(1)}s)`, cls: 'btn btn-danger', disabled: true };
+  if (odCharge > 0) return { label: `CHARGING (${odCharge.toFixed(0)}s)`, cls: 'btn btn-ghost', disabled: true };
+  return { label: 'OVERDRIVE', cls: 'btn btn-primary', disabled: false };
+}
+
+// Lightweight refresh: only updates dynamic parts of the panel (overdrive button +
+// subnet readout) without destroying the DOM. Critical so the X button isn't
+// rebuilt between a user's pointerdown and pointerup.
+export function refreshSelectedTowerLive(handles: GameScreenHandles, s: RunState): void {
+  const sel = s.selection;
+  if (sel.kind !== 'tower') return;
+  const t = s.towers.find((x) => x.id === sel.towerId);
+  if (!t) return;
+  const box = handles.selectedEl;
+  const odBtn = box.querySelector('#sel-overdrive') as HTMLButtonElement | null;
+  if (odBtn) {
+    const od = overdriveDisplay(t);
+    odBtn.textContent = od.label;
+    odBtn.className = od.cls;
+    odBtn.disabled = od.disabled;
+  }
+  const subnetEl = box.querySelector('#sel-subnet') as HTMLElement | null;
+  const subnetMult = t.extras.subnetMult ?? 1;
+  const subnetSize = t.extras.subnetSize ?? 1;
+  const subnetTypes = t.extras.subnetTypes ?? 1;
+  if (subnetEl && subnetSize > 1) {
+    subnetEl.innerHTML = `SUBNET: ${subnetSize} nodes / ${subnetTypes} types &nbsp;<b>+${Math.round((subnetMult - 1) * 100)}% DMG</b>`;
+    subnetEl.style.display = '';
+  } else if (subnetEl) {
+    subnetEl.style.display = 'none';
+  }
+}
+
 // Includes a TARGETING mode toggle (FIRST / STRONG / WEAK / CLOSE) cycling on tap.
 export function renderSelectedTower(
   handles: GameScreenHandles,
@@ -213,23 +251,16 @@ export function renderSelectedTower(
   const effDmg = Math.round(def.damage * dmgMod);
   const effRange = (def.range * rangeMod).toFixed(1);
   const effRate = (def.fireRate * rateMod).toFixed(2);
-  // Subnet bonus readout (only show when the tower is actually linked).
+  // Subnet bonus readout — element always present, refreshed in-place by the live updater.
   const subnetMult = t.extras.subnetMult ?? 1;
   const subnetSize = t.extras.subnetSize ?? 1;
   const subnetTypes = t.extras.subnetTypes ?? 1;
-  const subnetHtml = subnetSize > 1
-    ? `<div class="sel-subnet">SUBNET: ${subnetSize} nodes / ${subnetTypes} types &nbsp;<b>+${Math.round((subnetMult - 1) * 100)}% DMG</b></div>`
-    : '';
+  const subnetHtml = `<div class="sel-subnet" id="sel-subnet" style="${subnetSize > 1 ? '' : 'display:none'}">SUBNET: ${subnetSize} nodes / ${subnetTypes} types &nbsp;<b>+${Math.round((subnetMult - 1) * 100)}% DMG</b></div>`;
   // Overdrive button state.
-  const odActive = (t.extras.overdriveActive ?? 0) > 0;
-  const odOffline = (t.extras.overdriveOffline ?? 0) > 0;
-  const odCharge = t.extras.overdriveCharge ?? 0;
-  let odLabel = 'OVERDRIVE';
-  let odClass = 'btn btn-primary';
-  let odDisabled = false;
-  if (odActive) { odLabel = `BURNING (${(t.extras.overdriveActive).toFixed(1)}s)`; odClass = 'btn btn-primary'; odDisabled = true; }
-  else if (odOffline) { odLabel = `OFFLINE (${(t.extras.overdriveOffline).toFixed(1)}s)`; odClass = 'btn btn-danger'; odDisabled = true; }
-  else if (odCharge > 0) { odLabel = `CHARGING (${odCharge.toFixed(0)}s)`; odClass = 'btn btn-ghost'; odDisabled = true; }
+  const od = overdriveDisplay(t);
+  const odLabel = od.label;
+  const odClass = od.cls;
+  const odDisabled = od.disabled;
   box.innerHTML = `
     <div class="sel-tower-header" style="--accent:${def.accentColor}">
       <div class="sel-tower-name">${def.name} <span class="sel-tower-type">${def.damageType.toUpperCase()}</span></div>
