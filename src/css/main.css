@@ -1647,6 +1647,16 @@ html, body { overscroll-behavior: none; }
   letter-spacing: 2px;
   color: var(--yellow);
 }
+.contract-claim-all-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 12px 0 4px;
+}
+.contract-claim-all {
+  font-size: 12px;
+  letter-spacing: 2px;
+  padding: 10px 22px;
+}
 .quest-grid {
   display: flex;
   flex-direction: column;

@@ -95,6 +95,30 @@ function shopScreen(save: SaveData, persist: () => void, onBack: () => void): Sc
         // Contracts tab: rotating daily/weekly/monthly + permanent milestones
         html += `<div class="shop-intro">Rotating contracts reset on period boundary. Milestones are permanent achievements — claim each once.</div>`;
 
+        // CLAIM ALL button — sum up everything currently claimable (all three period
+        // buckets + permanent milestones) so the player can harvest in one tap.
+        const freqs2: ContractFrequency[] = ['daily', 'weekly', 'monthly'];
+        let claimAllTotal = 0;
+        for (const freq of freqs2) {
+          const bucket = save.contracts[freq];
+          for (const id of bucket.offered) {
+            const c = CONTRACTS_BY_ID[id];
+            if (!c || bucket.claimed.includes(id)) continue;
+            if (c.check(bucket.stats)) claimAllTotal += c.reward;
+          }
+        }
+        for (const q of QUESTS) {
+          if (save.quests.completed.includes(q.id)) continue;
+          if (q.check(save)) claimAllTotal += q.reward;
+        }
+        html += `
+          <div class="contract-claim-all-row">
+            <button class="btn btn-primary contract-claim-all"${claimAllTotal === 0 ? ' disabled' : ''}>
+              &#10003; CLAIM ALL ${claimAllTotal > 0 ? `(+${claimAllTotal}&#9670;)` : ''}
+            </button>
+          </div>
+        `;
+
         const now = Date.now();
         const freqs: ContractFrequency[] = ['daily', 'weekly', 'monthly'];
         for (const freq of freqs) {
@@ -236,6 +260,36 @@ function shopScreen(save: SaveData, persist: () => void, onBack: () => void): Sc
           render();
         };
       });
+
+      const claimAllBtn = root.querySelector<HTMLButtonElement>('.contract-claim-all');
+      if (claimAllBtn) {
+        claimAllBtn.onclick = () => {
+          let total = 0;
+          const freqs3: ContractFrequency[] = ['daily', 'weekly', 'monthly'];
+          for (const freq of freqs3) {
+            const bucket = save.contracts[freq];
+            for (const id of bucket.offered) {
+              const c = CONTRACTS_BY_ID[id];
+              if (!c || bucket.claimed.includes(id)) continue;
+              if (!c.check(bucket.stats)) continue;
+              bucket.claimed.push(id);
+              total += c.reward;
+            }
+          }
+          for (const q of QUESTS) {
+            if (save.quests.completed.includes(q.id)) continue;
+            if (!q.check(save)) continue;
+            save.quests.completed.push(q.id);
+            total += q.reward;
+          }
+          if (total === 0) { audio.play('sell'); return; }
+          save.protocols += total;
+          save.stats.totalProtocolsEarned += total;
+          persist();
+          audio.play('upgrade');
+          render();
+        };
+      }
     };
 
     render();
