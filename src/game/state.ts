@@ -1,6 +1,6 @@
 import type { Difficulty, RunState, SaveData, TowerId } from '@/types';
 import { getMap } from '@/data/maps';
-import { STARTING_UNLOCKED_CARDS } from '@/data/cards';
+import { CARDS_BY_ID, STARTING_UNLOCKED_CARDS } from '@/data/cards';
 import { recomputeMetaBoosts } from '@/data/shop';
 import { emptyPeriodStats } from '@/data/contracts';
 
@@ -13,7 +13,7 @@ export function xpForLevel(level: number): number {
 
 export function defaultSave(): SaveData {
   return {
-    version: 2,
+    version: 3,
     completed: {},
     unlockedCards: STARTING_UNLOCKED_CARDS.slice(),
     unlockedTowers: ['firewall'],
@@ -90,6 +90,22 @@ export function loadSave(): SaveData {
       const starters = new Set(d.unlockedCards);
       const existing = new Set(s.unlockedCards);
       for (const id of starters) if (!existing.has(id)) s.unlockedCards.push(id);
+    }
+    // Migrate pre-v3 saves: before the map reward overhaul, the starter card pool
+    // included deploy + upgrade cards for 7 towers regardless of whether the player
+    // had actually unlocked them. Trim the card list to only cards that belong to
+    // towers the player has unlocked (plus heals/exotics which are tower-agnostic).
+    if ((parsed.version ?? 0) < 3) {
+      const unlockedT = new Set(s.unlockedTowers);
+      s.unlockedCards = s.unlockedCards.filter((id) => {
+        const c = CARDS_BY_ID[id];
+        if (!c) return false;
+        if (c.category === 'heal' || c.category === 'exotic') return true;
+        if (c.towerHint && !unlockedT.has(c.towerHint)) return false;
+        if (c.towerHint2 && !unlockedT.has(c.towerHint2)) return false;
+        return true;
+      });
+      s.version = 3;
     }
     recomputeMetaBoosts(s);
     return s;

@@ -1275,19 +1275,20 @@ export const CARDS: CardDef[] = [
 
 export const CARDS_BY_ID: Record<string, CardDef> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 
+// Fresh-save unlocks. Only firewall cards are available at the start — every other
+// tower and its upgrade cards are earned through map clears (see maps.ts rewards
+// and finishRun() which auto-unlocks a tower's common/rare upgrades on unlock).
 export const STARTING_UNLOCKED_CARDS = [
-  // Deploy cards for basic towers (not epic/legendary)
-  'deploy_firewall', 'deploy_honeypot', 'deploy_antivirus', 'deploy_quantum',
-  'deploy_mine', 'deploy_pulse', 'deploy_scrambler',
-  // Common/rare upgrades for starter towers
+  'deploy_firewall',
+  // Common/rare firewall upgrades (no synergies — those are earned later)
   ...UPGRADE.filter((c) =>
     (c.rarity === 'common' || c.rarity === 'rare') &&
-    !c.towerHint2 &&  // exclude synergy cards from starter pool
-    ['firewall', 'honeypot', 'antivirus', 'mine', 'pulse', 'scrambler', 'sentinel'].includes(c.towerHint ?? '')
+    !c.towerHint2 &&
+    c.towerHint === 'firewall'
   ).map((c) => c.id),
-  // All heals except legendary
+  // Non-legendary heals always available
   ...HEAL.filter((c) => c.rarity !== 'legendary').map((c) => c.id),
-  // One exotic starter
+  // One gentle exotic starter
   'exotic_overclock',
 ];
 
