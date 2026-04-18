@@ -1052,32 +1052,114 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
 
 /* ------------- Pixel mode global tweaks ------------- */
 
-html.pixel-mode {
-  /* Swap to mono/retro fonts for cohesive feel */
-  font-family: 'VT323', monospace;
+/* Force VT323 on EVERY element so every screen reads as pixel/retro.
+   Prior rule only targeted html + a handful of selectors; body's
+   JetBrains Mono rule won by inheritance, and all Orbitron elements
+   stayed non-pixelated on the shop / databank / how-to-play screens. */
+html.pixel-mode,
+html.pixel-mode body,
+html.pixel-mode * {
+  font-family: 'VT323', monospace !important;
 }
-html.pixel-mode .btn,
-html.pixel-mode .hud-cell .value,
-html.pixel-mode .logo-sub,
+
+/* VT323 is a thin 1-bit font — bump the root font-size so small copy
+   stays legible even at tiny widths on mobile. */
+html.pixel-mode {
+  font-size: 18px;
+}
+
+/* Small-text elements (descriptions, hints, tip strings) need a
+   minimum readable floor, otherwise VT323 dots bleed into each
+   other. Also bumps line-height for breathing room. */
+html.pixel-mode .shop-desc,
+html.pixel-mode .shop-intro,
+html.pixel-mode .tower-card-desc,
+html.pixel-mode .card-desc,
+html.pixel-mode .quest-desc,
+html.pixel-mode .intel-desc,
+html.pixel-mode .intel-tip,
+html.pixel-mode .db-card-desc,
+html.pixel-mode .db-entry-desc,
+html.pixel-mode .db-tip,
+html.pixel-mode .db-special,
+html.pixel-mode .htp-list,
+html.pixel-mode .htp-section p,
+html.pixel-mode .settings-hint,
+html.pixel-mode .tutorial-body,
+html.pixel-mode .sel-tower-stats,
+html.pixel-mode .tokens-empty,
+html.pixel-mode .palette-empty,
+html.pixel-mode .bs-dmg-label,
 html.pixel-mode .logo-flavor,
+html.pixel-mode .eib-desc,
+html.pixel-mode .eib-tip {
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  line-height: 1.35;
+}
+
+/* Titles: VT323 reads better with wider spacing. Bump the headline
+   sizes so HOW TO PLAY, UPGRADE TERMINAL, DATABANK all pop. */
 html.pixel-mode .topbar-title,
-html.pixel-mode .card-rarity,
-html.pixel-mode .card-name,
-html.pixel-mode .card-category,
-html.pixel-mode .settings-label,
-html.pixel-mode .draft-title,
 html.pixel-mode .modal-title,
 html.pixel-mode .gameover-title,
-html.pixel-mode .intel-name,
-html.pixel-mode .map-name {
-  font-family: 'VT323', monospace !important;
+html.pixel-mode .draft-title,
+html.pixel-mode .shop-section-title,
+html.pixel-mode .db-section-title,
+html.pixel-mode .htp-h2,
+html.pixel-mode .tutorial-title {
+  letter-spacing: 4px;
+  font-size: 22px;
+}
+
+/* Buttons: taller glyphs for tap-readability. */
+html.pixel-mode .btn {
+  font-size: 17px;
   letter-spacing: 2px;
 }
+html.pixel-mode .btn-lg {
+  font-size: 26px;
+  letter-spacing: 4px;
+}
+
+/* Card names, tower names, rarity labels — moderate bump. */
+html.pixel-mode .card-name,
+html.pixel-mode .card-rarity,
+html.pixel-mode .card-category,
+html.pixel-mode .tower-card-name,
+html.pixel-mode .sel-tower-name,
+html.pixel-mode .map-name,
+html.pixel-mode .intel-name,
+html.pixel-mode .db-entry-name,
+html.pixel-mode .db-card-name,
+html.pixel-mode .shop-name,
+html.pixel-mode .quest-name {
+  letter-spacing: 2px;
+  font-size: 18px;
+}
+
+/* HUD numbers — keep bold and big, these are at-a-glance readouts. */
+html.pixel-mode .hud-cell .value,
+html.pixel-mode .gameover-stats b,
+html.pixel-mode .bs-tower-header,
+html.pixel-mode .shop-cost,
+html.pixel-mode .quest-proto,
+html.pixel-mode .shop-protocols b {
+  letter-spacing: 1px;
+  font-size: 20px;
+}
+
+/* Logo */
 html.pixel-mode .logo-primary {
-  font-family: 'VT323', monospace !important;
   letter-spacing: 10px;
   font-size: clamp(56px, 14vw, 110px);
 }
+html.pixel-mode .logo-sub {
+  font-size: 18px;
+  letter-spacing: 4px;
+}
+
+/* Pixelate images/canvases too, for sprite consistency. */
 html.pixel-mode img,
 html.pixel-mode canvas {
   image-rendering: pixelated;
