@@ -137,8 +137,13 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
   const d = map.difficulties[difficulty];
   const level = 1 + (save.metaBoosts.startingLevel ?? 0);
 
-  // Starting deploy tokens: always grant 1 Firewall minimum + any meta-boost starters.
-  const tokens: Partial<Record<TowerId, number>> = { firewall: 1 };
+  // Starting deploy tokens: grant 1 token for every tower the player has unlocked.
+  // With the singleton rule (one of each tower per run), a token-per-unlock means
+  // the player's full unlocked roster is available from wave 1 — no more hoping
+  // the draft RNG offers deploy cards for towers they already own.
+  const tokens: Partial<Record<TowerId, number>> = {};
+  for (const id of save.unlockedTowers) tokens[id] = 1;
+  if ((tokens.firewall ?? 0) === 0) tokens.firewall = 1; // safety: always at least firewall
   for (const [k, v] of Object.entries(save.metaBoosts.startingDeployTokens ?? {})) {
     tokens[k as TowerId] = (tokens[k as TowerId] ?? 0) + (v as number);
   }

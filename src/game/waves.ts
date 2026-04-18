@@ -1,10 +1,12 @@
 import type { EnemyId, MapDef, RunState } from '@/types';
 
 // Compute number of enemies for a given wave.
-export function waveCount(wave: number): number {
-  // Per spec §9.5: wave 1 is always 4. §9.4: count = clamp(5 + floor(wave*1.1), 5, 25)
+export function waveCount(wave: number, difficulty: 'easy' | 'medium' | 'hard' = 'medium'): number {
   if (wave === 1) return 4;
-  return Math.max(5, Math.min(25, 5 + Math.floor(wave * 1.1)));
+  // Per-difficulty caps so easy doesn't pile 25 enemies/wave on a player with
+  // limited turret variety. Hard keeps the original 25-cap density.
+  const cap = { easy: 18, medium: 22, hard: 25 }[difficulty];
+  return Math.max(5, Math.min(cap, 5 + Math.floor(wave * 1.1)));
 }
 
 // Spawn delay in seconds per §9.6.
@@ -24,8 +26,10 @@ export function waveBonus(wave: number): number {
 }
 
 // HP scale per wave based on difficulty.
+// Easy was 0.22 (wave 20 ≈ 5.2× HP) which outpaced 2-tower starter loadouts.
+// Now: easy 0.15 (wave 20 ≈ 3.85×), medium 0.24, hard 0.32.
 export function hpScale(wave: number, difficulty: 'easy' | 'medium' | 'hard'): number {
-  const p = { easy: 0.22, medium: 0.28, hard: 0.34 }[difficulty];
+  const p = { easy: 0.15, medium: 0.24, hard: 0.32 }[difficulty];
   return 1 + (wave - 1) * p;
 }
 
@@ -73,7 +77,7 @@ function pickEnemyForWave(map: MapDef, wave: number, total: number, rng: () => n
 // Build the spawn queue for a wave.
 export function buildWaveSpawnQueue(map: MapDef, difficulty: 'easy' | 'medium' | 'hard', wave: number, totalWaves: number): RunState['spawnQueue'] {
   const rng = Math.random;
-  const count = waveCount(wave);
+  const count = waveCount(wave, difficulty);
   const delay = spawnDelay(wave);
 
   const queue: RunState['spawnQueue'] = [];
