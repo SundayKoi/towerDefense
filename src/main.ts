@@ -11,6 +11,7 @@ import { mapSelectScreen } from '@/ui/mapSelect';
 import { gameScreen, renderPalette, renderSelectedTower, renderTokensBar, type GameScreenHandles } from '@/ui/game';
 import { openBuildStats, openCardDraft, openEnemyIntel, openGameOver, openPauseMenu, openSettingsModal } from '@/ui/modals';
 import { openShopScreen } from '@/ui/shop';
+import { openDatabankScreen } from '@/ui/databank';
 import { mount } from '@/ui/screens';
 import { audio } from '@/audio/sfx';
 import { addToAllPeriods } from '@/data/contracts';
@@ -93,6 +94,7 @@ function showStart() {
     () => showMapSelect(),
     () => openSettingsModal(save, applySettings),
     () => openShopScreen(save, () => writeSave(save), showStart),
+    () => openDatabankScreen(save, showStart),
   ));
 }
 
