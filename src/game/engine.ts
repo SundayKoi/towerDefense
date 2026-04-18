@@ -43,7 +43,11 @@ export function endWave(s: RunState, events: EngineEvents): void {
   grantXp(s, bonus);
   const isBoss = bossForWave(getMap(s.mapId), s.difficulty, s.wave) != null;
   const bossBonus = isBoss ? (s.mods.bossProtocolBonus ?? 0) : 0;
-  const proto = (isBoss ? 3 : 1) + bossBonus;
+  let proto = (isBoss ? 3 : 1) + bossBonus;
+  // Data miner protocol_mine upgrade: +1 protocol per wave cleared.
+  if (s.towers.some((t) => t.def === 'data_miner') && hasEffect(s, 'data_miner', 'protocol_mine')) {
+    proto += 1;
+  }
   s.protocolsEarned += proto;
   s.floaters.push({ pos: { x: 0, y: -0.5 }, text: `+${proto} \u2b22 PROTOCOL`, vy: -18, life: 2, maxLife: 2, color: '#ffd600', size: 16 });
   s.floaters.push({ pos: { x: 0, y: 0 }, text: `+${bonus} XP`, vy: -20, life: 2, maxLife: 2, color: '#00fff0', size: 28 });
@@ -477,6 +481,26 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
       continue;
     }
+    if (t.def === 'data_miner') {
+      // Passive XP generation. Base 3/s; +5/s with THROUGHPUT; +5/s additional with RECURSIVE.
+      // Doubled during waves with UPLINK.
+      let rate = hasEffect(s, 'data_miner', 'throughput') ? 8 : 3;
+      if (hasEffect(s, 'data_miner', 'recursive')) rate += 5;
+      if (s.phase === 'wave' && hasEffect(s, 'data_miner', 'uplink')) rate *= 2;
+      grantXp(s, rate * dtSec);
+      // gentle pulse flash
+      t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
+      if (t.extras.flashTimer <= 0) { t.extras.flashTimer = 1.2; t.fireFlash = 0.18; }
+      if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
+      continue;
+    }
+    if (t.def === 'booster_node') {
+      // Passive aura — handled in effectiveDamage / effectiveFireRate. Just pulse a flash for visuals.
+      t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
+      if (t.extras.flashTimer <= 0) { t.extras.flashTimer = 1.5; t.fireFlash = 0.2; }
+      if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
+      continue;
+    }
     updateTower(s, t, dtSec);
     if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
   }
@@ -542,6 +566,18 @@ function effectiveDamage(s: RunState, t: TowerInstance): number {
   dmg *= (t.extras.subnetMult ?? 1);
   // Overdrive: +200% damage for the boost duration.
   if ((t.extras.overdriveActive ?? 0) > 0) dmg *= 3;
+  // Booster Node aura: each in-range booster adds its damage buff. Stacks across boosters.
+  if (t.def !== 'booster_node' && t.def !== 'data_miner') {
+    for (const b of s.towers) {
+      if (b.def !== 'booster_node') continue;
+      const r = effectiveRange(s, b) + (hasEffect(s, 'booster_node', 'amplify') ? 0.5 : 0);
+      const focus = hasEffect(s, 'booster_node', 'focus_beam');
+      const dist = focus ? 0 : Math.hypot(b.grid.x - t.grid.x, b.grid.y - t.grid.y);
+      if (dist <= r) {
+        dmg *= hasEffect(s, 'booster_node', 'overcharge') ? 1.35 : 1.25;
+      }
+    }
+  }
   // Exotic redundancy: 4+ different tower types placed = +20% global damage
   // Count unique tower types without allocating a Set.
   if (s.cardsPicked.includes('exotic_redundancy') && s.towers.length >= 4) {
@@ -588,6 +624,18 @@ function effectiveFireRate(s: RunState, t: TowerInstance, dt = 0): number {
   }
   // Overdrive: +100% fire rate for the boost duration.
   if ((t.extras.overdriveActive ?? 0) > 0) rate *= 2;
+  // Booster Node aura: in-range boosters add fire-rate buff.
+  if (t.def !== 'booster_node' && t.def !== 'data_miner') {
+    for (const b of s.towers) {
+      if (b.def !== 'booster_node') continue;
+      const r = effectiveRange(s, b) + (hasEffect(s, 'booster_node', 'amplify') ? 0.5 : 0);
+      const focus = hasEffect(s, 'booster_node', 'focus_beam');
+      const dist = focus ? 0 : Math.hypot(b.grid.x - t.grid.x, b.grid.y - t.grid.y);
+      if (dist <= r) {
+        rate *= hasEffect(s, 'booster_node', 'overcharge') ? 1.25 : 1.15;
+      }
+    }
+  }
   return rate;
 }
 
@@ -617,11 +665,16 @@ export function computeSubnets(s: RunState): void {
     // Mult = base 1 + 8% per extra node + 12% per extra unique type, capped at 1.6×.
     const size = cluster.length;
     const types = new Set(cluster.map((c) => c.def));
-    const mult = Math.min(1.6, 1 + 0.08 * (size - 1) + 0.12 * (types.size - 1));
+    let typeCount = types.size;
+    // Booster Resonance: counts as 2 unique types when present in a subnet.
+    if (cluster.some((c) => c.def === 'booster_node') && hasEffect(s, 'booster_node', 'resonance')) {
+      typeCount += 1;
+    }
+    const mult = Math.min(1.6, 1 + 0.08 * (size - 1) + 0.12 * (typeCount - 1));
     for (const c of cluster) {
       c.extras.subnetMult = mult;
       c.extras.subnetSize = size;
-      c.extras.subnetTypes = types.size;
+      c.extras.subnetTypes = typeCount;
     }
   }
 }
@@ -698,6 +751,10 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
   // Overdrive timers — when offline, skip firing entirely.
   if (!tickOverdrive(t, dt)) { t.cooldown = Math.max(0, t.cooldown - dt); return; }
   t.cooldown = Math.max(0, t.cooldown - dt);
+  // Support turrets do nothing in the targeting/firing loop. Their effects are
+  // applied passively (booster aura in effectiveDamage/Rate, data miner XP in
+  // updateRun).
+  if (t.def === 'booster_node' || t.def === 'data_miner') return;
 
   // Quantum observer: charge idle time for extra crit mult
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'observer')) {

@@ -122,6 +122,24 @@ const DEPLOY: CardDef[] = [
     description: 'Gain a SENTINEL NODE token. Passive field damages and slows all nearby enemies.',
     apply: (s) => { addToken(s, 'sentinel', 1); },
   },
+  {
+    id: 'deploy_booster_node',
+    name: 'DEPLOY: BOOSTER NODE',
+    rarity: 'common',
+    category: 'deploy',
+    towerHint: 'booster_node',
+    description: 'Gain a BOOSTER NODE token. Passive support — buffs adjacent turrets (+25% damage, +15% rate).',
+    apply: (s) => { addToken(s, 'booster_node', 1); },
+  },
+  {
+    id: 'deploy_data_miner',
+    name: 'DEPLOY: DATA MINER',
+    rarity: 'rare',
+    category: 'deploy',
+    towerHint: 'data_miner',
+    description: 'Gain a DATA MINER token. Passive XP generator — +3 XP/sec while deployed.',
+    apply: (s) => { addToken(s, 'data_miner', 1); },
+  },
 ];
 
 // ==================== UPGRADE CARDS (behavioral changes only) ====================
@@ -1043,6 +1061,62 @@ const UPGRADE: CardDef[] = [
     apply: (s) => { addEffect(s, 'sentinel', 'total_suppression'); },
   },
 
+  // ===== BOOSTER NODE (5 upgrades) =====
+  {
+    id: 'bn_amplify', name: 'BOOSTER: AMPLIFIER', rarity: 'common', category: 'upgrade', towerHint: 'booster_node',
+    description: 'BOOSTER NODE aura range +0.5 cells.',
+    apply: (s) => { addEffect(s, 'booster_node', 'amplify'); },
+  },
+  {
+    id: 'bn_overcharge', name: 'BOOSTER: OVERCHARGE', rarity: 'common', category: 'upgrade', towerHint: 'booster_node',
+    description: 'BOOSTER NODE aura is stronger: +35% damage / +25% fire rate.',
+    apply: (s) => { addEffect(s, 'booster_node', 'overcharge'); },
+  },
+  {
+    id: 'bn_dual_wave', name: 'BOOSTER: DUAL WAVE', rarity: 'rare', category: 'upgrade', towerHint: 'booster_node',
+    description: 'Buffed turrets also gain +10% crit chance from the BOOSTER NODE aura.',
+    apply: (s) => { addEffect(s, 'booster_node', 'dual_wave'); s.mods.globalCritChance += 0.10; },
+  },
+  {
+    id: 'bn_focus_beam', name: 'BOOSTER: FOCUS BEAM', rarity: 'epic', category: 'upgrade', towerHint: 'booster_node',
+    requires: ['bn_amplify'],
+    description: '[Requires AMPLIFIER] BOOSTER NODE aura targets ALL turrets regardless of distance.',
+    apply: (s) => { addEffect(s, 'booster_node', 'focus_beam'); },
+  },
+  {
+    id: 'bn_resonance', name: 'BOOSTER: RESONANCE', rarity: 'rare', category: 'upgrade', towerHint: 'booster_node',
+    description: 'BOOSTER NODE counts as 2 unique types in subnet diversity calculations.',
+    apply: (s) => { addEffect(s, 'booster_node', 'resonance'); },
+  },
+
+  // ===== DATA MINER (5 upgrades) =====
+  {
+    id: 'dm_throughput', name: 'DATA MINER: HIGH THROUGHPUT', rarity: 'common', category: 'upgrade', towerHint: 'data_miner',
+    description: 'DATA MINER XP generation increased from 3/s to 8/s.',
+    apply: (s) => { addEffect(s, 'data_miner', 'throughput'); },
+  },
+  {
+    id: 'dm_compress', name: 'DATA MINER: COMPRESSION', rarity: 'common', category: 'upgrade', towerHint: 'data_miner',
+    description: 'All enemy kills grant +20% bonus XP.',
+    apply: (s) => { addEffect(s, 'data_miner', 'compress'); s.mods.xpMult *= 1.2; },
+  },
+  {
+    id: 'dm_uplink', name: 'DATA MINER: UPLINK', rarity: 'rare', category: 'upgrade', towerHint: 'data_miner',
+    description: 'DATA MINER XP generation doubles during waves.',
+    apply: (s) => { addEffect(s, 'data_miner', 'uplink'); },
+  },
+  {
+    id: 'dm_protocol_mine', name: 'DATA MINER: PROTOCOL EXTRACTOR', rarity: 'rare', category: 'upgrade', towerHint: 'data_miner',
+    description: 'DATA MINER also extracts +1 PROTOCOL each wave cleared.',
+    apply: (s) => { addEffect(s, 'data_miner', 'protocol_mine'); },
+  },
+  {
+    id: 'dm_recursive', name: 'DATA MINER: RECURSIVE LEARNING', rarity: 'epic', category: 'upgrade', towerHint: 'data_miner',
+    requires: ['dm_throughput'],
+    description: '[Requires HIGH THROUGHPUT] DATA MINER XP rate +5/s additional. 13/s total combined.',
+    apply: (s) => { addEffect(s, 'data_miner', 'recursive'); },
+  },
+
   // ==================== SYNERGY CARDS (require both towers placed) ====================
 
   {
@@ -1275,18 +1349,19 @@ export const CARDS: CardDef[] = [
 
 export const CARDS_BY_ID: Record<string, CardDef> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 
-// Fresh-save unlocks. Two starter towers (firewall + honeypot) plus their common/rare
-// upgrades — every other tower and its upgrade cards are earned through map clears
-// (see maps.ts rewards and finishRun() which auto-unlocks a tower's common/rare
-// upgrades on unlock).
+// Fresh-save unlocks. Three starter towers (firewall + honeypot + booster_node) plus
+// their common/rare upgrades — every other tower and its upgrade cards are earned
+// through map clears (see maps.ts rewards and finishRun() which auto-unlocks a tower's
+// common/rare upgrades on unlock).
 export const STARTING_UNLOCKED_CARDS = [
   'deploy_firewall',
   'deploy_honeypot',
-  // Common/rare upgrades for the two starter towers (no synergies — those are earned later)
+  'deploy_booster_node',
+  // Common/rare upgrades for the three starter towers (no synergies — those are earned later)
   ...UPGRADE.filter((c) =>
     (c.rarity === 'common' || c.rarity === 'rare') &&
     !c.towerHint2 &&
-    (c.towerHint === 'firewall' || c.towerHint === 'honeypot')
+    (c.towerHint === 'firewall' || c.towerHint === 'honeypot' || c.towerHint === 'booster_node')
   ).map((c) => c.id),
   // Non-legendary heals always available
   ...HEAL.filter((c) => c.rarity !== 'legendary').map((c) => c.id),

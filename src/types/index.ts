@@ -16,7 +16,9 @@ export type TowerId =
   | 'pulse'
   | 'sniper'
   | 'scrambler'
-  | 'sentinel';
+  | 'sentinel'
+  | 'booster_node'
+  | 'data_miner';
 
 export type EnemyId =
   | 'worm'

@@ -617,6 +617,92 @@ const towerSVG: Record<TowerId, () => string> = {
         <line x1='81' y1='81' x2='88' y2='88'/>
       </g>
     </svg>`,
+
+  // BOOSTER NODE — concentric power rings with a glowing core, no barrel
+  booster_node: () => `
+    <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <radialGradient id='bn-core' cx='50%' cy='50%'>
+          <stop offset='0' stop-color='#88ffdd'/>
+          <stop offset='0.5' stop-color='#00ffaa'/>
+          <stop offset='1' stop-color='#003322'/>
+        </radialGradient>
+        <filter id='bn-glow'><feGaussianBlur stdDeviation='2.5'/><feMerge><feMergeNode/><feMergeNode in='SourceGraphic'/></feMerge></filter>
+      </defs>
+      <ellipse cx='64' cy='112' rx='34' ry='5' fill='#000' opacity='0.5'/>
+      <!-- Hex base -->
+      <polygon points='44,88 84,88 100,64 84,40 44,40 28,64' fill='#003322' stroke='#00ffaa' stroke-width='2'/>
+      <!-- Outer rotor ring -->
+      <circle cx='64' cy='64' r='34' fill='none' stroke='#00ffaa' stroke-width='1.2' opacity='0.55'/>
+      <circle cx='64' cy='64' r='34' fill='none' stroke='#00ffaa' stroke-width='2' opacity='0.4' stroke-dasharray='6 8'/>
+      <!-- Inner rotor ring -->
+      <circle cx='64' cy='64' r='22' fill='none' stroke='#00ffaa' stroke-width='1.5' opacity='0.7'/>
+      <!-- Core node -->
+      <circle cx='64' cy='64' r='14' fill='url(#bn-core)' filter='url(#bn-glow)'/>
+      <circle cx='64' cy='64' r='5' fill='#ffffff'/>
+      <!-- Cardinal connector pylons -->
+      <g fill='#00ffaa' filter='url(#bn-glow)'>
+        <rect x='62' y='28' width='4' height='10' rx='1'/>
+        <rect x='62' y='90' width='4' height='10' rx='1'/>
+        <rect x='28' y='62' width='10' height='4' rx='1'/>
+        <rect x='90' y='62' width='10' height='4' rx='1'/>
+      </g>
+      <!-- Diagonal accent ticks -->
+      <g stroke='#00ffaa' stroke-width='1.5' opacity='0.6'>
+        <line x1='40' y1='40' x2='48' y2='48'/>
+        <line x1='88' y1='40' x2='80' y2='48'/>
+        <line x1='40' y1='88' x2='48' y2='80'/>
+        <line x1='88' y1='88' x2='80' y2='80'/>
+      </g>
+    </svg>`,
+
+  // DATA MINER — server rack with ascending data streams
+  data_miner: () => `
+    <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <linearGradient id='dm-rack' x1='0' y1='0' x2='0' y2='1'>
+          <stop offset='0' stop-color='#ffea66'/>
+          <stop offset='1' stop-color='#332700'/>
+        </linearGradient>
+        <filter id='dm-glow'><feGaussianBlur stdDeviation='2'/><feMerge><feMergeNode/><feMergeNode in='SourceGraphic'/></feMerge></filter>
+      </defs>
+      <ellipse cx='64' cy='114' rx='32' ry='5' fill='#000' opacity='0.5'/>
+      <!-- Rack chassis -->
+      <rect x='40' y='38' width='48' height='72' rx='3' fill='url(#dm-rack)' stroke='#ffd600' stroke-width='2'/>
+      <!-- Server slots -->
+      <g fill='#1a1300' stroke='#ffd600' stroke-width='0.8'>
+        <rect x='44' y='44' width='40' height='8' rx='1'/>
+        <rect x='44' y='56' width='40' height='8' rx='1'/>
+        <rect x='44' y='68' width='40' height='8' rx='1'/>
+        <rect x='44' y='80' width='40' height='8' rx='1'/>
+        <rect x='44' y='92' width='40' height='8' rx='1'/>
+      </g>
+      <!-- Activity LEDs -->
+      <g filter='url(#dm-glow)'>
+        <circle cx='49' cy='48' r='1.6' fill='#00ff88'/>
+        <circle cx='49' cy='60' r='1.6' fill='#ffd600'/>
+        <circle cx='49' cy='72' r='1.6' fill='#00ff88'/>
+        <circle cx='49' cy='84' r='1.6' fill='#ffd600'/>
+        <circle cx='49' cy='96' r='1.6' fill='#00ff88'/>
+      </g>
+      <!-- Data readouts (binary-ish) -->
+      <g fill='#ffd600' opacity='0.7' font-family='monospace' font-size='5'>
+        <text x='56' y='51'>10110</text>
+        <text x='56' y='63'>01001</text>
+        <text x='56' y='75'>11010</text>
+        <text x='56' y='87'>00111</text>
+        <text x='56' y='99'>10101</text>
+      </g>
+      <!-- Top antenna / data uplink -->
+      <line x1='64' y1='38' x2='64' y2='22' stroke='#ffd600' stroke-width='1.5'/>
+      <circle cx='64' cy='20' r='3' fill='#ffd600' filter='url(#dm-glow)'/>
+      <!-- Ascending data particles -->
+      <g fill='#ffd600' opacity='0.8' filter='url(#dm-glow)'>
+        <circle cx='60' cy='14' r='1.4'/>
+        <circle cx='68' cy='10' r='1'/>
+        <circle cx='64' cy='6' r='0.8'/>
+      </g>
+    </svg>`,
 };
 
 // ---------- ENEMY SPRITES ----------

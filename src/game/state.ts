@@ -23,9 +23,11 @@ export function defaultSave(): SaveData {
     version: 3,
     completed: {},
     unlockedCards: STARTING_UNLOCKED_CARDS.slice(),
-    // Two starter towers — firewall provides damage, honeypot provides slow+puddles.
-    // A single turret type per run (singleton rule) wasn't enough to beat Map 1 easy.
-    unlockedTowers: ['firewall', 'honeypot'],
+    // Three starter towers — firewall (damage), honeypot (slow + puddles),
+    // booster_node (passive aura buff). Booster amplifies the two damage turrets
+    // without taking up an attack slot, helping the early game survive without
+    // requiring deep card draws.
+    unlockedTowers: ['firewall', 'honeypot', 'booster_node'],
     seenEnemies: [],
     challengesCompleted: [],
     protocols: 0,

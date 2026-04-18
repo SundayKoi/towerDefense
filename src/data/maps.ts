@@ -37,9 +37,9 @@ export const MAPS: MapDef[] = [
       hard:   { 10: 'kernel', 20: 'daemon', 30: 'leviathan', 40: 'daemon', 50: 'voidlord' },
     },
     rewards: {
-      easyClear:   { type: 'unlock-tower', id: 'quantum' },
-      mediumClear: { type: 'unlock-tower', id: 'antivirus' },
-      hardClear:   { type: 'unlock-card',  id: 'heal_max' },
+      easyClear:   { type: 'unlock-tower', id: 'data_miner' },
+      mediumClear: { type: 'unlock-tower', id: 'quantum' },
+      hardClear:   { type: 'unlock-tower', id: 'antivirus' },
     },
   },
 
