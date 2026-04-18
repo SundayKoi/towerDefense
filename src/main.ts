@@ -1,6 +1,7 @@
 import '@/css/main.css';
 import { loadSave, writeSave, createRun, defaultSave } from '@/game/state';
-import { CARDS_BY_ID, drawDraft } from '@/data/cards';
+import { CARDS, CARDS_BY_ID, drawDraft } from '@/data/cards';
+import { TOWERS } from '@/data/towers';
 import { cycleTargetMode, placeTower, removeTower, startWave, updateRun } from '@/game/engine';
 import { applyBloom, applyPixelate, canPlaceAt, createViewport, renderRun, resizeViewport } from '@/render/canvas';
 import { preloadSprites } from '@/render/sprites';
@@ -452,6 +453,7 @@ function finishRun(victory: boolean) {
   save.stats.totalWins += victory ? 1 : 0;
   save.protocols += run.protocolsEarned;
   save.stats.totalProtocolsEarned += run.protocolsEarned;
+  const unlocks: { kind: 'tower' | 'card'; id: string; name: string; rarity?: string }[] = [];
   if (victory) {
     const c = (save.completed[run.mapId] ?? {});
     c[run.difficulty] = true;
@@ -463,12 +465,34 @@ function finishRun(victory: boolean) {
     run.protocolsEarned += clearBonus;
     const reward = getMap(run.mapId).rewards[(run.difficulty + 'Clear') as 'easyClear'|'mediumClear'|'hardClear'];
     if (reward) {
-      if (reward.type === 'unlock-card' && !save.unlockedCards.includes(reward.id)) save.unlockedCards.push(reward.id);
-      if (reward.type === 'unlock-tower' && !save.unlockedTowers.includes(reward.id as TowerId)) save.unlockedTowers.push(reward.id as TowerId);
+      if (reward.type === 'unlock-card' && !save.unlockedCards.includes(reward.id)) {
+        save.unlockedCards.push(reward.id);
+        const c = CARDS_BY_ID[reward.id];
+        if (c) unlocks.push({ kind: 'card', id: c.id, name: c.name, rarity: c.rarity });
+      }
+      if (reward.type === 'unlock-tower' && !save.unlockedTowers.includes(reward.id as TowerId)) {
+        save.unlockedTowers.push(reward.id as TowerId);
+        const tid = reward.id as TowerId;
+        const tdef = TOWERS[tid];
+        unlocks.push({ kind: 'tower', id: tid, name: tdef?.name ?? tid.toUpperCase() });
+        // Also grant the deploy card and every common/rare non-synergy upgrade for this tower,
+        // so when you unlock a turret you immediately have meaningful upgrade paths in the draft pool.
+        const auto = CARDS.filter((c) =>
+          (c.id === `deploy_${tid}`) ||
+          (c.category === 'upgrade' && c.towerHint === tid && !c.towerHint2 &&
+            (c.rarity === 'common' || c.rarity === 'rare'))
+        );
+        for (const c of auto) {
+          if (!save.unlockedCards.includes(c.id)) {
+            save.unlockedCards.push(c.id);
+            unlocks.push({ kind: 'card', id: c.id, name: c.name, rarity: c.rarity });
+          }
+        }
+      }
     }
   }
   writeSave(save);
-  openGameOver(run, victory, () => {
+  openGameOver(run, victory, unlocks, () => {
     const mid = run!.mapId, d = run!.difficulty;
     cancelAnimationFrame(rafId);
     runRunCleanups();

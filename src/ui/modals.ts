@@ -305,12 +305,27 @@ export function openCardDraft(
 export function openGameOver(
   s: RunState,
   isVictory: boolean,
+  unlocks: { kind: 'tower' | 'card'; id: string; name: string; rarity?: string }[],
   onRetry: () => void,
   onExit: () => void,
 ): HTMLElement {
   const el = document.createElement('div');
   el.className = 'modal-overlay';
   audio.play(isVictory ? 'victory' : 'gameover');
+  const unlocksHtml = unlocks.length > 0 ? `
+    <div class="go-unlocks">
+      <div class="go-unlocks-title">&#9733; UNLOCKED</div>
+      <div class="go-unlocks-list">
+        ${unlocks.map((u) => {
+          if (u.kind === 'tower') {
+            return `<div class="go-unlock go-unlock-tower"><span class="go-unlock-tag">NEW TURRET</span><span class="go-unlock-name">${u.name}</span></div>`;
+          }
+          const rarityClass = u.rarity ? `go-unlock-${u.rarity}` : '';
+          return `<div class="go-unlock go-unlock-card ${rarityClass}"><span class="go-unlock-tag">NEW CARD</span><span class="go-unlock-name">${u.name}</span></div>`;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
   el.innerHTML = `
     <div class="modal gameover-modal ${isVictory ? 'victory' : 'defeat'}">
       <div class="gameover-title">${isVictory ? '// BREACH CONTAINED' : '// SYSTEM COMPROMISED'}</div>
@@ -320,6 +335,7 @@ export function openGameOver(
         <div><span>Towers placed</span><b>${s.towers.length}</b></div>
         <div><span>Integrity remaining</span><b>${s.hp}</b></div>
       </div>
+      ${unlocksHtml}
       <div class="modal-actions">
         <button class="btn btn-primary" id="go-retry">RETRY</button>
         <button class="btn" id="go-exit">MAP SELECT</button>
