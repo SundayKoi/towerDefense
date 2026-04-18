@@ -121,7 +121,9 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
 // ======================= XP / Level =======================
 
 function grantXp(s: RunState, amount: number): void {
-  const gain = Math.round(amount * s.mods.xpMult);
+  // Keep xp as float so sub-integer grants (data miner's 0.05/frame) actually
+  // accumulate instead of being rounded to 0. HUD displays Math.floor(run.xp).
+  const gain = amount * s.mods.xpMult;
   s.xp += gain;
   s.xpThisRun += gain;
   while (s.xp >= s.xpToNext) {

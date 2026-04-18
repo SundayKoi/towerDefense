@@ -413,7 +413,7 @@ function updateHud() {
   runHandles.hudLevel.textContent = String(run.level);
   const pct = Math.max(0, Math.min(100, (run.xp / run.xpToNext) * 100));
   runHandles.hudXpFill.style.width = pct + '%';
-  runHandles.hudXpText.textContent = `${run.xp}/${run.xpToNext}`;
+  runHandles.hudXpText.textContent = `${Math.floor(run.xp)}/${run.xpToNext}`;
   const surv = isSurvival(run.mapId);
   runHandles.hudWave.textContent = surv ? `${run.wave}/\u221e` : `${run.wave}/${run.totalWaves}`;
   runHandles.hudMap.textContent = getMap(run.mapId).name;

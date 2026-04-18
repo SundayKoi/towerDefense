@@ -85,7 +85,7 @@ export function openBuildStats(r: _RS): HTMLElement {
         <div class="bs-section-title">PROGRESS</div>
         <div class="bs-progress">
           <div class="bs-prog-cell"><span>LEVEL</span><b>${r.level}</b></div>
-          <div class="bs-prog-cell"><span>XP</span><b>${r.xp}/${r.xpToNext}</b></div>
+          <div class="bs-prog-cell"><span>XP</span><b>${Math.floor(r.xp)}/${r.xpToNext}</b></div>
           <div class="bs-prog-cell"><span>WAVE</span><b>${r.wave}/${r.totalWaves}</b></div>
           <div class="bs-prog-cell"><span>INTEGRITY</span><b>${r.hp}/${r.maxHp}</b></div>
           <div class="bs-prog-cell"><span>PROTOCOLS EARNED</span><b>+${r.protocolsEarned}</b></div>
