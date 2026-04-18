@@ -151,7 +151,10 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
   ctx.fillRect(0, 0, vp.width, vp.height);
 
   drawBackgroundPattern(ctx, vp, map, s.elapsed);
+  drawPacketTraces(ctx, vp, map, s.elapsed);
+  drawScanningRing(ctx, vp, map, s.elapsed);
   drawGrid(ctx, vp, map);
+  drawGridEnergize(ctx, vp, s);
   drawPaths(ctx, vp, map, s.elapsed);
   drawEndPortal(ctx, vp, map, s.elapsed);
 
@@ -193,6 +196,10 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
   // Towers
   for (const t of s.towers) { drawTower(ctx, vp, t); drawTowerDebuffs(ctx, vp, t, s.elapsed); }
 
+  // Priority-kill markers: LEECH tethers + saturated pulsing ring on LEECH/PARASITE.
+  // Drawn before enemies so the ring halos sit behind the sprite.
+  drawPriorityMarkers(ctx, vp, s);
+
   // Enemies (with mark overlay)
   for (const e of s.enemies) { drawEnemy(ctx, vp, e, s.elapsed); if ((e.marked ?? 0) > 0) drawMark(ctx, vp, e); }
 
@@ -205,6 +212,155 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
   // Floaters
   drawFloaters(ctx, vp, s);
 
+  // Scanline overlay — CRT phosphor feel. Every 2nd row at ~14% opacity.
+  // Drawn in-shake so pixelate/bloom treat it as part of the frame.
+  drawScanlines(ctx, vp);
+
+  ctx.restore();
+}
+
+// Priority-kill signalling — LEECH/PARASITE get a saturated magenta pulse ring
+// so the player's eye lands on them before stats are read. LEECH additionally
+// draws a tether beam to the nearest other enemy (the ally it's healing).
+function drawPriorityMarkers(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: RunState): void {
+  const cs = vp.cellSize;
+  const now = performance.now() / 1000;
+  ctx.save();
+  for (const e of s.enemies) {
+    if (!e.alive) continue;
+    if (e.def !== 'leech' && e.def !== 'parasite') continue;
+    const cx = e.pos.x * cs + cs / 2;
+    const cy = e.pos.y * cs + cs / 2;
+    const size = cs * e.size;
+    // Pulsing priority ring
+    const pulse = 0.55 + 0.45 * Math.sin(now * 6 + e.id);
+    ctx.globalAlpha = 0.8 * pulse;
+    ctx.strokeStyle = '#ff2d95';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#ff2d95';
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+    // LEECH tether beam to nearest ally enemy.
+    if (e.def === 'leech') {
+      let best: EnemyInstance | null = null; let bestD = Infinity;
+      for (const o of s.enemies) {
+        if (!o.alive || o.id === e.id) continue;
+        const d = Math.hypot(o.pos.x - e.pos.x, o.pos.y - e.pos.y);
+        if (d < bestD) { bestD = d; best = o; }
+      }
+      if (best && bestD < 4) {
+        const bx = best.pos.x * cs + cs / 2;
+        const by = best.pos.y * cs + cs / 2;
+        ctx.globalAlpha = 0.55 + 0.35 * Math.sin(now * 8 + e.id);
+        ctx.strokeStyle = '#3eff9c';
+        ctx.shadowColor = '#00ff88';
+        ctx.shadowBlur = 10;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function drawScanlines(ctx: CanvasRenderingContext2D, vp: RenderViewport): void {
+  ctx.save();
+  ctx.globalAlpha = 0.14;
+  ctx.fillStyle = '#000000';
+  for (let y = 0; y < vp.height; y += 2) {
+    ctx.fillRect(0, y, vp.width, 1);
+  }
+  ctx.restore();
+}
+
+// Packet-trace lines — 3 pseudo-random pulses sliding across the background every
+// few seconds. Each pulse is a thin bright line ~100px long traveling along a
+// randomized diagonal, seeded by integer division of elapsed time so each cycle
+// feels different without tracking state.
+function drawPacketTraces(ctx: CanvasRenderingContext2D, vp: RenderViewport, map: MapDef, t: number): void {
+  ctx.save();
+  ctx.lineCap = 'round';
+  const periods = [3.2, 4.1, 5.7];
+  for (let i = 0; i < periods.length; i++) {
+    const period = periods[i];
+    const phase = (t + i * 1.3) % period;
+    const progress = phase / period;
+    const cycleIdx = Math.floor((t + i * 1.3) / period) + i * 17;
+    // Seeded pseudo-random start/end points from cycleIdx so each cycle is different.
+    const h = (n: number) => {
+      const x = Math.sin(n * 127.1 + i * 311.7) * 43758.5453;
+      return x - Math.floor(x);
+    };
+    const sx = h(cycleIdx) * vp.width;
+    const sy = h(cycleIdx * 2.3) * vp.height;
+    const ex = h(cycleIdx * 3.7) * vp.width;
+    const ey = h(cycleIdx * 5.1) * vp.height;
+    const hx = sx + (ex - sx) * progress;
+    const hy = sy + (ey - sy) * progress;
+    const trailLen = 0.18;
+    const tx = sx + (ex - sx) * Math.max(0, progress - trailLen);
+    const ty = sy + (ey - sy) * Math.max(0, progress - trailLen);
+    ctx.globalAlpha = 0.4 * (1 - Math.abs(progress - 0.5) * 1.8);
+    ctx.strokeStyle = map.accentColor;
+    ctx.lineWidth = 1;
+    ctx.shadowColor = map.accentColor;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(hx, hy);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Scanning ring pulse — every ~7s a concentric ring expands from the map center.
+// Signals "system is alive" without stealing attention from combat.
+function drawScanningRing(ctx: CanvasRenderingContext2D, vp: RenderViewport, map: MapDef, t: number): void {
+  const period = 7;
+  const phase = t % period;
+  if (phase > 1.6) return;
+  const progress = phase / 1.6;
+  const cx = vp.width / 2;
+  const cy = vp.height / 2;
+  const maxR = Math.hypot(vp.width, vp.height) * 0.55;
+  const r = progress * maxR;
+  ctx.save();
+  ctx.globalAlpha = 0.35 * (1 - progress);
+  ctx.strokeStyle = map.secondaryColor;
+  ctx.lineWidth = 2;
+  ctx.shadowColor = map.secondaryColor;
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Grid energize — a firing tower lights up its 8 neighboring cells with a faint
+// pulse driven by its fireFlash timer. Ties combat events to the world surface.
+function drawGridEnergize(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: RunState): void {
+  const cs = vp.cellSize;
+  ctx.save();
+  for (const t of s.towers) {
+    if (t.fireFlash <= 0) continue;
+    const intensity = Math.min(1, t.fireFlash / 0.18);
+    ctx.globalAlpha = 0.18 * intensity;
+    ctx.fillStyle = TOWERS[t.def].accentColor;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const gx = t.grid.x + dx;
+        const gy = t.grid.y + dy;
+        if (gx < 0 || gy < 0) continue;
+        ctx.fillRect(gx * cs, gy * cs, cs, cs);
+      }
+    }
+  }
   ctx.restore();
 }
 
@@ -458,7 +614,13 @@ function drawSubnetLinks(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: R
 function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerInstance): void {
   const cs = vp.cellSize;
   const cx = t.grid.x * cs + cs / 2;
-  const cy = t.grid.y * cs + cs / 2;
+  // Sub-pixel idle bob — ~1px vertical sway every ~1.3s, per-tower phase offset
+  // so a cluster doesn't bob in lockstep. Zero while firing so the recoil
+  // animation reads cleanly.
+  const now = performance.now() / 1000;
+  const idlePhase = t.id * 0.73;
+  const idleBob = t.fireFlash > 0 ? 0 : Math.sin(now * 4.8 + idlePhase) * 0.9;
+  const cy = t.grid.y * cs + cs / 2 + idleBob;
   const def = TOWERS[t.def];
   const sprite = getTowerSprite(t.def);
 
@@ -504,6 +666,20 @@ function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerIn
     }
     const s = cs * 0.9;
     ctx.drawImage(sprite, -s / 2, -s / 2, s, s);
+    // Charge-up tell for slow DPS turrets — when cooldown is in the last 200ms
+    // before fire, brighten a halo around the sprite so the player sees the
+    // windup. Only applied to slow firers where the tell is readable.
+    const SLOW_FIRERS: Record<string, number> = { railgun: 4.0, sniper: 5.5, mine: 1.8, antivirus: 1.8 };
+    const maxCd = SLOW_FIRERS[t.def];
+    if (maxCd && t.targetId != null && t.cooldown > 0 && t.cooldown < 0.25) {
+      const chargePct = 1 - (t.cooldown / 0.25); // 0 → 1 as we approach fire
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.globalAlpha = 0.35 * chargePct;
+      ctx.fillStyle = def.accentColor;
+      ctx.fillRect(-s / 2, -s / 2, s, s);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
     ctx.restore();
     // Muzzle flash — per-tower style
     if (t.fireFlash > 0) drawMuzzleFlash(ctx, vp, t, recoilPct);
@@ -701,6 +877,17 @@ function drawTowerDebuffs(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: 
   ctx.restore();
 }
 
+// VOIDLORD phase-shift color per damage type — read in drawEnemy to tint sprite
+// and draw matching ground aura so the player can identify the current immunity
+// at a glance from anywhere on the map.
+const PHASE_SHIFT_COLOR: Record<string, string> = {
+  kinetic: '#ff3355',
+  energy:  '#00fff0',
+  aoe:     '#ff9933',
+  chain:   '#b847ff',
+  pierce:  '#00ff88',
+};
+
 function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyInstance, t: number): void {
   const cs = vp.cellSize;
   // Per-enemy walk animation variation
@@ -737,6 +924,45 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
   const size = cs * e.size;
 
   ctx.save();
+  // Boss spawn aura — big pulsing ring under any boss while they're in the
+  // first ~8% of their path. Telegraphs arrival and draws the eye. Stacks
+  // cleanly under the VOIDLORD immunity aura.
+  if (e.isBoss && e.progress < 0.08) {
+    const spawnT = e.progress / 0.08;
+    const auraAlpha = (1 - spawnT) * 0.6;
+    const ringR = size * (0.6 + spawnT * 0.8);
+    ctx.save();
+    ctx.globalAlpha = auraAlpha;
+    ctx.strokeStyle = def.accent;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = def.accent;
+    ctx.shadowBlur = 22;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+    ctx.stroke();
+    // Ground reticle rings — two concentric pulses
+    ctx.globalAlpha = auraAlpha * 0.6;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.35, ringR * 1.1, ringR * 0.35, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // VOIDLORD ground aura — pulsing ellipse in the current immunity color.
+  // Drawn BEFORE the sprite so it sits under the boss. 40% opacity, 1s pulse.
+  if (e.phaseShiftType && e.def === 'voidlord') {
+    const auraColor = PHASE_SHIFT_COLOR[e.phaseShiftType] ?? '#ffffff';
+    const pulse = 0.7 + 0.3 * Math.sin(t * 4);
+    ctx.save();
+    ctx.globalAlpha = 0.38 * pulse;
+    ctx.fillStyle = auraColor;
+    ctx.shadowColor = auraColor;
+    ctx.shadowBlur = 24;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + size * 0.28, size * 0.85, size * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   // Invisibility fade (stealth)
   let alpha = 1;
   if (def.invisChance) {
@@ -780,6 +1006,57 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
       ctx.globalAlpha = prevAlpha;
     }
     ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+    // BOMBER detonation windup — when HP drops below 30%, pulse red→white so
+    // the player knows to finish it fast. Visual-only telegraph; the "detonates
+    // on death" lore sells itself through the pulse.
+    if (e.def === 'bomber' && e.hp / e.maxHp < 0.3) {
+      const urgency = 1 - (e.hp / e.maxHp) / 0.3; // 0 → 1 as HP drops
+      const strobe = (Math.sin(t * (12 + urgency * 20)) + 1) / 2;
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.globalAlpha = 0.35 + strobe * 0.45 * urgency;
+      ctx.fillStyle = strobe > 0.5 ? '#ffffff' : '#ff3355';
+      ctx.fillRect(-size / 2, -size / 2, size, size);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    // Digital-entity motif: scanline corruption band slides vertically across
+    // the sprite of unstable/phased enemies. Applied to PHANTOM, WRAITH, GLITCH,
+    // CORRUPTOR. Sells "program running" without generic Matrix rain.
+    if (e.def === 'phantom' || e.def === 'wraith' || e.def === 'glitch' || e.def === 'corruptor') {
+      const bandCycle = (t * 0.55 + e.id * 0.17) % 1;
+      const bandY = -size / 2 + bandCycle * size;
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = e.def === 'corruptor' ? '#ff2d95' : '#00fff0';
+      ctx.fillRect(-size / 2, bandY, size, 2);
+      // Second thinner trailing band for glitch feel.
+      ctx.globalAlpha = 0.25;
+      ctx.fillRect(-size / 2, bandY + 4, size, 1);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    // VOIDLORD body tint — soft fill in the active immunity color, applied via
+    // source-atop so only opaque sprite pixels are tinted. 35% alpha so the
+    // sprite detail still reads through.
+    if (e.phaseShiftType && e.def === 'voidlord') {
+      const tint = PHASE_SHIFT_COLOR[e.phaseShiftType] ?? '#ffffff';
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = tint;
+      ctx.fillRect(-size / 2, -size / 2, size, size);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    // White-tint hit flash — fills the sprite's opaque pixels with white during
+    // the first ~40ms after a hit. Source-atop clips the fill to the sprite
+    // silhouette so it never spills into background pixels. Fades out fast.
+    if (e.hitFlash > 0.12) {
+      const flashAlpha = Math.min(1, (e.hitFlash - 0.12) * 12);
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha.toFixed(3)})`;
+      ctx.fillRect(-size / 2, -size / 2, size, size);
+      ctx.globalCompositeOperation = 'source-over';
+    }
     ctx.restore();
   }
   // Always draw a colored body circle as baseline so enemies are always visible
@@ -1201,17 +1478,40 @@ function drawMark(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIns
 function drawFloaters(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: RunState): void {
   const cs = vp.cellSize;
   ctx.save();
-  ctx.font = 'bold 14px "JetBrains Mono", monospace';
   ctx.textAlign = 'center';
+  ctx.lineJoin = 'round';
   for (const f of s.floaters) {
-    const a = Math.max(0, f.life / f.maxLife);
+    const tLife = f.life / f.maxLife;
+    // Damage numbers (with physics) fade only in the last 200ms; status text
+    // keeps the original life-scaled fade and adds the retro upward drift.
+    const hasPhysics = f.gravity !== undefined || f.vx !== undefined;
+    const a = hasPhysics
+      ? (f.life < 0.2 ? Math.max(0, f.life / 0.2) : 1)
+      : Math.max(0, tLife);
+    // Crits briefly scale up then settle for punch.
+    const critAge = f.maxLife - f.life;
+    const critScale = f.isCrit && critAge < 0.1 ? (1 + (1 - critAge / 0.1) * 0.25) : 1;
     ctx.globalAlpha = a;
     ctx.fillStyle = f.color;
-    ctx.font = `bold ${f.size}px "JetBrains Mono", monospace`;
+    // Damage numbers use Press Start 2P for that crunchy pixel-arcade read.
+    // Status text stays on Orbitron so wave banners etc. keep their shape.
+    const pixelFont = hasPhysics ? '"Press Start 2P", "VT323", monospace' : '"Orbitron", "JetBrains Mono", monospace';
+    const fontWeight = hasPhysics ? '400' : '900';
+    const fontSize = hasPhysics ? f.size * critScale * 0.8 : f.size * critScale;
+    ctx.font = `${fontWeight} ${fontSize}px ${pixelFont}`;
     ctx.shadowColor = f.color;
-    ctx.shadowBlur = 6;
+    ctx.shadowBlur = f.isCrit ? 10 : 4;
     const cx = f.pos.x * cs + cs / 2;
-    const cy = f.pos.y * cs + cs / 2 + (1 - a) * -30;
+    const cy = f.pos.y * cs + cs / 2 + (hasPhysics ? 0 : (1 - a) * -30);
+    // Outline pass for readability over busy backgrounds.
+    if (f.outline) {
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = f.isCrit ? 4 : 3;
+      ctx.strokeStyle = f.outline;
+      ctx.strokeText(f.text, cx, cy);
+      ctx.shadowColor = f.color;
+      ctx.shadowBlur = f.isCrit ? 10 : 4;
+    }
     ctx.fillText(f.text, cx, cy);
   }
   ctx.restore();

@@ -1403,20 +1403,46 @@ export const CARDS: CardDef[] = [
 
 export const CARDS_BY_ID: Record<string, CardDef> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 
-// Fresh-save unlocks. Three starter towers (firewall + honeypot + antivirus) plus
-// their common/rare upgrades — every other tower and its upgrade cards are earned
-// through map clears (see maps.ts rewards and finishRun() which auto-unlocks a tower's
-// common/rare upgrades on unlock).
+// Branch scatter system: when a turret unlocks, only its STARTER_BRANCH cards
+// are granted (deploy + 6 branch cards). Other branches unlock via later map
+// rewards using the `unlock-branch` reward type with id `{tower}.{branchKey}`.
+// Starter branch per tower is the "signature" playstyle for that turret.
+export const STARTER_BRANCH: Record<TowerId, string> = {
+  firewall:     'sup',    // suppression — slow / CC
+  honeypot:     'ven',    // venom — pairs with base slow
+  antivirus:    'mark',   // marker / crit
+  quantum:      'super',  // superposition
+  ice:          'blz',    // blizzard — wide AoE
+  mine:         'brg',    // barrage — artillery classic
+  chain:        'strm',   // storm — chain AoE
+  railgun:      'sab',    // sabot — pierce
+  pulse:        'frq',    // frequency — EMP
+  sniper:       'mks',    // marksman — single target
+  scrambler:    'dec',    // decrypt — armor strip
+  sentinel:     'fld',    // field — passive aura
+  booster_node: 'amp',    // amplify — buff
+  data_miner:   'thr',    // breach — damage aura
+};
+
+// Every card ID that belongs to a specific tower branch. Used by the finishRun
+// reward handler when granting a whole branch at once and by the tower-unlock
+// grant which only seeds the starter branch.
+export function cardsInBranch(tower: TowerId, branchKey: string): CardDef[] {
+  const prefix = `${tower}_${branchKey}_`;
+  return CARDS.filter((c) => c.id.startsWith(prefix));
+}
+
+// Fresh-save unlocks. Three starter towers (firewall + honeypot + antivirus)
+// plus ONLY each one's starter branch. Other branches for the starters earn via
+// map rewards like any other turret's non-starter branch. This keeps the initial
+// draft pool focused instead of overwhelming new players with every variant.
 export const STARTING_UNLOCKED_CARDS = [
   'deploy_firewall',
   'deploy_honeypot',
   'deploy_antivirus',
-  // Common/rare branch upgrades for the three starter towers (no synergies — those are earned later)
-  ...UPGRADE.filter((c) =>
-    (c.rarity === 'common' || c.rarity === 'rare') &&
-    !c.towerHint2 &&
-    (c.towerHint === 'firewall' || c.towerHint === 'honeypot' || c.towerHint === 'antivirus')
-  ).map((c) => c.id),
+  ...cardsInBranch('firewall',  STARTER_BRANCH.firewall ).map((c) => c.id),
+  ...cardsInBranch('honeypot',  STARTER_BRANCH.honeypot ).map((c) => c.id),
+  ...cardsInBranch('antivirus', STARTER_BRANCH.antivirus).map((c) => c.id),
   // Non-legendary heals always available
   ...HEAL.filter((c) => c.rarity !== 'legendary').map((c) => c.id),
   // One gentle exotic starter
@@ -1434,6 +1460,9 @@ export interface DraftContext {
   // out of the draft pool (fixes the 'draft offers deploy_firewall on wave 1'
   // bug players hit with the NEURAL BOOSTER starting-level perk).
   tokensHeld?: Set<TowerId>;
+  // Hard-mode turret lock — deploy cards AND upgrade cards touching a locked
+  // tower are filtered so the player never sees a dead pick.
+  lockedTurrets?: Set<TowerId>;
 }
 
 function categoryWeight(category: string, level: number, ctx: DraftContext): number {
@@ -1450,6 +1479,12 @@ function categoryWeight(category: string, level: number, ctx: DraftContext): num
 export function drawDraft(level: number, unlockedIds: Set<string>, context: DraftContext, count = 3, pickedIds: string[] = []): string[] {
   const pool = CARDS.filter((c) => {
     if (!unlockedIds.has(c.id)) return false;
+    // Locked-turret filter (hard mode): remove every card referencing a locked tower
+    // so no pick is wasted on a turret the player can't deploy this run.
+    if (context.lockedTurrets && (
+      (c.towerHint && context.lockedTurrets.has(c.towerHint)) ||
+      (c.towerHint2 && context.lockedTurrets.has(c.towerHint2))
+    )) return false;
     // Upgrade cards only appear if the relevant tower(s) are placed
     if (c.category === 'upgrade' && c.towerHint && !context.placedTowerTypes.has(c.towerHint)) return false;
     if (c.category === 'upgrade' && c.towerHint2 && !context.placedTowerTypes.has(c.towerHint2)) return false;

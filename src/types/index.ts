@@ -156,12 +156,19 @@ export interface MapDef {
   };
   bosses: Record<Difficulty, Record<number, EnemyId>>;
   rewards: {
-    easyClear?: { type: 'unlock-card' | 'unlock-tower' | 'protocols'; id: string };
-    mediumClear?: { type: 'unlock-card' | 'unlock-tower' | 'protocols'; id: string };
-    hardClear?: { type: 'unlock-card' | 'unlock-tower' | 'protocols'; id: string };
+    // unlock-branch id format: `{towerId}.{branchKey}` e.g. `firewall.brst`.
+    // Grants every card in that branch (keystone + 4 + capstone = 6 cards).
+    easyClear?: { type: 'unlock-card' | 'unlock-tower' | 'unlock-branch' | 'protocols'; id: string };
+    mediumClear?: { type: 'unlock-card' | 'unlock-tower' | 'unlock-branch' | 'protocols'; id: string };
+    hardClear?: { type: 'unlock-card' | 'unlock-tower' | 'unlock-branch' | 'protocols'; id: string };
   };
-  // Sector index for grouping (1–6). Used for prestige tracking + start-screen badges.
+  // Sector index for grouping (1–7). Used for prestige tracking + start-screen badges.
+  // Post-overhaul: aliased with `act` — each sector IS an act. Kept as `sector` for save compat.
   sector?: number;
+  // Act metadata — surfaced in the map-select UI and act-briefing modal.
+  act?: number;          // 1–7, mirrors sector
+  actName?: string;      // display name shown on briefing/map-select header ("SYSTEM BOOT")
+  actTag?: string;       // one-line tagline ("Learn the grid.")
   // Cyberattack modifiers applied to every enemy spawned on this map.
   // All optional; absent = vanilla behavior.
   modifiers?: {
@@ -185,6 +192,9 @@ export interface TowerInstance {
   targetId: number | null;
   angle: number;
   fireFlash: number;
+  // Recoil offset (pixels) applied opposite the fire direction, decays over ~80ms.
+  // Read in drawTower to displace the sprite for physical-fire feel.
+  recoil: number;
   targetMode: TargetMode;
   debuffs: TowerDebuff[];
   extras: Record<string, number>; // flexible per-tower state (shot counters, charge timers, etc.)
@@ -215,6 +225,15 @@ export interface EnemyInstance {
   shield?: number;        // current shield value (absorbed before HP)
   maxShield?: number;     // max shield value, for regen
   shieldRegenTimer?: number; // seconds since last damage; regens after 2s of no damage
+  // VOIDLORD mid-fight phase shift: every 12s, the boss becomes immune to a
+  // different damage type. Forces the player to cycle builds mid-fight and is
+  // the primary anti-snowball mechanic for the Act 7 finale.
+  phaseShiftType?: DamageType; // current type being resisted (100% resist)
+  phaseShiftTimer?: number;    // seconds elapsed since last rotation
+  // BOMBER detonation telegraph: when the bomber is within 0.8 tiles of the
+  // end, this counts UP from 0 to 0.8s. While > 0, drawEnemy pulses red→white.
+  // On reaching 0.8s, the bomber detonates (handled in engine).
+  detonateTimer?: number;
 }
 
 export interface Projectile {
@@ -257,6 +276,12 @@ export interface FloatingText {
   maxLife: number;
   color: string;
   size: number;
+  // Damage-number physics (optional). When set, floater arcs with gravity
+  // and lateral drift instead of the flat upward float used by status text.
+  vx?: number;
+  gravity?: number;
+  isCrit?: boolean;
+  outline?: string;
 }
 
 // ---------- Save / meta ----------
@@ -407,9 +432,17 @@ export interface RunState {
   shakeTime: number;
   shakeAmp: number;
   timeScale: number;
+  // Hit-pause: world frozen for this many seconds (decremented in updateRun).
+  // Set by tryKillEnemy at tiered durations (30/80/200ms for normal/elite/boss).
+  // Particles and floaters continue — only enemy movement + projectiles pause.
+  hitPause: number;
   elapsed: number;
   // Pending level-ups queued for when player is idle
   pendingLevelUps: number;
+  // Tower IDs locked out for this run (hard-mode random turret lock).
+  // Cards granting deploy tokens for these towers are filtered from drafts, and
+  // the deploy palette hides them. Always empty on easy/medium.
+  lockedTurrets: TowerId[];
   // Log of cards drafted this run (in order).
   cardsPicked: string[];
   // Countdown (seconds) until next wave auto-starts. null = not counting.

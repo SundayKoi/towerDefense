@@ -1,8 +1,9 @@
 import '@/css/main.css';
 import { loadSave, writeSave, createRun, defaultSave } from '@/game/state';
-import { CARDS, CARDS_BY_ID, drawDraft } from '@/data/cards';
+import { CARDS_BY_ID, drawDraft, STARTER_BRANCH, cardsInBranch } from '@/data/cards';
 import { TOWERS } from '@/data/towers';
 import { cycleTargetMode, placeTower, removeTower, startWave, triggerOverdrive, updateRun } from '@/game/engine';
+import { DIFFICULTY_PROFILE } from '@/game/waves';
 import { applyBloom, applyPixelate, canPlaceAt, createViewport, renderRun, resizeViewport } from '@/render/canvas';
 import { preloadSprites } from '@/render/sprites';
 import { initBackground } from '@/render/background';
@@ -12,11 +13,12 @@ import { gameScreen, refreshSelectedTowerLive, renderPalette, renderSelectedTowe
 import { openBuildStats, openCardDraft, openEnemyIntel, openGameOver, openPauseMenu, openSettingsModal } from '@/ui/modals';
 import { openShopScreen } from '@/ui/shop';
 import { openDatabankScreen } from '@/ui/databank';
-import { openHowToPlayScreen, showTutorialIfNew } from '@/ui/tutorial';
+import { openHowToPlayScreen, showTutorialIfNew, showActBriefingIfNew } from '@/ui/tutorial';
 import { mount } from '@/ui/screens';
 import { audio } from '@/audio/sfx';
+import { haptics } from '@/audio/haptics';
 import { addToAllPeriods } from '@/data/contracts';
-import type { Difficulty, EnemyId, RunState, SaveData, TowerId } from '@/types';
+import type { CardDef, Difficulty, EnemyId, RunState, SaveData, TowerId } from '@/types';
 import { ENEMIES } from '@/data/enemies';
 import { getMap, isSurvival, MAPS } from '@/data/maps';
 
@@ -149,6 +151,12 @@ function startRun(mapId: string, difficulty: Difficulty) {
   audio.startAmbient('game');
   // Tutorial: very first run ever — explain the basics before they tap anything.
   showTutorialIfNew(save, () => writeSave(save), 'first_run');
+  // Act briefing: first time entering any map in this act, explain the modifier
+  // and the act's thematic identity. Acts 2-7 only — act 1 has no modifier.
+  const actNum = getMap(mapId).act;
+  if (actNum !== undefined) {
+    showActBriefingIfNew(save, () => writeSave(save), actNum);
+  }
   // If meta-boosts gave us an opening level, let player draft immediately.
   if (save.metaBoosts.extraDraftCards > 0 || save.metaBoosts.startingLevel > 0) {
     // No auto-draft at start unless pending level-ups accrued — keep it predictable.
@@ -526,27 +534,29 @@ function pauseRun() {
   );
 }
 
-function buildDraftContext(r: RunState): { placedTowerTypes: Set<TowerId>; towerCount: number; tokensHeld: Set<TowerId> } {
+function buildDraftContext(r: RunState): { placedTowerTypes: Set<TowerId>; towerCount: number; tokensHeld: Set<TowerId>; lockedTurrets: Set<TowerId> } {
   const placed = new Set<TowerId>();
   for (const t of r.towers) placed.add(t.def);
   const tokensHeld = new Set<TowerId>();
   for (const [id, count] of Object.entries(r.deployTokens)) {
     if ((count as number) > 0) tokensHeld.add(id as TowerId);
   }
-  return { placedTowerTypes: placed, towerCount: r.towers.length, tokensHeld };
+  const lockedTurrets = new Set<TowerId>(r.lockedTurrets);
+  return { placedTowerTypes: placed, towerCount: r.towers.length, tokensHeld, lockedTurrets };
 }
 
 function openLevelUpDraft() {
   if (!run) return;
   if (run.phase === 'draft') return;
   const r = run;
+  haptics.fire('level_up');
   r.pendingLevelUps = Math.max(0, r.pendingLevelUps - 1);
   const prevPhase = r.phase;
   r.phase = 'draft';
   // Tutorial: explain card drafts on the player's first ever level-up.
   showTutorialIfNew(save, () => writeSave(save), 'first_levelup');
   const unlocked = new Set(save.unlockedCards);
-  const cardCount = 3 + (save.metaBoosts.extraDraftCards ?? 0);
+  const cardCount = DIFFICULTY_PROFILE[r.difficulty].draftSize + (save.metaBoosts.extraDraftCards ?? 0);
   const ctx = buildDraftContext(r);
   r.draftOptions = drawDraft(r.level, unlocked, ctx, cardCount, r.cardsPicked);
   r.draftSource = 'level';
@@ -592,6 +602,7 @@ function openLevelUpDraft() {
 
 function finishRun(victory: boolean) {
   if (!run) return;
+  haptics.fire(victory ? 'level_up' : 'game_over');
   save.stats.totalWins += victory ? 1 : 0;
   save.protocols += run.protocolsEarned;
   save.stats.totalProtocolsEarned += run.protocolsEarned;
@@ -646,17 +657,33 @@ function finishRun(victory: boolean) {
         const tid = reward.id as TowerId;
         const tdef = TOWERS[tid];
         unlocks.push({ kind: 'tower', id: tid, name: tdef?.name ?? tid.toUpperCase() });
-        // Also grant the deploy card and every common/rare non-synergy upgrade for this tower,
-        // so when you unlock a turret you immediately have meaningful upgrade paths in the draft pool.
-        const auto = CARDS.filter((c) =>
-          (c.id === `deploy_${tid}`) ||
-          (c.category === 'upgrade' && c.towerHint === tid && !c.towerHint2 &&
-            (c.rarity === 'common' || c.rarity === 'rare'))
-        );
+        // Branch-gating overhaul: unlocking a turret grants the deploy card and
+        // ONLY its starter-branch cards. The turret's other two branches are
+        // earned via `unlock-branch` map rewards in later acts. Keeps early-game
+        // draft pool curated and makes every subsequent map-clear meaningful.
+        const starterBranch = STARTER_BRANCH[tid];
+        const starterCards = cardsInBranch(tid, starterBranch);
+        const auto: CardDef[] = [];
+        const deploy = CARDS_BY_ID[`deploy_${tid}`];
+        if (deploy) auto.push(deploy);
+        auto.push(...starterCards);
         for (const c of auto) {
           if (!save.unlockedCards.includes(c.id)) {
             save.unlockedCards.push(c.id);
             unlocks.push({ kind: 'card', id: c.id, name: c.name, rarity: c.rarity });
+          }
+        }
+      }
+      if (reward.type === 'unlock-branch') {
+        // Grant every card in the named branch. Silently skips if already unlocked.
+        const [towerPart, branchKey] = reward.id.split('.');
+        if (towerPart && branchKey) {
+          const branchCards = cardsInBranch(towerPart as TowerId, branchKey);
+          for (const c of branchCards) {
+            if (!save.unlockedCards.includes(c.id)) {
+              save.unlockedCards.push(c.id);
+              unlocks.push({ kind: 'card', id: c.id, name: c.name, rarity: c.rarity });
+            }
           }
         }
       }
@@ -667,17 +694,23 @@ function finishRun(victory: boolean) {
         unlocks.push({ kind: 'card', id: 'protocols_bonus', name: `+${amount} PROTOCOLS`, rarity: 'rare' });
       }
     }
-    // Prestige star check: did this hard clear complete all 5 maps in the sector?
+    // Prestige star check: did this hard clear complete every map in the act?
     if (run.difficulty === 'hard') {
       const map = getMap(run.mapId);
       if (map.sector !== undefined && !save.sectorClears[map.sector]) {
-        // Find every campaign map in this sector and check it's hard-cleared.
         const sectorMaps = MAPS.filter((m) => m.sector === map.sector);
         const allCleared = sectorMaps.every((m) => save.completed[m.id]?.hard);
         if (allCleared) {
           save.sectorClears[map.sector] = true;
           save.prestigeStars = (save.prestigeStars ?? 0) + 1;
-          unlocks.push({ kind: 'card', id: 'prestige_star', name: `\u2605 SECTOR ${map.sector} PRESTIGE STAR`, rarity: 'legendary' });
+          // Meaningful one-time reward per prestige star so the system feels like
+          // real progression, not just a cosmetic +1% damage tick. Scales with
+          // sector — later acts require more mastery and should pay out more.
+          const prestigeBonus = 250 + map.sector * 100; // Act 1 = 350, Act 7 = 950
+          save.protocols += prestigeBonus;
+          save.stats.totalProtocolsEarned += prestigeBonus;
+          unlocks.push({ kind: 'card', id: 'prestige_star', name: `\u2605 ACT ${map.sector} PRESTIGE STAR  +${prestigeBonus}P`, rarity: 'legendary' });
+          haptics.fire('prestige_earned');
         }
       }
     }

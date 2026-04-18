@@ -3,15 +3,19 @@ import { getMap } from '@/data/maps';
 import { CARDS_BY_ID, STARTING_UNLOCKED_CARDS } from '@/data/cards';
 import { recomputeMetaBoosts } from '@/data/shop';
 import { emptyPeriodStats } from '@/data/contracts';
+import { DIFFICULTY_PROFILE } from '@/game/waves';
 
-// Bumped from netrunner_meta_v1 to v2 to wipe everyone's progress as a clean slate
-// after the progression overhaul (new map-reward tree, unlock notifications, the
-// contracts system, and the starter-card-pool cleanup). Old v1 data is explicitly
-// removed below so it doesn't sit abandoned in the browser's localStorage.
-export const SAVE_KEY = 'netrunner_meta_v2';
+// v3 key rotation = hard reset. The overhaul sessions re-shaped branch gating,
+// scattered turret unlocks, added new reward types, reworked difficulty tiers,
+// and landed substantial juice/audio changes. Rather than migrate players
+// forward onto inconsistent save shapes, we cut a clean slate under a new key
+// and purge the old ones so abandoned data doesn't linger in localStorage.
+export const SAVE_KEY = 'netrunner_meta_v3';
 
-// Purge any pre-reset save data. Safe no-op if the key doesn't exist.
-try { localStorage.removeItem('netrunner_meta_v1'); } catch { /* storage disabled */ }
+try {
+  localStorage.removeItem('netrunner_meta_v1');
+  localStorage.removeItem('netrunner_meta_v2');
+} catch { /* storage disabled */ }
 
 // XP threshold for reaching (level+1). Exponential-ish so early levels come fast, late ones earn more.
 export function xpForLevel(level: number): number {
@@ -20,7 +24,7 @@ export function xpForLevel(level: number): number {
 
 export function defaultSave(): SaveData {
   return {
-    version: 4,
+    version: 5,
     completed: {},
     unlockedCards: STARTING_UNLOCKED_CARDS.slice(),
     // Three starter turrets — firewall (kinetic frontline), honeypot (slow + goo),
@@ -137,6 +141,19 @@ export function loadSave(): SaveData {
       s.settings.pixelFactor = 2;
       s.version = 4;
     }
+    // v4 → v5: 28-map 7-act overhaul. The set of map IDs in MAPS changed (NEONSPRAWL and
+    // OBLITERATOR were removed, several maps moved between acts). Prune completion entries
+    // for removed maps so the map-select grid doesn't reference dead IDs, and clear
+    // sectorClears — sector→act boundaries shifted, so existing stars would be miscounted.
+    // prestigeStars is kept because it's a cosmetic damage bonus and wiping it feels punishing.
+    if ((parsed.version ?? 0) < 5) {
+      const removedMapIds = new Set(['neonsprawl', 'obliterator']);
+      for (const id of Object.keys(s.completed)) {
+        if (removedMapIds.has(id)) delete s.completed[id];
+      }
+      s.sectorClears = {};
+      s.version = 5;
+    }
     recomputeMetaBoosts(s);
     return s;
   } catch {
@@ -151,12 +168,27 @@ export function writeSave(s: SaveData): void {
 export function createRun(mapId: string, difficulty: Difficulty, save: SaveData): RunState {
   const map = getMap(mapId);
   const d = map.difficulties[difficulty];
+  const prof = DIFFICULTY_PROFILE[difficulty];
   const level = 1 + (save.metaBoosts.startingLevel ?? 0);
 
+  // Hard-mode turret lock: pick N random non-starter, non-FIREWALL unlocked turrets to lock
+  // out this run. FIREWALL stays available because every run begins with a firewall token;
+  // locking it would make the run unwinnable. Only triggers if the player has enough
+  // unlocked turrets that losing one is a real constraint rather than a death sentence.
+  const lockedTurrets: TowerId[] = [];
+  const lockable = save.unlockedTowers.filter((t) => t !== 'firewall');
+  if (prof.turretLockCount > 0 && lockable.length >= 5) {
+    const shuffled = lockable.slice().sort(() => Math.random() - 0.5);
+    for (let i = 0; i < Math.min(prof.turretLockCount, shuffled.length); i++) {
+      lockedTurrets.push(shuffled[i]);
+    }
+  }
+
   // Starting deploy tokens: always grant 1 Firewall minimum + any meta-boost starters.
-  // Other turrets come via draft (deploy cards for unlocked towers appear in the pool).
+  // Skip tokens for locked turrets — the lockout must be consistent across all sources.
   const tokens: Partial<Record<TowerId, number>> = { firewall: 1 };
   for (const [k, v] of Object.entries(save.metaBoosts.startingDeployTokens ?? {})) {
+    if (lockedTurrets.includes(k as TowerId)) continue;
     tokens[k as TowerId] = (tokens[k as TowerId] ?? 0) + (v as number);
   }
 
@@ -201,15 +233,17 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     showDraft: false,
     draftOptions: [],
     draftSource: 'start',
-    draftRerollsLeft: save.metaBoosts.extraRerolls ?? 0,
+    draftRerollsLeft: (save.metaBoosts.extraRerolls ?? 0) + prof.startingRerolls,
     selection: { kind: 'none' },
     shakeTime: 0,
     shakeAmp: 0,
     timeScale: 1,
+    hitPause: 0,
     elapsed: 0,
     // NEURAL BOOSTER: each startingLevel stack grants an immediate pending level-up so the
     // player actually gets the promised draft options at run start, not when they hit level+2.
     pendingLevelUps: save.metaBoosts.startingLevel ?? 0,
+    lockedTurrets,
     cardsPicked: [],
     autoStartTimer: null,
     puddles: [],

@@ -248,12 +248,22 @@ export function openCardDraft(
     const cardsHtml = s.draftOptions.map((id) => {
       const c = CARDS_BY_ID[id];
       if (!c) return '';
+      // Surface branch commitment: if this card excludes other branches, list their
+      // display names so the player sees what door closes when they pick it.
+      let lockoutHtml = '';
+      if (c.excludes && c.excludes.length > 0) {
+        const names = c.excludes.map((xid) => CARDS_BY_ID[xid]?.name ?? xid).filter(Boolean);
+        if (names.length) {
+          lockoutHtml = `<div class="card-lockout">\u26A0 LOCKS OUT: ${names.join(' / ')}</div>`;
+        }
+      }
       return `<button class="card card-${c.rarity}" data-id="${id}">
         <div class="card-frame">
           <div class="card-rarity">${c.rarity.toUpperCase()}</div>
           <div class="card-name">${c.name}</div>
           <div class="card-sep"></div>
           <div class="card-desc">${c.description}</div>
+          ${lockoutHtml}
           <div class="card-category">${c.category.toUpperCase()}</div>
         </div>
       </button>`;

@@ -713,6 +713,19 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
   font-family: 'Orbitron', sans-serif;
   font-weight: 700;
 }
+.card-lockout {
+  margin-top: 6px;
+  padding: 4px 6px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  color: #ff9933;
+  background: rgba(255, 80, 40, 0.14);
+  border-left: 2px solid #ff9933;
+  text-align: left;
+  line-height: 1.3;
+}
 
 .draft-actions { display: flex; justify-content: center; gap: 12px; margin-top: 10px; }
 .draft-credits {
@@ -2076,4 +2089,110 @@ html, body { overscroll-behavior: none; }
 .htp-section p { font-size: 13px; line-height: 1.6; color: var(--text); margin: 0 0 8px; }
 .htp-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--text); }
 .htp-list li { margin-bottom: 4px; }
+
+/* ═══════════════ LANDSCAPE LAYOUT ═══════════════
+   When the viewport is wider than it is tall (landscape phones + desktop +
+   tablets) we pivot the game screen from column-stacked HUD/canvas/actions
+   to a three-zone row layout: HUD sidebar | canvas | tokens+actions sidebar.
+   The canvas aspect ratio already letterboxes via Math.min(cellW, cellH) so
+   the portrait-shaped maps render centered in the middle zone. Portrait mode
+   (phones held vertically) keeps the current stacked layout untouched. */
+@media (min-aspect-ratio: 1/1) {
+  .game-screen {
+    flex-direction: row;
+  }
+  .hud {
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+    width: 118px;
+    flex-shrink: 0;
+    border-bottom: none;
+    border-right: 1px solid rgba(0, 255, 240, 0.2);
+    padding: 8px 6px;
+    gap: 8px;
+    align-content: start;
+  }
+  .hud-cell { padding: 4px 2px; }
+  .hud-cell .value { font-size: 15px; }
+  .hud-cell .label { font-size: 8px; }
+  .hud-cell.map .value { font-size: 11px; }
+
+  .canvas-wrap { order: 2; flex: 1; min-width: 0; }
+
+  .tokens-bar {
+    order: 3;
+    flex-direction: column;
+    width: 132px;
+    flex-shrink: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-bottom: none;
+    border-left: 1px solid rgba(0, 255, 240, 0.12);
+    max-height: unset;
+  }
+  .token-chip { width: 100%; }
+
+  .action-bar {
+    order: 4;
+    flex-direction: column;
+    width: 118px;
+    flex-shrink: 0;
+    border-top: none;
+    border-left: 1px solid rgba(0, 255, 240, 0.2);
+    padding: 6px;
+    gap: 6px;
+  }
+  .action-btn, .btn-grow { width: 100%; }
+
+  /* Palette becomes a right-edge vertical drawer instead of bottom sheet. */
+  .palette {
+    left: auto;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(360px, 55vw);
+    max-height: 100vh;
+    border-top: none;
+    border-left: 2px solid var(--cyan);
+    box-shadow: -20px 0 40px rgba(0, 0, 0, 0.6), 0 0 40px rgba(0, 255, 240, 0.15);
+  }
+  .palette.open { animation: slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+}
+
+/* Extra breathing room on wide desktop — grow the sidebars rather than the
+   canvas so the map doesn't pixel-bloom to a cartoonish scale. */
+@media (min-aspect-ratio: 1/1) and (min-width: 1100px) {
+  .hud { width: 160px; padding: 12px 10px; }
+  .hud-cell .value { font-size: 18px; }
+  .hud-cell .label { font-size: 9px; }
+  .hud-cell.map .value { font-size: 13px; }
+  .tokens-bar { width: 180px; }
+  .action-bar { width: 150px; padding: 10px; gap: 8px; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+/* Lock orientation behavior is viewport-driven — nothing JS needs to do. But
+   make sure the <html>/<body> never clip when the player rotates between
+   orientations (some browsers preserve scroll state across rotations). */
+html, body { overflow-x: hidden; }
+
+/* Terminal corner brackets — cyan L-shapes at the corners of the playfield.
+   Sell the "you are inside a captured system" frame without adding any DOM
+   chrome inside the canvas. Sized relative to cell so they scale with viewport. */
+.corner-bracket {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  z-index: 5;
+  --cb: var(--cyan);
+}
+.corner-tl { top: 6px;    left: 6px;    border-top:    2px solid var(--cb); border-left:  2px solid var(--cb); }
+.corner-tr { top: 6px;    right: 6px;   border-top:    2px solid var(--cb); border-right: 2px solid var(--cb); }
+.corner-bl { bottom: 6px; left: 6px;    border-bottom: 2px solid var(--cb); border-left:  2px solid var(--cb); }
+.corner-br { bottom: 6px; right: 6px;   border-bottom: 2px solid var(--cb); border-right: 2px solid var(--cb); }
+.canvas-wrap { position: relative; }
 .htp-list b { color: var(--cyan); letter-spacing: 1px; }

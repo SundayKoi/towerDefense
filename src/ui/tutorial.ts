@@ -3,6 +3,7 @@
 import type { SaveData } from '@/types';
 import { mount, type Screen } from './screens';
 import { audio } from '@/audio/sfx';
+import { ACTS } from '@/data/maps';
 
 export interface TutorialTip {
   id: string;
@@ -43,6 +44,40 @@ export function showTutorialIfNew(save: SaveData, persist: () => void, tipId: ke
   save.tutorial.seen.push(tipId);
   persist();
   showTipPopup(TIPS[tipId]);
+}
+
+// Act-briefing modal: fires the first time a player starts any map in a new act.
+// Uses save.tutorial.seen with IDs `act_<n>_brief` so it only shows once per act.
+// Act 1 is skipped on purpose — no modifier, and the first_run tip already covers basics.
+export function showActBriefingIfNew(save: SaveData, persist: () => void, actNum: number): void {
+  if (actNum < 2 || actNum > 7) return;
+  const id = `act_${actNum}_brief`;
+  if (save.tutorial.seen.includes(id)) return;
+  const meta = ACTS.find((a) => a.act === actNum);
+  if (!meta) return;
+  save.tutorial.seen.push(id);
+  persist();
+  showActPopup(meta.act, meta.name, meta.tagline, meta.brief);
+}
+
+function showActPopup(actNum: number, name: string, tagline: string, brief: string): void {
+  const el = document.createElement('div');
+  el.className = 'modal-overlay';
+  el.innerHTML = `
+    <div class="modal tutorial-modal">
+      <div class="tutorial-tag">// ACT ${actNum} // INTRUSION BRIEF</div>
+      <div class="tutorial-title">${name}</div>
+      <div class="tutorial-body">
+        <div style="font-style:italic;opacity:0.8;margin-bottom:0.6em;">${tagline}</div>
+        ${brief}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="act-ok">DEPLOY</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
+  (el.querySelector('#act-ok') as HTMLButtonElement).onclick = () => { audio.play('ui_click'); el.remove(); };
 }
 
 function showTipPopup(tip: TutorialTip): void {

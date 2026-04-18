@@ -9,6 +9,7 @@ import {
   hpScale,
 } from './waves';
 import { audio } from '@/audio/sfx';
+import { haptics } from '@/audio/haptics';
 import { xpForLevel } from './state';
 
 let entityIdSeq = 1;
@@ -66,6 +67,7 @@ export function startWave(s: RunState): void {
   s.spawnElapsed = 0;
   s.phase = 'wave';
   audio.play('wave_start');
+  haptics.fire('wave_start');
 }
 
 export interface EngineEvents {
@@ -162,7 +164,35 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
     shield: maxShield > 0 ? maxShield : undefined,
     maxShield: maxShield > 0 ? maxShield : undefined,
     shieldRegenTimer: maxShield > 0 ? 0 : undefined,
+    // VOIDLORD phase shift: spawn with a random initial immune type. Rotated every
+    // 12s in the per-frame enemy tick (see updateRun). Non-voidlord enemies get no
+    // phase shift fields (undefined).
+    phaseShiftType: defId === 'voidlord' ? randomPhaseType(null) : undefined,
+    phaseShiftTimer: defId === 'voidlord' ? 0 : undefined,
   });
+  // Haptic: boss spawn buzzes with a dread pattern so the player can feel the
+  // wave shift even if the sound is muted.
+  const spawnedIsBoss = isBoss || def.threat === 'BOSS' || def.threat === 'MEGA' || def.threat === 'FINAL';
+  if (spawnedIsBoss) haptics.fire('boss_spawn');
+  // Telegraph VOIDLORD's starting immunity so the player reacts at spawn, not
+  // after the first 12s rotation.
+  if (defId === 'voidlord') {
+    const spawned = s.enemies[s.enemies.length - 1];
+    s.floaters.push({
+      pos: { x: spawned.pos.x, y: spawned.pos.y - 0.5 },
+      text: `IMMUNE: ${(spawned.phaseShiftType ?? 'kinetic').toUpperCase()}`,
+      vy: -0.6, life: 2.4, maxLife: 2.4,
+      color: '#ff3355', size: 16,
+    });
+  }
+}
+
+// Pick a damage type for VOIDLORD phase shift that differs from the current one,
+// so the rotation actually forces a build pivot instead of re-rolling the same immunity.
+const PHASE_TYPES: DamageType[] = ['kinetic', 'energy', 'aoe', 'chain', 'pierce'];
+function randomPhaseType(exclude: DamageType | null): DamageType {
+  const pool = exclude ? PHASE_TYPES.filter((t) => t !== exclude) : PHASE_TYPES;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // ======================= XP / Level =======================
@@ -443,6 +473,15 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
 
   if (s.shakeTime > 0) s.shakeTime = Math.max(0, s.shakeTime - dtSec);
 
+  // Hit-pause: freeze world sim but keep FX ticking so the player sees the
+  // satisfying micro-freeze without losing the death particles/floaters.
+  // Tier durations: 30ms normal, 80ms elite, 200ms boss — set on kill.
+  if (s.hitPause > 0) {
+    s.hitPause = Math.max(0, s.hitPause - dtSec);
+    tickFxOnly(s, dtSec);
+    return;
+  }
+
   // Auto-start countdown
   if (s.phase === 'prep' && s.autoStartTimer !== null) {
     s.autoStartTimer -= dtSec;
@@ -480,6 +519,23 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       if (e.collapseTimer <= 0) {
         e.armor = ENEMIES[e.def].armor ?? 0;
         e.collapseTimer = undefined;
+      }
+    }
+    // VOIDLORD phase shift — rotate the immune damage type every 12s while alive.
+    // Spawns a floater telegraphing the new immune type so the player has a chance
+    // to react rather than being silently punished for the wrong build.
+    if (e.phaseShiftType !== undefined && e.phaseShiftTimer !== undefined) {
+      e.phaseShiftTimer += dtSec;
+      if (e.phaseShiftTimer >= 12) {
+        const next = randomPhaseType(e.phaseShiftType);
+        e.phaseShiftType = next;
+        e.phaseShiftTimer = 0;
+        s.floaters.push({
+          pos: { x: e.pos.x, y: e.pos.y - 0.5 },
+          text: `IMMUNE: ${next.toUpperCase()}`,
+          vy: -0.6, life: 1.8, maxLife: 1.8,
+          color: '#ff3355', size: 14,
+        });
       }
     }
     // ENCRYPTED PAYLOADS: shield regenerates after 2s of no damage.
@@ -561,8 +617,10 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       const dmg = ENEMIES[e.def].damage;
       e.alive = false;
       s.hp -= dmg;
-      s.shakeTime = 0.35;
-      s.shakeAmp = 12;
+      // Take-damage shake tuned per research: moderate 150ms/5px for normal hits.
+      s.shakeTime = Math.max(s.shakeTime, 0.15);
+      s.shakeAmp = Math.max(s.shakeAmp, 5);
+      haptics.fire(dmg >= 3 ? 'take_damage_big' : 'take_damage_small');
       audio.play('damage');
       if (s.hp <= 0) {
         if (s.mods.revive) {
@@ -670,7 +728,15 @@ function tickFxOnly(s: RunState, dtSec: number): void {
   for (let i = s.particles.length - 1; i >= 0; i--) { if (s.particles[i].life <= 0) s.particles.splice(i, 1); }
   for (const f of s.floaters) {
     f.life -= dtSec;
-    f.pos.y += f.vy * dtSec * 0.01;
+    // Physics path: damage numbers arc with gravity + lateral drift.
+    // Status text path (no vx/gravity): flat upward float like before.
+    if (f.gravity !== undefined || f.vx !== undefined) {
+      f.pos.y += (f.vy ?? 0) * dtSec * 0.01;
+      f.pos.x += (f.vx ?? 0) * dtSec * 0.01;
+      if (f.gravity) f.vy = (f.vy ?? 0) + f.gravity * dtSec;
+    } else {
+      f.pos.y += f.vy * dtSec * 0.01;
+    }
   }
   for (let i = s.floaters.length - 1; i >= 0; i--) { if (s.floaters[i].life <= 0) s.floaters.splice(i, 1); }
 }
@@ -2017,6 +2083,10 @@ function findChainTarget(s: RunState, from: EnemyInstance, exclude: Set<number>,
 
 function applyResistanceAndArmor(e: EnemyInstance, raw: number, type: DamageType, isCrit: boolean): number {
   const def = ENEMIES[e.def];
+  // VOIDLORD phase shift — current immune type nullifies damage of that type entirely.
+  // Crits do NOT bypass phase-shift immunity (unlike normal resistances) because the
+  // whole point of the mechanic is to force the player to swap damage types.
+  if (e.phaseShiftType && e.phaseShiftType === type) return 0;
   const resist = def.resistances?.[type];
   let final = raw;
   if (resist != null && !(isCrit && def.critIgnoresResist)) {
@@ -2092,8 +2162,34 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
   e.hp -= final;
   e.hitFlash = isCrit ? 0.25 : 0.18;
   if (source) s.damageDealt[source] = (s.damageDealt[source] ?? 0) + final;
+  // Damage number floater with physics — only for non-silent hits over 1 dmg
+  // so DoT tick spam doesn't flood the screen. Crits are larger, yellow, and
+  // tagged so the renderer can draw them with extra weight.
+  if (!silent && final >= 1) {
+    spawnDamageNumber(s, e.pos.x, e.pos.y - 0.3, Math.round(final), isCrit);
+  }
   if (e.hp <= 0) killEnemy(s, e);
   return final;
+}
+
+function spawnDamageNumber(s: RunState, x: number, y: number, dmg: number, isCrit: boolean): void {
+  // Initial velocity from research: vy -60 to -90 px/s upward, vx ±40 px/s lateral,
+  // gravity 180 px/s². The renderer multiplies pos by 0.01 for world-units mapping,
+  // so these numbers are large — they get normalized at draw time.
+  const vy = -60 - Math.random() * 30;
+  const vx = (Math.random() - 0.5) * 80;
+  s.floaters.push({
+    pos: { x, y },
+    text: String(dmg),
+    vy, vx,
+    gravity: 180,
+    life: 0.7,
+    maxLife: 0.7,
+    color: isCrit ? '#ffd600' : '#ffffff',
+    outline: isCrit ? '#ff6600' : '#000000',
+    size: isCrit ? 22 : 14,
+    isCrit,
+  });
 }
 
 function killEnemy(s: RunState, e: EnemyInstance): void {
@@ -2105,9 +2201,24 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
   s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y }, text: `+${def.xp} XP`, vy: -40, life: 0.9, maxLife: 0.9, color: '#00fff0', size: 14 });
   spawnDeathBurst(s, e.pos, def.color, def.accent, e.isBoss ? 30 : 14);
   audio.play(e.isBoss ? 'boss_die' : 'enemy_die');
+  // Tiered hit-pause on kill for perceived weight. Stacks max (not sum) so a
+  // boss-kill freeze isn't shortened by an adjacent normal kill. Boss kills
+  // also add the bigger shake further down, so the pause reads as ceremony.
+  const pauseDur = e.isBoss ? 0.20 : (def.threat === 'HIGH' || def.threat === 'EXTREME') ? 0.08 : 0.03;
+  s.hitPause = Math.max(s.hitPause, pauseDur);
+  // Kill-shake by tier — max-stack so boss kills keep their ceremony even if a
+  // normal kill lands in the same frame.
   if (e.isBoss) {
-    s.shakeTime = 0.5;
-    s.shakeAmp = 16;
+    s.shakeTime = Math.max(s.shakeTime, 0.45);
+    s.shakeAmp = Math.max(s.shakeAmp, 10);
+  } else if (def.threat === 'HIGH' || def.threat === 'EXTREME') {
+    s.shakeTime = Math.max(s.shakeTime, 0.18);
+    s.shakeAmp = Math.max(s.shakeAmp, 5);
+  } else {
+    s.shakeTime = Math.max(s.shakeTime, 0.10);
+    s.shakeAmp = Math.max(s.shakeAmp, 3);
+  }
+  if (e.isBoss) {
     s.protocolsEarned += 5;
     s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.8 }, text: '+5 \u2b22 PROTOCOL', vy: -35, life: 1.8, maxLife: 1.8, color: '#ffd600', size: 20 });
     // Expanding ring of pixel squares in the enemy's color.
@@ -2358,6 +2469,7 @@ export function placeTower(s: RunState, defId: keyof typeof TOWERS, grid: Vec2):
     targetId: null,
     angle: 0,
     fireFlash: 0,
+    recoil: 0,
     targetMode: defaultTargetMode(defId),
     debuffs: [],
     extras: {},
@@ -2365,6 +2477,7 @@ export function placeTower(s: RunState, defId: keyof typeof TOWERS, grid: Vec2):
   s.towers.push(t);
   computeSubnets(s);
   audio.play('place');
+  haptics.fire('tower_placed');
   return t;
 }
 

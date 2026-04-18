@@ -18,7 +18,10 @@ export default defineConfig({
         theme_color: '#00fff0',
         background_color: '#05060a',
         display: 'fullscreen',
-        orientation: 'portrait',
+        // `any` allows the installed PWA to honor whichever orientation the
+        // user is currently holding the device in, matching the new responsive
+        // landscape/portrait CSS.
+        orientation: 'any',
         start_url: './',
         icons: [
           { src: 'icons/icon-192.svg', sizes: '192x192', type: 'image/svg+xml', purpose: 'any' },

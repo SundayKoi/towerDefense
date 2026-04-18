@@ -68,6 +68,10 @@ export function gameScreen(s: RunState, _save: SaveData): Screen & { handles: ()
 
         <div class="canvas-wrap">
           <canvas id="game-canvas"></canvas>
+          <span class="corner-bracket corner-tl" aria-hidden="true"></span>
+          <span class="corner-bracket corner-tr" aria-hidden="true"></span>
+          <span class="corner-bracket corner-bl" aria-hidden="true"></span>
+          <span class="corner-bracket corner-br" aria-hidden="true"></span>
         </div>
 
         <div class="action-bar">
@@ -189,6 +193,26 @@ export function renderPalette(handles: GameScreenHandles, s: RunState, onPick: (
     }
     btn.addEventListener('pointerdown', (ev) => { audio.play('ui_click'); onPick(id, ev); });
     container.appendChild(btn);
+  }
+  // Hard-mode turret lock: show a disabled chip per locked turret so the player
+  // understands why a familiar tower is unavailable this run.
+  for (const locked of s.lockedTurrets) {
+    const def = TOWERS[locked];
+    if (!def) continue;
+    const chip = document.createElement('div');
+    chip.className = 'tower-card tower-card-locked';
+    chip.style.setProperty('--accent', '#555');
+    chip.style.opacity = '0.45';
+    chip.style.filter = 'grayscale(1)';
+    chip.style.pointerEvents = 'none';
+    chip.innerHTML = `
+      <div class="tower-card-portrait" style="--accent:#555"></div>
+      <div class="tower-card-name">${def.name}</div>
+      <div class="tower-card-stats"><span>LOCKED</span></div>
+      <div class="tower-card-cost">HARD-MODE LOCK</div>
+      <div class="tower-card-desc">Randomly excluded this run.</div>
+    `;
+    container.appendChild(chip);
   }
 }
 

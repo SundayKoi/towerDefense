@@ -10,12 +10,13 @@ const THREAT_COLOR: Record<string, string> = {
 };
 
 const SECTOR_INFO: Record<number, { name: string; modifier: string }> = {
-  1: { name: 'TRAINING SUBNET',     modifier: '' },
-  2: { name: 'CORPORATE BACKBONE',  modifier: 'PACKET BURSTS' },
-  3: { name: 'DEEP CORE',           modifier: 'ENCRYPTED PAYLOADS' },
-  4: { name: 'NEON UNDERGROUND',    modifier: 'STEALTH PROTOCOL' },
-  5: { name: 'VOID NETWORK',        modifier: 'REPLICATION VIRUS' },
+  1: { name: 'SYSTEM BOOT',         modifier: '' },
+  2: { name: 'PACKET STORM',        modifier: 'PACKET BURSTS' },
+  3: { name: 'ENCRYPTED CORE',      modifier: 'ENCRYPTED PAYLOADS' },
+  4: { name: 'STEALTH NET',         modifier: 'STEALTH PROTOCOL' },
+  5: { name: 'VOID SWARM',          modifier: 'REPLICATION VIRUS' },
   6: { name: 'APEX RUIN',           modifier: 'ROOTKIT INTRUSION' },
+  7: { name: 'OMEGA PROTOCOL',      modifier: 'FUSION — ALL MODIFIERS' },
 };
 
 function enemyChip(id: EnemyId): string {
@@ -50,7 +51,10 @@ export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficul
       const prev = campaign[i - 1];
       unlockStatus[campaign[i].id] = !!save.completed[prev.id]?.easy;
     }
-    unlockStatus['survival'] = !!save.completed['mainframe']?.easy;
+    // SURVIVAL.EXE is the post-campaign endless mode. Gate it behind earning
+    // your first prestige star so it functions as an endgame unlock rather
+    // than a distraction from the campaign.
+    unlockStatus['survival'] = (save.prestigeStars ?? 0) >= 1;
 
     // Group by sector. Maps without a sector (survival) go to the end.
     const sectors = new Map<number, MapDef[]>();

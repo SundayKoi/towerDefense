@@ -30,6 +30,9 @@ type SoundId =
 class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  // SFX bus gets its own compressor + gain so the glue/sidechain treatment
+  // doesn't affect music. Per-sound connect() calls use sfxBus instead of master.
+  private sfxBus: GainNode | null = null;
   private enabled = true;
   private musicEnabled = true;
   private musicGain: GainNode | null = null;
@@ -39,6 +42,14 @@ class AudioEngine {
   // Rate-limit buckets: last-play timestamp per sound id. Prevents "wall of
   // explosions" when an artillery shell + cluster + frag all fire on one frame.
   private lastPlay: Record<string, number> = {};
+  // Global voice cap — active count incremented on each play, decremented
+  // after the sound's dur. Sounds exceeding the cap are silently dropped.
+  // Prevents audio sludge at wave 40 with 14 turrets firing simultaneously.
+  private activeVoices = 0;
+  private readonly voiceCap = 24;
+  // Universal retrigger throttle — the same sound can't re-fire within 25ms
+  // of itself (prevents flam / phasing). Per-sound cooldowns override this.
+  private readonly universalThrottle = 0.025;
 
   setEnabled(on: boolean) { this.enabled = on; }
 
@@ -51,8 +62,21 @@ class AudioEngine {
       const master = ctx.createGain();
       master.gain.value = 0.35;
       master.connect(ctx.destination);
+      // SFX chain: sfxBus → compressor → master. The compressor glues stacked
+      // events and prevents peaks clipping the master output on busy frames.
+      // Threshold −18dB / ratio 4:1 / fast attack per research for TD-style mixes.
+      const sfxBus = ctx.createGain();
+      sfxBus.gain.value = 1.0;
+      const sfxComp = ctx.createDynamicsCompressor();
+      sfxComp.threshold.value = -18;
+      sfxComp.ratio.value = 4;
+      sfxComp.attack.value = 0.003;
+      sfxComp.release.value = 0.12;
+      sfxComp.knee.value = 6;
+      sfxBus.connect(sfxComp).connect(master);
       this.ctx = ctx;
       this.master = master;
+      this.sfxBus = sfxBus;
       // Unlock on first gesture
       if (ctx.state === 'suspended') {
         const resume = () => { ctx.resume(); window.removeEventListener('pointerdown', resume); };
@@ -64,20 +88,29 @@ class AudioEngine {
     }
   }
 
+  // Called from each voice helper to reserve a voice slot. Returns false if the
+  // cap is hit and the caller should skip synthesis. The caller is responsible
+  // for releasing the voice via releaseVoice() after its dur.
+  private reserveVoice(dur: number): boolean {
+    if (this.activeVoices >= this.voiceCap) return false;
+    this.activeVoices++;
+    setTimeout(() => { if (this.activeVoices > 0) this.activeVoices--; }, dur * 1000 + 40);
+    return true;
+  }
+
   play(id: string): void {
     if (!this.enabled) return;
     const ctx = this.ensure();
     if (!ctx || !this.master) return;
-    // Rate-limit loud / overlapping sounds so an artillery shell + cluster + frag
-    // + secondary chain hits don't stack into a painful wall of noise.
+    // Throttle: loud/overlapping sounds get longer cooldowns; everything else
+    // uses the universal 25ms retrigger floor. Prevents flam on rapid-fire
+    // turrets and the "wall of noise" when many events land on one frame.
     const cooldowns: Record<string, number> = { explode: 0.10, fire_mine: 0.08, boss_die: 0.2 };
-    const cd = cooldowns[id];
-    if (cd != null) {
-      const now = ctx.currentTime;
-      const last = this.lastPlay[id] ?? -Infinity;
-      if (now - last < cd) return;
-      this.lastPlay[id] = now;
-    }
+    const cd = cooldowns[id] ?? this.universalThrottle;
+    const nowT = ctx.currentTime;
+    const last = this.lastPlay[id] ?? -Infinity;
+    if (nowT - last < cd) return;
+    this.lastPlay[id] = nowT;
     const now = ctx.currentTime;
     switch (id as SoundId) {
       // ---------- UI ----------
@@ -233,6 +266,7 @@ class AudioEngine {
 
   // Same as blip but starts at an explicit time — used to schedule arpeggios from play().
   private scheduleBlip(ctx: AudioContext, freq: number, dur: number, type: OscillatorType, gain: number, startAt: number) {
+    if (!this.reserveVoice(dur)) return;
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = type;
@@ -240,12 +274,13 @@ class AudioEngine {
     g.gain.setValueAtTime(0, startAt);
     g.gain.linearRampToValueAtTime(gain, startAt + 0.005);
     g.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
-    osc.connect(g).connect(this.master!);
+    osc.connect(g).connect(this.sfxBus ?? this.master!);
     osc.start(startAt);
     osc.stop(startAt + dur + 0.02);
   }
 
   private sweep(ctx: AudioContext, fFrom: number, fTo: number, dur: number, type: OscillatorType, gain: number) {
+    if (!this.reserveVoice(dur)) return;
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = type;
@@ -255,12 +290,13 @@ class AudioEngine {
     g.gain.setValueAtTime(0, now);
     g.gain.linearRampToValueAtTime(gain, now + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-    osc.connect(g).connect(this.master!);
+    osc.connect(g).connect(this.sfxBus ?? this.master!);
     osc.start(now);
     osc.stop(now + dur + 0.02);
   }
 
   private noise(ctx: AudioContext, dur: number, gain: number, cutoff: number) {
+    if (!this.reserveVoice(dur)) return;
     const buf = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * dur)), ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
@@ -271,7 +307,7 @@ class AudioEngine {
     filter.frequency.value = cutoff;
     const g = ctx.createGain();
     g.gain.value = gain;
-    src.connect(filter).connect(g).connect(this.master!);
+    src.connect(filter).connect(g).connect(this.sfxBus ?? this.master!);
     src.start();
     src.stop(ctx.currentTime + dur + 0.02);
   }
@@ -279,6 +315,7 @@ class AudioEngine {
   // Bitcrushed-feel noise — narrow bandpass around a low center freq gives that
   // crunchy 8-bit grit. cutoff = bandpass center, Q ≈ 1.2 for a tight band.
   private crushedNoise(ctx: AudioContext, dur: number, gain: number, cutoff: number) {
+    if (!this.reserveVoice(dur)) return;
     const sampleRate = ctx.sampleRate;
     // Quantize the noise source to ~4-bit steps for bitcrush character.
     const steps = 8;
@@ -297,7 +334,7 @@ class AudioEngine {
     bp.Q.value = 1.2;
     const g = ctx.createGain();
     g.gain.value = gain;
-    src.connect(bp).connect(g).connect(this.master!);
+    src.connect(bp).connect(g).connect(this.sfxBus ?? this.master!);
     const now = ctx.currentTime;
     src.start(now);
     src.stop(now + dur + 0.02);
@@ -306,6 +343,7 @@ class AudioEngine {
   // Hi-pass / bandpass noise burst — used for chirp/crunch layers that need
   // airy top-end rather than a low thud.
   private bandNoise(ctx: AudioContext, dur: number, gain: number, cutoff: number, q: number) {
+    if (!this.reserveVoice(dur)) return;
     const buf = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * dur)), ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
@@ -317,7 +355,7 @@ class AudioEngine {
     filter.Q.value = q;
     const g = ctx.createGain();
     g.gain.value = gain;
-    src.connect(filter).connect(g).connect(this.master!);
+    src.connect(filter).connect(g).connect(this.sfxBus ?? this.master!);
     const now = ctx.currentTime;
     src.start(now);
     src.stop(now + dur + 0.02);

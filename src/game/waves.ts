@@ -1,10 +1,27 @@
-import type { EnemyId, MapDef, RunState } from '@/types';
+import type { EnemyId, MapDef, RunState, Difficulty } from '@/types';
+
+// Per-difficulty profile. Difficulty = constraint change, not just stat inflation.
+// Easy   : 4-card draft, +1 starting reroll, gentle enemy gates, soft HP curve.
+// Medium : 3-card draft, 0 bonus rerolls, medium gates, moderate HP curve, composition skew.
+// Hard   : 2-card draft, 0 bonus rerolls, aggressive gates, steep HP curve, random turret lock.
+export interface DifficultyProfile {
+  draftSize: number;               // card options per draft
+  startingRerolls: number;         // rerolls granted on run start (added to shop bonus)
+  phaseThresholds: [number, number]; // fractions of totalWaves when phase2/phase3 pool activates
+  enemyGates: Record<string, number>; // enemy id -> earliest wave index it may appear
+  turretLockCount: number;         // # of random non-FIREWALL turrets locked out at run start
+}
+
+export const DIFFICULTY_PROFILE: Record<Difficulty, DifficultyProfile> = {
+  easy:   { draftSize: 4, startingRerolls: 1, phaseThresholds: [0.34, 0.67], enemyGates: { trojan: 4, rootkit: 8, phantom: 12 }, turretLockCount: 0 },
+  medium: { draftSize: 3, startingRerolls: 0, phaseThresholds: [0.25, 0.55], enemyGates: { trojan: 3, rootkit: 6, phantom: 9  }, turretLockCount: 0 },
+  hard:   { draftSize: 2, startingRerolls: 0, phaseThresholds: [0.18, 0.42], enemyGates: { trojan: 2, rootkit: 4, phantom: 6  }, turretLockCount: 1 },
+};
 
 // Compute number of enemies for a given wave.
-export function waveCount(wave: number, difficulty: 'easy' | 'medium' | 'hard' = 'medium'): number {
+export function waveCount(wave: number, difficulty: Difficulty = 'medium'): number {
   if (wave === 1) return 4;
-  // Per-difficulty caps so easy doesn't pile 25 enemies/wave on a player with
-  // limited turret variety. Hard keeps the original 25-cap density.
+  // Per-difficulty caps keep easy from flooding a player with limited turret variety.
   const cap = { easy: 18, medium: 22, hard: 25 }[difficulty];
   return Math.max(5, Math.min(cap, 5 + Math.floor(wave * 1.1)));
 }
@@ -25,18 +42,18 @@ export function waveBonus(wave: number): number {
   return 20 + wave * 4;
 }
 
-// HP scale per wave based on difficulty.
-// Easy was 0.22 (wave 20 ≈ 5.2× HP) which outpaced 2-tower starter loadouts.
-// Now: easy 0.15 (wave 20 ≈ 3.85×), medium 0.24, hard 0.32.
-export function hpScale(wave: number, difficulty: 'easy' | 'medium' | 'hard'): number {
-  const p = { easy: 0.15, medium: 0.24, hard: 0.32 }[difficulty];
+// HP scale per wave, softened across all tiers after the difficulty rebuild.
+// Old easy (+15%/wave) hit 3.85× at wave 20; new easy (+10%/wave) hits 2.9× — winnable with a
+// starter loadout. Medium/hard stay noticeably steeper so difficulty tiers feel distinct.
+export function hpScale(wave: number, difficulty: Difficulty): number {
+  const p = { easy: 0.10, medium: 0.17, hard: 0.24 }[difficulty];
   return 1 + (wave - 1) * p;
 }
 
-// Speed scale per wave.
-export function speedScale(wave: number, difficulty: 'easy' | 'medium' | 'hard'): number {
+// Speed scale per wave — kept mild across all tiers; large speed swings feel unfair.
+export function speedScale(wave: number, difficulty: Difficulty): number {
   const p = { easy: 0.02, medium: 0.04, hard: 0.06 }[difficulty];
-  return 1 + (wave - 1) * p * 0.05; // Mild per-wave growth
+  return 1 + (wave - 1) * p * 0.05;
 }
 
 // Boss HP formula (§9.3)
@@ -45,7 +62,7 @@ export function bossHpMult(wave: number): number {
 }
 
 // Determine if this wave has a boss.
-export function bossForWave(map: MapDef, difficulty: 'easy' | 'medium' | 'hard', wave: number): EnemyId | null {
+export function bossForWave(map: MapDef, difficulty: Difficulty, wave: number): EnemyId | null {
   const map_bosses = map.bosses[difficulty];
   return (map_bosses[wave] as EnemyId | undefined) ?? null;
 }
@@ -55,19 +72,19 @@ export function isMiniBossWave(wave: number): boolean {
   return wave > 0 && wave % 10 === 5;
 }
 
-// Pick an enemy from the map's appropriate phase pool.
-function pickEnemyForWave(map: MapDef, wave: number, total: number, rng: () => number): EnemyId {
+// Pick an enemy from the map's appropriate phase pool, factoring in difficulty composition
+// bias (hard hits phase2/phase3 earlier) and per-difficulty enemy-availability gates.
+function pickEnemyForWave(map: MapDef, difficulty: Difficulty, wave: number, total: number, rng: () => number): EnemyId {
+  const prof = DIFFICULTY_PROFILE[difficulty];
   const progress = wave / total;
   let pool: EnemyId[];
-  if (progress < 0.34) pool = map.enemyPool.phase1;
-  else if (progress < 0.67) pool = map.enemyPool.phase2;
+  if (progress < prof.phaseThresholds[0]) pool = map.enemyPool.phase1;
+  else if (progress < prof.phaseThresholds[1]) pool = map.enemyPool.phase2;
   else pool = map.enemyPool.phase3;
 
-  // Enforce progression ramps per spec §6.3
   pool = pool.filter((e) => {
-    if (e === 'trojan' && wave < 4) return false;
-    if (e === 'rootkit' && wave < 8) return false;
-    if (e === 'phantom' && wave < 12) return false;
+    const gate = prof.enemyGates[e as string];
+    if (gate !== undefined && wave < gate) return false;
     return true;
   });
   if (pool.length === 0) pool = ['worm'];
@@ -75,7 +92,7 @@ function pickEnemyForWave(map: MapDef, wave: number, total: number, rng: () => n
 }
 
 // Build the spawn queue for a wave.
-export function buildWaveSpawnQueue(map: MapDef, difficulty: 'easy' | 'medium' | 'hard', wave: number, totalWaves: number): RunState['spawnQueue'] {
+export function buildWaveSpawnQueue(map: MapDef, difficulty: Difficulty, wave: number, totalWaves: number): RunState['spawnQueue'] {
   const rng = Math.random;
   const count = waveCount(wave, difficulty);
   const delay = spawnDelay(wave);
@@ -102,7 +119,7 @@ export function buildWaveSpawnQueue(map: MapDef, difficulty: 'easy' | 'medium' |
     // Boss waves: minion softener (40% of count) + 1 boss
     const softener = Math.max(3, Math.floor(count * 0.4));
     for (let i = 0; i < softener; i++) {
-      const e = { def: pickEnemyForWave(map, wave, totalWaves, rng), pathIndex: Math.floor(rng() * map.paths.length), delay: i === 0 ? 0.5 : delay * 0.9 };
+      const e = { def: pickEnemyForWave(map, difficulty, wave, totalWaves, rng), pathIndex: Math.floor(rng() * map.paths.length), delay: i === 0 ? 0.5 : delay * 0.9 };
       queue.push(e);
       maybeBurst(e);
     }
@@ -115,7 +132,7 @@ export function buildWaveSpawnQueue(map: MapDef, difficulty: 'easy' | 'medium' |
   if (isMiniBossWave(wave)) {
     const softener = Math.max(3, Math.floor(count * 0.5));
     for (let i = 0; i < softener; i++) {
-      const e = { def: pickEnemyForWave(map, wave, totalWaves, rng), pathIndex: Math.floor(rng() * map.paths.length), delay: i === 0 ? 0.4 : delay };
+      const e = { def: pickEnemyForWave(map, difficulty, wave, totalWaves, rng), pathIndex: Math.floor(rng() * map.paths.length), delay: i === 0 ? 0.4 : delay };
       queue.push(e);
       maybeBurst(e);
     }
@@ -125,7 +142,7 @@ export function buildWaveSpawnQueue(map: MapDef, difficulty: 'easy' | 'medium' |
 
   // Normal wave
   for (let i = 0; i < count; i++) {
-    const e = { def: pickEnemyForWave(map, wave, totalWaves, rng), pathIndex: Math.floor(rng() * map.paths.length), delay: i === 0 ? 0.5 : delay };
+    const e = { def: pickEnemyForWave(map, difficulty, wave, totalWaves, rng), pathIndex: Math.floor(rng() * map.paths.length), delay: i === 0 ? 0.5 : delay };
     queue.push(e);
     maybeBurst(e);
   }
