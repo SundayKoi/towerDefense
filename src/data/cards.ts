@@ -137,7 +137,7 @@ const DEPLOY: CardDef[] = [
     rarity: 'rare',
     category: 'deploy',
     towerHint: 'data_miner',
-    description: 'Gain a DATA MINER token. Passive XP generator — +3 XP/sec while deployed.',
+    description: 'Gain a DATA MINER token. Passive XP generator — +3 XP/sec during waves.',
     apply: (s) => { addToken(s, 'data_miner', 1); },
   },
 ];

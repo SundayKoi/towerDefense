@@ -519,15 +519,17 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       continue;
     }
     if (t.def === 'data_miner') {
-      // Passive XP generation. Base 3/s; +5/s with THROUGHPUT; +5/s additional with RECURSIVE.
-      // Doubled during waves with UPLINK.
-      let rate = hasEffect(s, 'data_miner', 'throughput') ? 8 : 3;
-      if (hasEffect(s, 'data_miner', 'recursive')) rate += 5;
-      if (s.phase === 'wave' && hasEffect(s, 'data_miner', 'uplink')) rate *= 2;
-      grantXp(s, rate * dtSec);
-      // gentle pulse flash
-      t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
-      if (t.extras.flashTimer <= 0) { t.extras.flashTimer = 1.2; t.fireFlash = 0.18; }
+      // Passive XP generation — ONLY during active waves, not prep/pause/draft.
+      // Base 3/s; +5/s with THROUGHPUT; +5/s additional with RECURSIVE. Doubled with UPLINK.
+      if (s.phase === 'wave') {
+        let rate = hasEffect(s, 'data_miner', 'throughput') ? 8 : 3;
+        if (hasEffect(s, 'data_miner', 'recursive')) rate += 5;
+        if (hasEffect(s, 'data_miner', 'uplink')) rate *= 2;
+        grantXp(s, rate * dtSec);
+        // Pulse flash only while mining
+        t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
+        if (t.extras.flashTimer <= 0) { t.extras.flashTimer = 1.2; t.fireFlash = 0.18; }
+      }
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
       continue;
     }
