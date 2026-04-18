@@ -5,6 +5,7 @@ import type { EnemyDef, EnemyId } from '@/types';
 export const ENEMIES: Record<EnemyId, EnemyDef> = {
   worm: {
     id: 'worm',
+    spriteAngleOffset: Math.PI / 2,
     name: 'WORM',
     threat: 'LOW',
     hp: 28,
@@ -54,6 +55,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   rootkit: {
     id: 'rootkit',
+    spriteAngleOffset: Math.PI / 2,
     name: 'ROOTKIT',
     threat: 'HIGH',
     hp: 180,
@@ -104,6 +106,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   leech: {
     id: 'leech',
+    spriteAngleOffset: Math.PI / 2,
     name: 'LEECH',
     threat: 'MEDIUM',
     hp: 40,
@@ -188,6 +191,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   leviathan: {
     id: 'leviathan',
+    spriteAngleOffset: Math.PI / 2,
     name: 'LEVIATHAN',
     threat: 'MEGA',
     hp: 1800,
@@ -243,6 +247,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   corruptor: {
     id: 'corruptor',
+    spriteAngleOffset: Math.PI / 2,
     name: 'CORRUPTOR',
     threat: 'MEGA',
     hp: 2200,
@@ -260,6 +265,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   glitch: {
     id: 'glitch',
+    spriteAngleOffset: Math.PI / 2,
     name: 'GLITCH',
     threat: 'MEDIUM',
     hp: 55,
