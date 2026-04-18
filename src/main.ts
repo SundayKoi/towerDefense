@@ -13,6 +13,7 @@ import { openBuildStats, openCardDraft, openEnemyIntel, openGameOver, openPauseM
 import { openShopScreen } from '@/ui/shop';
 import { mount } from '@/ui/screens';
 import { audio } from '@/audio/sfx';
+import { addToAllPeriods } from '@/data/contracts';
 import type { Difficulty, EnemyId, RunState, SaveData, TowerId } from '@/types';
 import { ENEMIES } from '@/data/enemies';
 import { getMap, isSurvival } from '@/data/maps';
@@ -426,6 +427,7 @@ function openLevelUpDraft() {
         c.apply(r);
         if (c.rarity === 'legendary') {
           save.stats.legendaryDrafts = (save.stats.legendaryDrafts ?? 0) + 1;
+          r.legendariesThisRun += 1;
           writeSave(save);
         }
       }
@@ -453,6 +455,35 @@ function finishRun(victory: boolean) {
   save.stats.totalWins += victory ? 1 : 0;
   save.protocols += run.protocolsEarned;
   save.stats.totalProtocolsEarned += run.protocolsEarned;
+  save.stats.totalKills = (save.stats.totalKills ?? 0) + run.killsThisRun;
+  save.stats.bossKills = (save.stats.bossKills ?? 0) + run.bossKillsThisRun;
+  save.stats.totalXpEarned = (save.stats.totalXpEarned ?? 0) + run.xpThisRun;
+  if (isSurvival(run.mapId) && run.wave > (save.stats.survivalBestWave ?? 0)) {
+    save.stats.survivalBestWave = run.wave;
+  }
+
+  // Update per-period contract stats for daily/weekly/monthly
+  {
+    const r = run;
+    const mediumWin = victory && r.difficulty === 'medium';
+    const hardWin = victory && r.difficulty === 'hard';
+    const towersThisRun = Array.from(new Set(r.towers.map((t) => t.def)));
+    addToAllPeriods(save, (ps) => {
+      ps.runs += 1;
+      if (victory) ps.wins += 1;
+      if (mediumWin) ps.mediumWins += 1;
+      if (hardWin) ps.hardWins += 1;
+      ps.kills += r.killsThisRun;
+      ps.bossKills += r.bossKillsThisRun;
+      ps.wavesCleared += r.wave;
+      ps.protocolsEarned += r.protocolsEarned;
+      ps.xpEarned += r.xpThisRun;
+      ps.legendaryDrafts += r.legendariesThisRun;
+      for (const tid of towersThisRun) {
+        if (!ps.uniqueTowersDeployed.includes(tid)) ps.uniqueTowersDeployed.push(tid);
+      }
+    });
+  }
   const unlocks: { kind: 'tower' | 'card'; id: string; name: string; rarity?: string }[] = [];
   if (victory) {
     const c = (save.completed[run.mapId] ?? {});

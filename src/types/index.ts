@@ -242,6 +242,20 @@ export interface FloatingText {
 
 // ---------- Save / meta ----------
 
+export interface PeriodStats {
+  runs: number;
+  wins: number;
+  mediumWins: number;
+  hardWins: number;
+  kills: number;
+  bossKills: number;
+  wavesCleared: number;
+  protocolsEarned: number;
+  xpEarned: number;
+  legendaryDrafts: number;
+  uniqueTowersDeployed: string[];  // track tower IDs deployed this period
+}
+
 export interface ShopUpgradeDef {
   id: string;
   name: string;
@@ -285,6 +299,11 @@ export interface SaveData {
   shopPurchased: Record<string, number>;    // upgradeId -> stack count
   metaBoosts: MetaBoosts;                   // derived from shop, cached for quick apply
   quests: { completed: string[] };          // quest IDs claimed
+  contracts: {
+    daily:   { period: string; offered: string[]; claimed: string[]; stats: PeriodStats };
+    weekly:  { period: string; offered: string[]; claimed: string[]; stats: PeriodStats };
+    monthly: { period: string; offered: string[]; claimed: string[]; stats: PeriodStats };
+  };
   stats: {
     totalRuns: number;
     totalWins: number;
@@ -376,4 +395,9 @@ export interface RunState {
   damageDealt: Partial<Record<TowerId, number>>;
   // Enemy types encountered this run (for intro popups)
   seenThisRun: Set<EnemyId>;
+  // Run-scoped counters for contracts / period stats
+  killsThisRun: number;
+  bossKillsThisRun: number;
+  xpThisRun: number;
+  legendariesThisRun: number;
 }

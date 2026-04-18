@@ -1602,6 +1602,18 @@ html, body { overscroll-behavior: none; }
 }
 
 /* ===== Contracts / Quests ===== */
+.contract-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 18px;
+}
+.contract-countdown {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--yellow);
+}
 .quest-grid {
   display: flex;
   flex-direction: column;

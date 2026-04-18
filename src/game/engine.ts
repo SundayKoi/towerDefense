@@ -108,6 +108,7 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
 function grantXp(s: RunState, amount: number): void {
   const gain = Math.round(amount * s.mods.xpMult);
   s.xp += gain;
+  s.xpThisRun += gain;
   while (s.xp >= s.xpToNext) {
     s.xp -= s.xpToNext;
     s.level += 1;
@@ -1530,6 +1531,8 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
 function killEnemy(s: RunState, e: EnemyInstance): void {
   e.alive = false;
   const def = ENEMIES[e.def];
+  s.killsThisRun += 1;
+  if (e.isBoss) s.bossKillsThisRun += 1;
   grantXp(s, def.xp);
   s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y }, text: `+${def.xp} XP`, vy: -40, life: 0.9, maxLife: 0.9, color: '#00fff0', size: 14 });
   spawnDeathBurst(s, e.pos, def.color, def.accent, e.isBoss ? 30 : 14);

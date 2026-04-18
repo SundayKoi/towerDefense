@@ -2,6 +2,7 @@ import type { Difficulty, RunState, SaveData, TowerId } from '@/types';
 import { getMap } from '@/data/maps';
 import { STARTING_UNLOCKED_CARDS } from '@/data/cards';
 import { recomputeMetaBoosts } from '@/data/shop';
+import { emptyPeriodStats } from '@/data/contracts';
 
 export const SAVE_KEY = 'netrunner_meta_v1';
 
@@ -39,6 +40,11 @@ export function defaultSave(): SaveData {
       bossProtocolBonus: 0,
     },
     quests: { completed: [] },
+    contracts: {
+      daily:   { period: '', offered: [], claimed: [], stats: emptyPeriodStats() },
+      weekly:  { period: '', offered: [], claimed: [], stats: emptyPeriodStats() },
+      monthly: { period: '', offered: [], claimed: [], stats: emptyPeriodStats() },
+    },
     stats: {
       totalRuns: 0,
       totalWins: 0,
@@ -68,6 +74,7 @@ export function loadSave(): SaveData {
       metaBoosts: { ...d.metaBoosts, ...(parsed.metaBoosts ?? {}) },
       shopPurchased: parsed.shopPurchased ?? {},
       quests: parsed.quests ?? { completed: [] },
+      contracts: parsed.contracts ?? d.contracts,
       stats: { ...d.stats, ...(parsed.stats ?? {}) },
       settings: { ...d.settings, ...(parsed.settings ?? {}) },
     };
@@ -152,12 +159,18 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     shakeAmp: 0,
     timeScale: 1,
     elapsed: 0,
-    pendingLevelUps: 0,
+    // NEURAL BOOSTER: each startingLevel stack grants an immediate pending level-up so the
+    // player actually gets the promised draft options at run start, not when they hit level+2.
+    pendingLevelUps: save.metaBoosts.startingLevel ?? 0,
     cardsPicked: [],
     autoStartTimer: null,
     puddles: [],
     towerEffects: {},
     damageDealt: {},
     seenThisRun: new Set(),
+    killsThisRun: 0,
+    bossKillsThisRun: 0,
+    xpThisRun: 0,
+    legendariesThisRun: 0,
   };
 }
