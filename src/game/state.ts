@@ -20,7 +20,7 @@ export function xpForLevel(level: number): number {
 
 export function defaultSave(): SaveData {
   return {
-    version: 3,
+    version: 4,
     completed: {},
     unlockedCards: STARTING_UNLOCKED_CARDS.slice(),
     // Three starter turrets — firewall (kinetic frontline), honeypot (slow + goo),
@@ -71,7 +71,9 @@ export function defaultSave(): SaveData {
       towersEverDeployed: [],
       legendaryDrafts: 0,
     },
-    settings: { sfx: true, music: true, particleQuality: 'high', speed: 1, pixelMode: false, pixelFactor: 3 },
+    // Pixel mode on at 2× factor is the intended look — chunky pixels without
+    // over-blurring. Players can still toggle it off in SETTINGS.
+    settings: { sfx: true, music: true, particleQuality: 'high', speed: 1, pixelMode: true, pixelFactor: 2 },
   };
 }
 
@@ -127,6 +129,13 @@ export function loadSave(): SaveData {
         return true;
       });
       s.version = 3;
+    }
+    // v3 → v4: flip pixel mode on at 2× factor as the new default look. Only
+    // touches the pixel settings; audio/speed/particleQuality are preserved.
+    if ((parsed.version ?? 0) < 4) {
+      s.settings.pixelMode = true;
+      s.settings.pixelFactor = 2;
+      s.version = 4;
     }
     recomputeMetaBoosts(s);
     return s;
