@@ -1349,19 +1349,19 @@ export const CARDS: CardDef[] = [
 
 export const CARDS_BY_ID: Record<string, CardDef> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 
-// Fresh-save unlocks. Three starter towers (firewall + honeypot + booster_node) plus
+// Fresh-save unlocks. Three starter towers (firewall + honeypot + antivirus) plus
 // their common/rare upgrades — every other tower and its upgrade cards are earned
 // through map clears (see maps.ts rewards and finishRun() which auto-unlocks a tower's
 // common/rare upgrades on unlock).
 export const STARTING_UNLOCKED_CARDS = [
   'deploy_firewall',
   'deploy_honeypot',
-  'deploy_booster_node',
+  'deploy_antivirus',
   // Common/rare upgrades for the three starter towers (no synergies — those are earned later)
   ...UPGRADE.filter((c) =>
     (c.rarity === 'common' || c.rarity === 'rare') &&
     !c.towerHint2 &&
-    (c.towerHint === 'firewall' || c.towerHint === 'honeypot' || c.towerHint === 'booster_node')
+    (c.towerHint === 'firewall' || c.towerHint === 'honeypot' || c.towerHint === 'antivirus')
   ).map((c) => c.id),
   // Non-legendary heals always available
   ...HEAL.filter((c) => c.rarity !== 'legendary').map((c) => c.id),

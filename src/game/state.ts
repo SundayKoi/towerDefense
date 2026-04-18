@@ -23,11 +23,10 @@ export function defaultSave(): SaveData {
     version: 3,
     completed: {},
     unlockedCards: STARTING_UNLOCKED_CARDS.slice(),
-    // Three starter towers — firewall (damage), honeypot (slow + puddles),
-    // booster_node (passive aura buff). Booster amplifies the two damage turrets
-    // without taking up an attack slot, helping the early game survive without
-    // requiring deep card draws.
-    unlockedTowers: ['firewall', 'honeypot', 'booster_node'],
+    // Three starter turrets — firewall (kinetic frontline), honeypot (slow + goo),
+    // antivirus (long-range pierce sniper). Gives the player a proper damage-dealer
+    // trio from wave 1. BOOSTER NODE moves to the Map 1 easy reward slot.
+    unlockedTowers: ['firewall', 'honeypot', 'antivirus'],
     seenEnemies: [],
     challengesCompleted: [],
     protocols: 0,
