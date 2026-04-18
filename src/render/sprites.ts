@@ -3,6 +3,12 @@
 // at 128px for caching; the renderer scales as needed.
 
 import type { EnemyId, TowerId } from '@/types';
+import {
+  loadSpriteSheet,
+  getSheetTowerSprite,
+  getSheetEnemySprite,
+  getSheetDataUrl,
+} from './spriteSheetLoader';
 
 const SIZE = 128;
 
@@ -1607,6 +1613,9 @@ export function preloadSprites(): Promise<void> {
   for (const id of Object.keys(enemySVG) as EnemyId[]) {
     loads.push(rasterize(enemySVG[id]()).then((canvas) => { enemySprites.set(id, canvas); }));
   }
+  // Also load the indexed PNG spritesheet — when available, getTowerSprite /
+  // getEnemySprite below prefer it over the procedural SVG.
+  loads.push(loadSpriteSheet());
   return Promise.all(loads).then(() => undefined);
 }
 
@@ -1638,6 +1647,16 @@ function rasterize(svg: string): Promise<HTMLCanvasElement> {
   });
 }
 
-export function getTowerSprite(id: TowerId): HTMLCanvasElement | undefined { return towerSprites.get(id); }
-export function getEnemySprite(id: EnemyId): HTMLCanvasElement | undefined { return enemySprites.get(id); }
-export function getTowerDataUrl(id: TowerId): string | undefined { return towerDataUrls.get(id); }
+// Prefer the indexed PNG spritesheet when it has a frame for this id, fall back
+// to the procedural SVG cache otherwise. The sheet is loaded once at boot via
+// preloadSprites; until it resolves, getSheet*Sprite returns undefined and the
+// caller transparently gets the SVG fallback.
+export function getTowerSprite(id: TowerId): HTMLCanvasElement | undefined {
+  return getSheetTowerSprite(id) ?? towerSprites.get(id);
+}
+export function getEnemySprite(id: EnemyId): HTMLCanvasElement | undefined {
+  return getSheetEnemySprite(id) ?? enemySprites.get(id);
+}
+export function getTowerDataUrl(id: TowerId): string | undefined {
+  return getSheetDataUrl(id) ?? towerDataUrls.get(id);
+}
