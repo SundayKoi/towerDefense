@@ -874,6 +874,47 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
   100% { width: 0%; }
 }
 
+/* ------------- Letter-by-letter reveal + scanline sweep ------------- */
+
+/* Each letter span fades+drops in, with an offset animation-delay set inline. */
+.reveal-char {
+  display: inline-block;
+  opacity: 0;
+  animation: letter-reveal 0.12s forwards;
+  /* Inherit the gradient-clipped fill from .wb-big so spans don't go invisible. */
+  background: inherit;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@keyframes letter-reveal {
+  0%   { opacity: 0; transform: translateY(-4px); filter: blur(2px); }
+  100% { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+
+/* Scanline sweep — a bright vertical streak slides across the banner once. */
+.wave-banner, .enemy-intro-banner { position: fixed; overflow: hidden; }
+.wave-banner::after, .enemy-intro-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.08) 48%,
+    rgba(255,255,255,0.25) 50%,
+    rgba(255,255,255,0.08) 52%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: scanline-sweep 1.2s ease-in-out forwards;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+@keyframes scanline-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
 /* ------------- Boss incoming indicator ------------- */
 
 .boss-incoming {

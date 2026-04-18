@@ -15,6 +15,7 @@ type SoundId =
   | 'fire_chain'
   | 'fire_railgun'
   | 'fire_mine'
+  | 'fire_pulse'
   | 'enemy_die'
   | 'boss_die'
   | 'damage'
@@ -77,50 +78,171 @@ class AudioEngine {
       if (now - last < cd) return;
       this.lastPlay[id] = now;
     }
+    const now = ctx.currentTime;
     switch (id as SoundId) {
-      case 'ui_click':      this.blip(ctx, 440, 0.04, 'square', 0.15); break;
-      case 'ui_hover':      this.blip(ctx, 780, 0.02, 'sine', 0.08); break;
-      case 'place':         this.sweep(ctx, 200, 600, 0.12, 'sawtooth', 0.15); break;
-      case 'sell':          this.sweep(ctx, 600, 200, 0.15, 'square', 0.15); break;
-      case 'upgrade':       this.chord(ctx, [400, 600, 800], 0.25, 'triangle', 0.15); break;
-      case 'wave_start':    this.sweep(ctx, 120, 500, 0.6, 'sawtooth', 0.2); this.noise(ctx, 0.4, 0.1, 400); break;
-      case 'fire_firewall': this.blip(ctx, 880 + Math.random()*80, 0.05, 'square', 0.08); break;
-      case 'fire_honeypot': this.blip(ctx, 520, 0.06, 'sine', 0.07); break;
-      case 'fire_antivirus':this.sweep(ctx, 1200, 400, 0.12, 'sawtooth', 0.13); break;
-      case 'fire_quantum':  this.blip(ctx, 660 + Math.random()*120, 0.05, 'triangle', 0.1); break;
-      case 'fire_ice':      this.noise(ctx, 0.15, 0.22, 800); break;
-      case 'fire_chain':    this.sweep(ctx, 2000, 1000, 0.06, 'sawtooth', 0.12); break;
-      case 'fire_railgun':  this.sweep(ctx, 2200, 200, 0.25, 'sawtooth', 0.22); this.noise(ctx, 0.2, 0.12, 300); break;
-      // Artillery cannon report — soft muffled thud, not the high-pitched square blip.
-      case 'fire_mine':     this.sweep(ctx, 140, 50, 0.18, 'triangle', 0.09); this.noise(ctx, 0.08, 0.05, 180); break;
-      case 'enemy_die':     this.noise(ctx, 0.08, 0.12, 600); this.blip(ctx, 180, 0.08, 'square', 0.1); break;
-      case 'boss_die':      this.sweep(ctx, 400, 40, 1.2, 'sawtooth', 0.3); this.noise(ctx, 0.6, 0.3, 300); break;
-      case 'damage':        this.sweep(ctx, 180, 60, 0.3, 'square', 0.25); break;
-      // Explosion thud — low-pass noise + gentle triangle sweep. Was a sawtooth sweep
-      // at 0.2 gain (piercing). Now triangle at 0.08 with noise at 0.06.
-      case 'explode':       this.noise(ctx, 0.28, 0.06, 150); this.sweep(ctx, 180, 55, 0.22, 'triangle', 0.08); break;
-      case 'mine':          this.noise(ctx, 0.3, 0.25, 150); break;
-      case 'card_reveal':   this.chord(ctx, [523, 659], 0.15, 'triangle', 0.12); break;
-      case 'card_legendary':this.chord(ctx, [523, 659, 784, 988], 0.6, 'triangle', 0.18); break;
-      case 'victory':       this.chord(ctx, [523, 659, 784], 0.8, 'triangle', 0.2); break;
-      case 'gameover':      this.sweep(ctx, 400, 80, 1.2, 'sawtooth', 0.22); break;
-      case 'revive':        this.sweep(ctx, 200, 900, 0.5, 'triangle', 0.2); break;
+      // ---------- UI ----------
+      case 'ui_click':
+        this.blip(ctx, 520, 0.03, 'square', 0.16);
+        break;
+      case 'ui_hover':
+        this.blip(ctx, 960, 0.015, 'triangle', 0.05);
+        break;
+      case 'place':
+        // Two-step square arpeggio 220 → 440, 0.08s total
+        this.blip(ctx, 220, 0.04, 'square', 0.14);
+        this.scheduleBlip(ctx, 440, 0.04, 'square', 0.14, now + 0.04);
+        break;
+      case 'sell':
+        // Descending triangle sweep 440 → 110
+        this.sweep(ctx, 440, 110, 0.12, 'triangle', 0.16);
+        break;
+      case 'upgrade':
+        // 3-note square arpeggio 440 → 660 → 880, fast 0.18s total
+        this.blip(ctx, 440, 0.06, 'square', 0.14);
+        this.scheduleBlip(ctx, 660, 0.06, 'square', 0.14, now + 0.06);
+        this.scheduleBlip(ctx, 880, 0.06, 'square', 0.15, now + 0.12);
+        break;
+      case 'wave_start':
+        // Low square pulse 80 → 200 + bitcrushed noise burst, 0.35s
+        this.sweep(ctx, 80, 200, 0.35, 'square', 0.22);
+        this.crushedNoise(ctx, 0.25, 0.1, 600);
+        break;
+
+      // ---------- Tower fire ----------
+      case 'fire_firewall':
+        // Kinetic thump — low square 200 Hz 0.04s + quick noise tick
+        this.blip(ctx, 200, 0.04, 'square', 0.14);
+        this.noise(ctx, 0.025, 0.08, 1800);
+        break;
+      case 'fire_honeypot':
+        // Gooey slap — sine at 380 Hz 0.05 s with short rising pitch
+        this.sweep(ctx, 320, 480, 0.05, 'sine', 0.14);
+        break;
+      case 'fire_antivirus':
+        // Laser zap — square sweep 1800 → 600, 0.06s
+        this.sweep(ctx, 1800, 600, 0.06, 'square', 0.12);
+        break;
+      case 'fire_quantum':
+        // Crystalline chirp — detuned triangle 660 + 680, 0.04s
+        this.blip(ctx, 660, 0.04, 'triangle', 0.09);
+        this.blip(ctx, 680, 0.04, 'triangle', 0.09);
+        break;
+      case 'fire_ice':
+        // Crunch — short hi-pass noise 0.08s + low triangle thump
+        this.bandNoise(ctx, 0.08, 0.1, 3200, 0.8);
+        this.blip(ctx, 120, 0.06, 'triangle', 0.12);
+        break;
+      case 'fire_chain':
+        // Zap — fast square sweep 2200 → 1100, 0.03s + tiny noise tick
+        this.sweep(ctx, 2200, 1100, 0.03, 'square', 0.11);
+        this.noise(ctx, 0.02, 0.05, 2200);
+        break;
+      case 'fire_railgun':
+        // Big sci-fi cannon — square sweep 2400 → 200, 0.22 s + crunchy noise 0.15 s
+        this.sweep(ctx, 2400, 200, 0.22, 'square', 0.2);
+        this.crushedNoise(ctx, 0.15, 0.12, 500);
+        this.blip(ctx, 80, 0.1, 'triangle', 0.18);
+        break;
+      case 'fire_mine':
+        // Artillery boom — low triangle sweep 160 → 50 + low-pass noise 0.1s
+        this.sweep(ctx, 160, 50, 0.22, 'triangle', 0.14);
+        this.noise(ctx, 0.1, 0.09, 220);
+        break;
+      case 'fire_pulse':
+        // EMP wub — dual square 180 + 240 detuned, 0.08s, with a downsweep
+        this.blip(ctx, 180, 0.08, 'square', 0.1);
+        this.blip(ctx, 240, 0.08, 'square', 0.09);
+        this.sweep(ctx, 320, 120, 0.12, 'triangle', 0.1);
+        break;
+
+      // ---------- Combat feedback ----------
+      case 'enemy_die':
+        // "Destroy" stinger — short square thump 120 Hz + hi noise tick
+        this.blip(ctx, 120, 0.07, 'square', 0.13);
+        this.bandNoise(ctx, 0.05, 0.08, 4200, 1.0);
+        break;
+      case 'boss_die':
+        // Big descent — square sweep 440 → 40 0.6s + thicker noise 0.3s + lowest octave drop
+        this.sweep(ctx, 440, 40, 0.6, 'square', 0.24);
+        this.crushedNoise(ctx, 0.3, 0.18, 400);
+        this.sweep(ctx, 110, 30, 0.8, 'triangle', 0.2);
+        break;
+      case 'damage':
+        // Player-hit sting — bitcrushed low noise 0.15s + square thump 100 Hz
+        this.crushedNoise(ctx, 0.15, 0.22, 450);
+        this.blip(ctx, 100, 0.1, 'square', 0.22);
+        break;
+      case 'explode':
+        // Muffled thud — triangle sweep 200 → 50 + low-pass noise, SHORT
+        this.sweep(ctx, 200, 50, 0.2, 'triangle', 0.09);
+        this.noise(ctx, 0.22, 0.06, 160);
+        break;
+      case 'mine':
+        // Low noise burst
+        this.noise(ctx, 0.2, 0.22, 160);
+        break;
+
+      // ---------- Draft / meta ----------
+      case 'card_reveal':
+        // 2-note triangle arpeggio 523 → 659, 0.1s
+        this.blip(ctx, 523, 0.05, 'triangle', 0.12);
+        this.scheduleBlip(ctx, 659, 0.05, 'triangle', 0.12, now + 0.05);
+        break;
+      case 'card_legendary':
+        // 4-note ascending arpeggio square + shimmer (fast repeated high triangle), 0.5s
+        this.scheduleBlip(ctx, 523, 0.09, 'square', 0.12, now + 0.00);
+        this.scheduleBlip(ctx, 659, 0.09, 'square', 0.12, now + 0.09);
+        this.scheduleBlip(ctx, 784, 0.09, 'square', 0.12, now + 0.18);
+        this.scheduleBlip(ctx, 988, 0.12, 'square', 0.13, now + 0.27);
+        // Sparkle tail — rapid high triangle ticks
+        for (let i = 0; i < 6; i++) {
+          this.scheduleBlip(ctx, 1760 + (i % 2) * 220, 0.04, 'triangle', 0.06, now + 0.3 + i * 0.04);
+        }
+        break;
+      case 'victory':
+        // Major-third arpeggio 523 → 659 → 784 triangle with sparkle, 0.7s
+        this.scheduleBlip(ctx, 523, 0.18, 'triangle', 0.18, now + 0.00);
+        this.scheduleBlip(ctx, 659, 0.18, 'triangle', 0.18, now + 0.15);
+        this.scheduleBlip(ctx, 784, 0.35, 'triangle', 0.2, now + 0.3);
+        for (let i = 0; i < 5; i++) {
+          this.scheduleBlip(ctx, 1568 + (i % 3) * 196, 0.05, 'triangle', 0.06, now + 0.4 + i * 0.05);
+        }
+        break;
+      case 'gameover':
+        // Descending minor arpeggio 440 → 349 → 262 → 174, square, 1.0s
+        this.scheduleBlip(ctx, 440, 0.18, 'square', 0.18, now + 0.00);
+        this.scheduleBlip(ctx, 349, 0.18, 'square', 0.18, now + 0.2);
+        this.scheduleBlip(ctx, 262, 0.22, 'square', 0.18, now + 0.4);
+        this.scheduleBlip(ctx, 174, 0.42, 'square', 0.2, now + 0.6);
+        break;
+      case 'revive':
+        // Rising triangle arp 200 → 400 → 800, 0.3s, with a shimmering tail
+        this.scheduleBlip(ctx, 200, 0.1, 'triangle', 0.18, now + 0.00);
+        this.scheduleBlip(ctx, 400, 0.1, 'triangle', 0.18, now + 0.1);
+        this.scheduleBlip(ctx, 800, 0.12, 'triangle', 0.2, now + 0.2);
+        for (let i = 0; i < 4; i++) {
+          this.scheduleBlip(ctx, 1600 + i * 80, 0.04, 'triangle', 0.05, now + 0.3 + i * 0.04);
+        }
+        break;
     }
   }
 
   private blip(ctx: AudioContext, freq: number, dur: number, type: OscillatorType, gain: number) {
+    this.scheduleBlip(ctx, freq, dur, type, gain, ctx.currentTime);
+  }
+
+  // Same as blip but starts at an explicit time — used to schedule arpeggios from play().
+  private scheduleBlip(ctx: AudioContext, freq: number, dur: number, type: OscillatorType, gain: number, startAt: number) {
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = type;
     osc.frequency.value = freq;
-    g.gain.value = 0;
-    const now = ctx.currentTime;
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(gain, now + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    g.gain.setValueAtTime(0, startAt);
+    g.gain.linearRampToValueAtTime(gain, startAt + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
     osc.connect(g).connect(this.master!);
-    osc.start(now);
-    osc.stop(now + dur + 0.02);
+    osc.start(startAt);
+    osc.stop(startAt + dur + 0.02);
   }
 
   private sweep(ctx: AudioContext, fFrom: number, fTo: number, dur: number, type: OscillatorType, gain: number) {
@@ -138,10 +260,6 @@ class AudioEngine {
     osc.stop(now + dur + 0.02);
   }
 
-  private chord(ctx: AudioContext, freqs: number[], dur: number, type: OscillatorType, gain: number) {
-    for (const f of freqs) this.blip(ctx, f, dur, type, gain / freqs.length);
-  }
-
   private noise(ctx: AudioContext, dur: number, gain: number, cutoff: number) {
     const buf = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * dur)), ctx.sampleRate);
     const data = buf.getChannelData(0);
@@ -156,6 +274,53 @@ class AudioEngine {
     src.connect(filter).connect(g).connect(this.master!);
     src.start();
     src.stop(ctx.currentTime + dur + 0.02);
+  }
+
+  // Bitcrushed-feel noise — narrow bandpass around a low center freq gives that
+  // crunchy 8-bit grit. cutoff = bandpass center, Q ≈ 1.2 for a tight band.
+  private crushedNoise(ctx: AudioContext, dur: number, gain: number, cutoff: number) {
+    const sampleRate = ctx.sampleRate;
+    // Quantize the noise source to ~4-bit steps for bitcrush character.
+    const steps = 8;
+    const buf = ctx.createBuffer(1, Math.max(1, Math.floor(sampleRate * dur)), sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      const raw = Math.random() * 2 - 1;
+      const quant = Math.round(raw * steps) / steps;
+      data[i] = quant * (1 - i / data.length);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = cutoff;
+    bp.Q.value = 1.2;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    src.connect(bp).connect(g).connect(this.master!);
+    const now = ctx.currentTime;
+    src.start(now);
+    src.stop(now + dur + 0.02);
+  }
+
+  // Hi-pass / bandpass noise burst — used for chirp/crunch layers that need
+  // airy top-end rather than a low thud.
+  private bandNoise(ctx: AudioContext, dur: number, gain: number, cutoff: number, q: number) {
+    const buf = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * dur)), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = cutoff;
+    filter.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    src.connect(filter).connect(g).connect(this.master!);
+    const now = ctx.currentTime;
+    src.start(now);
+    src.stop(now + dur + 0.02);
   }
 
   // =========== Ambient music (procedural drone + pulse) ===========

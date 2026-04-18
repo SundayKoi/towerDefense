@@ -27,6 +27,19 @@ function isBossWave(r: RunState, wave: number): boolean {
   return bosses[wave] != null;
 }
 
+// Wrap each visible character in a span with a staggered reveal delay so titles
+// cascade in character-by-character instead of appearing all at once.
+function letterReveal(text: string): string {
+  return text
+    .split('')
+    .map((ch, i) => {
+      if (ch === ' ') return '&nbsp;';
+      const safe = ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : ch;
+      return `<span class="reveal-char" style="animation-delay:${i * 30}ms">${safe}</span>`;
+    })
+    .join('');
+}
+
 function showEnemyIntroBanner(defId: EnemyId): void {
   const def = ENEMIES[defId];
   const threatColor: Record<string, string> = {
@@ -39,7 +52,7 @@ function showEnemyIntroBanner(defId: EnemyId): void {
   el.style.cssText = `border-color:${col};`;
   el.innerHTML = `
     <div class="eib-threat" style="color:${col}">// NEW THREAT DETECTED — ${def.threat}</div>
-    <div class="eib-name" style="color:${col}">${def.name}</div>
+    <div class="eib-name" style="color:${col}">${letterReveal(def.name)}</div>
     <div class="eib-desc">${def.description}</div>
     <div class="eib-tip">COUNTER: ${def.counterTip}</div>
   `;
@@ -55,7 +68,7 @@ function showWaveBanner(r: RunState): void {
   const waveText = isSurvival(r.mapId) ? `WAVE ${r.wave}` : `WAVE ${r.wave} / ${r.totalWaves}`;
   el.innerHTML = `
     <div class="wb-small">${isBoss ? '// BOSS INCOMING' : '// WAVE INITIATED'}</div>
-    <div class="wb-big">${waveText}</div>
+    <div class="wb-big">${letterReveal(waveText)}</div>
     <div class="wb-underline"></div>
   `;
   document.body.appendChild(el);

@@ -759,10 +759,26 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
 
   const sprite = getEnemySprite(e.def);
   if (sprite) {
+    const isCritFlash = e.hitFlash > 0.22;
+    const splitAmt = isCritFlash ? 2 : 0;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(e.angle + (def.spriteAngleOffset ?? 0));
     ctx.scale(scaleX, scaleY);
+    if (splitAmt > 0) {
+      // RGB chromatic split for crit hits — brief 1-2 frames.
+      const prevOp = ctx.globalCompositeOperation;
+      const prevAlpha = ctx.globalAlpha;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.5;
+      ctx.filter = 'hue-rotate(-30deg) saturate(3)';
+      ctx.drawImage(sprite, -size / 2 - splitAmt, -size / 2, size, size);
+      ctx.filter = 'hue-rotate(180deg) saturate(3)';
+      ctx.drawImage(sprite, -size / 2 + splitAmt, -size / 2, size, size);
+      ctx.filter = 'none';
+      ctx.globalCompositeOperation = prevOp;
+      ctx.globalAlpha = prevAlpha;
+    }
     ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
     ctx.restore();
   }
@@ -1074,16 +1090,15 @@ function drawParticles(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: Run
   const cs = vp.cellSize;
   ctx.save();
   for (const p of s.particles) {
-    const a = Math.max(0, p.life / p.maxLife);
-    ctx.globalAlpha = a;
+    const a = p.fade === undefined ? (p.life / p.maxLife) : Math.pow(p.life / p.maxLife, p.fade);
+    if (a <= 0) continue;
+    ctx.globalAlpha = Math.max(0, Math.min(1, a));
     ctx.fillStyle = p.color;
-    ctx.shadowColor = p.color;
-    ctx.shadowBlur = 6;
-    const cx = p.pos.x * cs + cs / 2;
-    const cy = p.pos.y * cs + cs / 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, p.size * a, 0, Math.PI * 2);
-    ctx.fill();
+    // Axis-aligned square, snapped to integer device pixels for the pixel-art grid.
+    const x = Math.round(p.pos.x * cs + cs / 2);
+    const y = Math.round(p.pos.y * cs + cs / 2);
+    const half = Math.max(1, Math.round(p.size * 0.6));
+    ctx.fillRect(x - half, y - half, half * 2, half * 2);
   }
   ctx.restore();
 }

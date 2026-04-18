@@ -1643,6 +1643,9 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     const nextTarget = findChainTarget(s, target, p.chain.hit, chainRange);
     if (nextTarget) {
       p.chain.hit.add(nextTarget.id);
+      // Digital-snap: tiny stutter on each arc, capped so it can't stack louder than other events.
+      s.shakeTime = Math.max(s.shakeTime, 0.06);
+      s.shakeAmp = Math.max(s.shakeAmp, 3);
       // Chain ground: stun
       if (hasEffect(s, 'chain', 'ground') && !ENEMIES[nextTarget.def].slowImmune) {
         nextTarget.speedMult = 0;
@@ -1760,6 +1763,8 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
     s.shakeAmp = 16;
     s.protocolsEarned += 5;
     s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.8 }, text: '+5 \u2b22 PROTOCOL', vy: -35, life: 1.8, maxLife: 1.8, color: '#ffd600', size: 20 });
+    // Expanding ring of pixel squares in the enemy's color.
+    spawnPulseRing(s, e.pos, ENEMIES[e.def].color, 4);
   }
 
   // REPLICATION VIRUS sector modifier: chance dead enemies spawn an offspring at their location.
@@ -1923,11 +1928,14 @@ const MAX_PARTICLES = 300;
 function spawnExplosion(s: RunState, pos: Vec2, color: string, radius: number): void {
   if (s.particles.length >= MAX_PARTICLES) return;
   const count = Math.min(Math.round(14 * radius), MAX_PARTICLES - s.particles.length);
+  // Bias spawn onto the 0.1-cell grid so particles line up with the pixel-art grid.
+  const sx = Math.round(pos.x * 10) / 10;
+  const sy = Math.round(pos.y * 10) / 10;
   for (let i = 0; i < count; i++) {
     const a = Math.random() * Math.PI * 2;
     const spd = 2 + Math.random() * 4;
     s.particles.push({
-      pos: { x: pos.x, y: pos.y },
+      pos: { x: sx, y: sy },
       vel: { x: Math.cos(a) * spd, y: Math.sin(a) * spd },
       life: 0.4 + Math.random() * 0.4,
       maxLife: 0.8,
@@ -1941,14 +1949,16 @@ function spawnExplosion(s: RunState, pos: Vec2, color: string, radius: number): 
 }
 
 // EMP-style expanding ring — no screen shake, no explode sound. Used by pulse tower.
-function spawnPulseRing(s: RunState, pos: Vec2, color: string, radius: number): void {
+export function spawnPulseRing(s: RunState, pos: Vec2, color: string, radius: number): void {
   if (s.particles.length >= MAX_PARTICLES) return;
   const count = Math.min(24, MAX_PARTICLES - s.particles.length);
+  const sx = Math.round(pos.x * 10) / 10;
+  const sy = Math.round(pos.y * 10) / 10;
   for (let i = 0; i < count; i++) {
     const a = (i / count) * Math.PI * 2;
     const spd = radius * 3; // expand outward to fill radius over ~0.5s
     s.particles.push({
-      pos: { x: pos.x, y: pos.y },
+      pos: { x: sx, y: sy },
       vel: { x: Math.cos(a) * spd, y: Math.sin(a) * spd },
       life: 0.45,
       maxLife: 0.45,
@@ -1961,11 +1971,13 @@ function spawnPulseRing(s: RunState, pos: Vec2, color: string, radius: number): 
 function spawnDeathBurst(s: RunState, pos: Vec2, color: string, accent: string, count: number): void {
   if (s.particles.length >= MAX_PARTICLES) return;
   const capped = Math.min(count, MAX_PARTICLES - s.particles.length);
+  const sx = Math.round(pos.x * 10) / 10;
+  const sy = Math.round(pos.y * 10) / 10;
   for (let i = 0; i < capped; i++) {
     const a = Math.random() * Math.PI * 2;
     const spd = 1.5 + Math.random() * 3.5;
     s.particles.push({
-      pos: { x: pos.x, y: pos.y },
+      pos: { x: sx, y: sy },
       vel: { x: Math.cos(a) * spd, y: Math.sin(a) * spd },
       life: 0.35 + Math.random() * 0.35,
       maxLife: 0.7,
