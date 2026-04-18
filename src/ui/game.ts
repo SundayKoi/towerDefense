@@ -119,7 +119,7 @@ export function gameScreen(s: RunState, _save: SaveData): Screen & { handles: ()
 }
 
 // Render the tokens bar: shows towers the player currently has deploy-tokens for.
-export function renderTokensBar(handles: GameScreenHandles, s: RunState, onTokenClick: (id: TowerId) => void): void {
+export function renderTokensBar(handles: GameScreenHandles, s: RunState, onTokenClick: (id: TowerId, ev?: PointerEvent) => void): void {
   const bar = handles.hudTokens;
   bar.innerHTML = '';
   const entries = Object.entries(s.deployTokens).filter(([, n]) => (n as number) > 0) as [TowerId, number][];
@@ -148,13 +148,14 @@ export function renderTokensBar(handles: GameScreenHandles, s: RunState, onToken
       img.alt = def.name;
       (btn.querySelector('.token-portrait') as HTMLElement).appendChild(img);
     }
-    btn.onclick = () => { audio.play('ui_click'); onTokenClick(id); };
+    // pointerdown drives both tap-to-arm and drag-to-place — main.ts handles the lift/drop.
+    btn.addEventListener('pointerdown', (ev) => { audio.play('ui_click'); onTokenClick(id, ev); });
     bar.appendChild(btn);
   }
 }
 
 // Tower palette (shown when tapping empty cell) — lists only tokens you have.
-export function renderPalette(handles: GameScreenHandles, s: RunState, onPick: (id: TowerId) => void): void {
+export function renderPalette(handles: GameScreenHandles, s: RunState, onPick: (id: TowerId, ev?: PointerEvent) => void): void {
   const container = handles.paletteTowersContainer;
   container.innerHTML = '';
   const entries = Object.entries(s.deployTokens).filter(([, n]) => (n as number) > 0) as [TowerId, number][];
@@ -186,7 +187,7 @@ export function renderPalette(handles: GameScreenHandles, s: RunState, onPick: (
       img.style.filter = `drop-shadow(0 0 8px ${def.accentColor})`;
       portrait.appendChild(img);
     }
-    btn.onclick = () => { audio.play('ui_click'); onPick(id); };
+    btn.addEventListener('pointerdown', (ev) => { audio.play('ui_click'); onPick(id, ev); });
     container.appendChild(btn);
   }
 }

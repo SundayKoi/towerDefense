@@ -177,10 +177,108 @@ function wireGameScreen() {
   }
   (wireGameScreen as any).__doResize = doResize;
 
-  const activatePlacement = (tid: TowerId) => {
+  // Place at the given grid cell. Returns true on success. Centralizes the
+  // singleton check + token consumption + palette refresh so both tap-to-place
+  // and drag-to-place use exactly the same logic.
+  const tryPlaceAt = (tid: TowerId, gx: number, gy: number): boolean => {
+    if (!run) return false;
+    if (run.towers.some((t) => t.def === tid)) {
+      const msg = document.createElement('div');
+      msg.className = 'wave-banner';
+      msg.innerHTML = `<div class="wb-small">// SINGLETON LIMIT</div><div class="wb-big">ALREADY DEPLOYED</div>`;
+      document.body.appendChild(msg);
+      setTimeout(() => msg.remove(), 1600);
+      audio.play('sell');
+      return false;
+    }
+    if (!canPlaceAt(run, { x: gx, y: gy })) {
+      audio.play('sell');
+      return false;
+    }
+    placeTower(run, tid, { x: gx, y: gy });
+    if (!save.stats.towersEverDeployed.includes(tid)) {
+      save.stats.towersEverDeployed.push(tid);
+      writeSave(save);
+    }
+    return true;
+  };
+
+  const activatePlacement = (tid: TowerId, ev?: PointerEvent) => {
     r.selection = { kind: 'placing', def: tid };
     h.paletteEl.classList.remove('open');
     h.cancelBtn.style.display = '';
+
+    // No event → keyboard / programmatic activation, just enter placing mode.
+    if (!ev) return;
+    ev.preventDefault();
+    // Release implicit pointer capture from the button so pointermove fires on document.
+    try { (ev.target as Element).releasePointerCapture?.(ev.pointerId); } catch {}
+
+    const startX = ev.clientX;
+    const startY = ev.clientY;
+    let dragged = false;
+
+    const updateHover = (cx: number, cy: number) => {
+      const rect = h.canvas.getBoundingClientRect();
+      const x = cx - rect.left;
+      const y = cy - rect.top;
+      const inCanvas = x >= 0 && x <= rect.width && y >= 0 && y <= rect.height;
+      hoverCell = inCanvas ? { x: Math.floor(x / vp.cellSize), y: Math.floor(y / vp.cellSize) } : null;
+      return inCanvas;
+    };
+    // Seed hover from the down position so the ghost shows immediately if the
+    // player presses inside the canvas (not over a palette button).
+    updateHover(startX, startY);
+
+    const onMove = (mv: PointerEvent) => {
+      if (!dragged) {
+        const dx = mv.clientX - startX;
+        const dy = mv.clientY - startY;
+        if (Math.hypot(dx, dy) > 6) dragged = true;
+      }
+      updateHover(mv.clientX, mv.clientY);
+    };
+
+    const onUp = (uv: PointerEvent) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+
+      // Quick tap with no drag → leave placing mode armed; user can tap a cell next.
+      if (!dragged) return;
+
+      // Drag release: try to drop at this position.
+      if (!run) return;
+      const rect = h.canvas.getBoundingClientRect();
+      const x = uv.clientX - rect.left;
+      const y = uv.clientY - rect.top;
+      const inCanvas = x >= 0 && x <= rect.width && y >= 0 && y <= rect.height;
+      if (!inCanvas) {
+        // Released outside the playfield → cancel.
+        run.selection = { kind: 'none' };
+        h.cancelBtn.style.display = 'none';
+        hoverCell = null;
+        return;
+      }
+      const gx = Math.floor(x / vp.cellSize);
+      const gy = Math.floor(y / vp.cellSize);
+      if (tryPlaceAt(tid, gx, gy)) {
+        run.selection = { kind: 'none' };
+        h.cancelBtn.style.display = 'none';
+        renderPalette(h, run, activatePlacement);
+        renderTokensBar(h, run, activatePlacement);
+        updateHud();
+      } else {
+        // Invalid cell on release — also cancel placing mode so the user gets a
+        // clean retry instead of being silently stuck in placement.
+        run.selection = { kind: 'none' };
+        h.cancelBtn.style.display = 'none';
+      }
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
   };
 
   renderPalette(h, r, activatePlacement);
@@ -228,32 +326,12 @@ function wireGameScreen() {
 
     if (run.selection.kind === 'placing') {
       const defId = run.selection.def;
-      // Singleton check: already have this tower type deployed
-      if (run.towers.some((t) => t.def === defId)) {
-        const msg = document.createElement('div');
-        msg.className = 'wave-banner';
-        msg.innerHTML = `<div class="wb-small">// SINGLETON LIMIT</div><div class="wb-big">ALREADY DEPLOYED</div>`;
-        document.body.appendChild(msg);
-        setTimeout(() => msg.remove(), 1600);
-        run.selection = { kind: 'none' };
-        h.cancelBtn.style.display = 'none';
-        audio.play('sell');
-        return;
-      }
-      if (canPlaceAt(run, { x: gx, y: gy })) {
-        placeTower(run, defId, { x: gx, y: gy });
-        // Track unique tower types deployed across runs
-        if (!save.stats.towersEverDeployed.includes(defId)) {
-          save.stats.towersEverDeployed.push(defId);
-          writeSave(save);
-        }
+      if (tryPlaceAt(defId, gx, gy)) {
         run.selection = { kind: 'none' };
         h.cancelBtn.style.display = 'none';
         renderPalette(h, run, activatePlacement);
         renderTokensBar(h, run, activatePlacement);
         updateHud();
-      } else {
-        audio.play('sell');
       }
       return;
     }
