@@ -27,6 +27,12 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Take control of all open tabs the moment a new SW activates, so a deploy
+        // rolls out on the player's next page load instead of whenever all tabs close.
+        skipWaiting: true,
+        clientsClaim: true,
+        // Delete precache entries from previous builds so the cache doesn't grow forever.
+        cleanupOutdatedCaches: true,
       },
     }),
   ],
