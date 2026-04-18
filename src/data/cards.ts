@@ -137,7 +137,7 @@ const DEPLOY: CardDef[] = [
     rarity: 'rare',
     category: 'deploy',
     towerHint: 'data_miner',
-    description: 'Gain a DATA MINER token. Passive XP generator — +3 XP/sec during waves.',
+    description: 'Gain a DATA MINER token. Passive XP generator — 1 XP per 3s during waves.',
     apply: (s) => { addToken(s, 'data_miner', 1); },
   },
 ];
@@ -1092,7 +1092,7 @@ const UPGRADE: CardDef[] = [
   // ===== DATA MINER (5 upgrades) =====
   {
     id: 'dm_throughput', name: 'DATA MINER: HIGH THROUGHPUT', rarity: 'common', category: 'upgrade', towerHint: 'data_miner',
-    description: 'DATA MINER XP generation increased from 3/s to 8/s.',
+    description: 'DATA MINER XP rate increases to 1 per second.',
     apply: (s) => { addEffect(s, 'data_miner', 'throughput'); },
   },
   {
@@ -1102,7 +1102,7 @@ const UPGRADE: CardDef[] = [
   },
   {
     id: 'dm_uplink', name: 'DATA MINER: UPLINK', rarity: 'rare', category: 'upgrade', towerHint: 'data_miner',
-    description: 'DATA MINER XP generation doubles during waves.',
+    description: 'DATA MINER XP rate ×1.5 during waves.',
     apply: (s) => { addEffect(s, 'data_miner', 'uplink'); },
   },
   {
@@ -1113,7 +1113,7 @@ const UPGRADE: CardDef[] = [
   {
     id: 'dm_recursive', name: 'DATA MINER: RECURSIVE LEARNING', rarity: 'epic', category: 'upgrade', towerHint: 'data_miner',
     requires: ['dm_throughput'],
-    description: '[Requires HIGH THROUGHPUT] DATA MINER XP rate +5/s additional. 13/s total combined.',
+    description: '[Requires HIGH THROUGHPUT] DATA MINER XP rate increases to 2 per second. Caps at 3/s with UPLINK.',
     apply: (s) => { addEffect(s, 'data_miner', 'recursive'); },
   },
 

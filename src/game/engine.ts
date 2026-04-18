@@ -519,12 +519,17 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       continue;
     }
     if (t.def === 'data_miner') {
-      // Passive XP generation — ONLY during active waves, not prep/pause/draft.
-      // Base 3/s; +5/s with THROUGHPUT; +5/s additional with RECURSIVE. Doubled with UPLINK.
+      // Passive XP — ONLY during active waves. Rates stay modest so the miner
+      // assists XP without replacing kill-based gains.
+      //   Base:       1 XP per 3s  (0.33/s)
+      //   Throughput: 1 XP per second
+      //   Recursive:  2 XP per second (replaces throughput's rate)
+      //   Uplink:     ×1.5 during waves (caps the top rate at 3/s)
       if (s.phase === 'wave') {
-        let rate = hasEffect(s, 'data_miner', 'throughput') ? 8 : 3;
-        if (hasEffect(s, 'data_miner', 'recursive')) rate += 5;
-        if (hasEffect(s, 'data_miner', 'uplink')) rate *= 2;
+        let rate = 1 / 3;
+        if (hasEffect(s, 'data_miner', 'throughput')) rate = 1.0;
+        if (hasEffect(s, 'data_miner', 'recursive')) rate = 2.0;
+        if (hasEffect(s, 'data_miner', 'uplink')) rate *= 1.5;
         grantXp(s, rate * dtSec);
         // Pulse flash only while mining
         t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
@@ -742,7 +747,15 @@ export function overdriveTimeLeft(t: TowerInstance): number {
   return 0;
 }
 
+export function canOverdrive(t: TowerInstance): boolean {
+  // Support turrets have no active firing loop to boost, so overdrive has
+  // nothing to toggle against. They also never tick the offline timer down
+  // (since they bypass updateTower), which would leave them stuck burning.
+  return t.def !== 'booster_node' && t.def !== 'data_miner';
+}
+
 export function triggerOverdrive(s: RunState, t: TowerInstance): boolean {
+  if (!canOverdrive(t)) return false;
   if (overdriveState(t) !== 'ready') return false;
   t.extras.overdriveActive = OVERDRIVE_ACTIVE;
   t.extras.overdriveCharge = OVERDRIVE_RECHARGE;

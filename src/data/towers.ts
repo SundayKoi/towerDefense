@@ -208,6 +208,6 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     accentColor: '#ffd600',
     damageType: 'energy',
     description: 'Passive XP generator — mines data from the network. No combat capability.',
-    special: 'Generates +3 XP per second during active waves.',
+    special: 'Generates 1 XP every 3 seconds during active waves.',
   },
 };

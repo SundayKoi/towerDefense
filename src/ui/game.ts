@@ -256,7 +256,9 @@ export function renderSelectedTower(
   const subnetSize = t.extras.subnetSize ?? 1;
   const subnetTypes = t.extras.subnetTypes ?? 1;
   const subnetHtml = `<div class="sel-subnet" id="sel-subnet" style="${subnetSize > 1 ? '' : 'display:none'}">SUBNET: ${subnetSize} nodes / ${subnetTypes} types &nbsp;<b>+${Math.round((subnetMult - 1) * 100)}% DMG</b></div>`;
-  // Overdrive button state.
+  // Overdrive button state. Hidden entirely for support turrets (data_miner, booster_node)
+  // since they have no firing loop for OVERDRIVE to boost.
+  const isSupport = t.def === 'booster_node' || t.def === 'data_miner';
   const od = overdriveDisplay(t);
   const odLabel = od.label;
   const odClass = od.cls;
@@ -280,7 +282,7 @@ export function renderSelectedTower(
       </span>
     </button>
     <div class="sel-tower-actions">
-      <button class="${odClass}" id="sel-overdrive" ${odDisabled ? 'disabled' : ''}>${odLabel}</button>
+      ${isSupport ? '' : `<button class="${odClass}" id="sel-overdrive" ${odDisabled ? 'disabled' : ''}>${odLabel}</button>`}
       <button class="btn btn-danger" id="sel-remove">REMOVE</button>
     </div>
   `;
@@ -288,5 +290,6 @@ export function renderSelectedTower(
   (box.querySelector('#sel-close') as HTMLButtonElement).onclick = () => { s.selection = { kind: 'none' }; box.classList.remove('open'); };
   (box.querySelector('#sel-target') as HTMLButtonElement).onclick = () => { onCycleTarget(); };
   (box.querySelector('#sel-remove') as HTMLButtonElement).onclick = () => { audio.play('ui_click'); onRemove(); };
-  (box.querySelector('#sel-overdrive') as HTMLButtonElement).onclick = () => { if (!odDisabled) onOverdrive(); };
+  const odBtn = box.querySelector('#sel-overdrive') as HTMLButtonElement | null;
+  if (odBtn) odBtn.onclick = () => { if (!odDisabled) onOverdrive(); };
 }
