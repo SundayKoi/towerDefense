@@ -18,6 +18,21 @@ function hasEffect(s: RunState, tower: TowerId, tag: string): boolean {
   return s.towerEffects[tower]?.has(tag) ?? false;
 }
 
+// True iff the enemy is currently inside the DECRYPT NODE aura (accounting for
+// the GLOBAL BREACH capstone and the EXPOSE FULL-EXPOSURE capstone that widen
+// the aura to the whole map under certain conditions).
+export function isEnemyInDecryptAura(s: RunState, e: EnemyInstance): boolean {
+  const decrypt = s.towers.find((tw) => tw.def === 'data_miner');
+  if (!decrypt) return false;
+  if (hasEffect(s, 'data_miner', 'dataminer_thr_caps')) return true;
+  if (hasEffect(s, 'data_miner', 'dataminer_eco_caps')
+      && s.enemies.some((ee) => ee.alive && ee.isBoss)) return true;
+  const rng = TOWERS.data_miner.range
+    + (hasEffect(s, 'data_miner', 'dataminer_thr_1') ? 0.5 : 0)
+    + (hasEffect(s, 'data_miner', 'dataminer_eco_1') ? 0.5 : 0);
+  return Math.hypot(e.pos.x - decrypt.grid.x, e.pos.y - decrypt.grid.y) <= rng;
+}
+
 // True iff towers of both types are placed AND share a connected subnet
 // (adjacency via BFS with ≤1 cell steps). Used by subnet-pair synergy cards
 // so you have to actually place the towers next to each other to get the bonus.
@@ -468,10 +483,30 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       }
     }
     // ENCRYPTED PAYLOADS: shield regenerates after 2s of no damage.
+    // DECRYPT CORRUPT sync field suppresses regen entirely.
     if (e.maxShield !== undefined && e.shield !== undefined) {
       e.shieldRegenTimer = (e.shieldRegenTimer ?? 0) + dtSec;
-      if (e.shieldRegenTimer > 2 && e.shield < e.maxShield) {
+      const suppressRegen = hasEffect(s, 'data_miner', 'dataminer_mta_nosync')
+        && isEnemyInDecryptAura(s, e);
+      if (!suppressRegen && e.shieldRegenTimer > 2 && e.shield < e.maxShield) {
         e.shield = Math.min(e.maxShield, e.shield + e.maxShield * 0.5 * dtSec);
+      }
+    }
+    // DECRYPT NODE — per-frame effects on enemies inside the aura.
+    if (isEnemyInDecryptAura(s, e)) {
+      // CORRUPT branch DoT.
+      if (hasEffect(s, 'data_miner', 'dataminer_mta_key')) {
+        const dps = hasEffect(s, 'data_miner', 'dataminer_mta_heavy') ? 8 : 4;
+        damageEnemy(s, e, dps * dtSec, false, 'energy', true, 'data_miner');
+      }
+      // CORRUPT slow.
+      if (hasEffect(s, 'data_miner', 'dataminer_mta_slow') && !ENEMIES[e.def].slowImmune) {
+        e.speedMult = Math.min(e.speedMult, 0.9);
+        e.slowTimer = Math.max(e.slowTimer, 0.25);
+      }
+      // EXPOSE reveal — strip invisibility.
+      if (hasEffect(s, 'data_miner', 'dataminer_eco_reveal')) {
+        if (e.invisTimer > 0) e.invisTimer = 0;
       }
     }
 
@@ -581,26 +616,10 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       continue;
     }
     if (t.def === 'data_miner') {
-      // Passive XP — ONLY during active waves. Rates stay modest so the miner
-      // assists XP without replacing kill-based gains.
-      //   Base:       1 XP per 3s  (0.33/s)
-      //   Throughput: 1 XP per second
-      //   Recursive:  2 XP per second (replaces throughput's rate)
-      //   Uplink:     ×1.5 during waves
-      //   Capstone:   fills the remaining room up to the 3/s hard cap
-      if (s.phase === 'wave') {
-        let rate = 1 / 3;
-        if (hasEffect(s, 'data_miner', 'throughput')) rate = 1.0;
-        if (hasEffect(s, 'data_miner', 'recursive')) rate = 2.0;
-        if (hasEffect(s, 'data_miner', 'uplink')) rate *= 1.5;
-        if (hasEffect(s, 'data_miner', 'dataminer_thr_caps')) rate = Math.max(rate, 2.5);
-        // Hard cap — DATA MINER should supplement, never replace, kill-based XP.
-        if (rate > 3) rate = 3;
-        grantXp(s, rate * dtSec);
-        // Pulse flash only while mining
-        t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
-        if (t.extras.flashTimer <= 0) { t.extras.flashTimer = 1.2; t.fireFlash = 0.18; }
-      }
+      // DECRYPT NODE — passive damage-amplification aura. The multiplier is
+      // applied in damageEnemy. Here we just pulse the visual.
+      t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
+      if (t.extras.flashTimer <= 0) { t.extras.flashTimer = 1.2; t.fireFlash = 0.18; }
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
       continue;
     }
@@ -2010,7 +2029,49 @@ function applyResistanceAndArmor(e: EnemyInstance, raw: number, type: DamageType
 export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: boolean, type: DamageType, silent = false, source?: TowerId): number {
   // Brittle coating: slowed/frozen enemies take +15% from all sources
   const brittleMult = (hasEffect(s, 'ice', 'brittle') && e.speedMult < 1) ? 1.15 : 1.0;
-  let final = applyResistanceAndArmor(e, dmg * brittleMult, type, isCrit);
+  // DECRYPT NODE aura — +% damage from all sources to enemies in range.
+  // Singleton rule keeps this cheap; most runs have either 1 decrypt or none.
+  let decryptMult = 1.0;
+  let decryptBonusArmor = 0;
+  const decrypt = s.towers.find((tw) => tw.def === 'data_miner');
+  let inAura = false;
+  if (decrypt) {
+    const rng = TOWERS.data_miner.range
+      + (hasEffect(s, 'data_miner', 'dataminer_thr_1') ? 0.5 : 0)
+      + (hasEffect(s, 'data_miner', 'dataminer_eco_1') ? 0.5 : 0);
+    const dist = Math.hypot(e.pos.x - decrypt.grid.x, e.pos.y - decrypt.grid.y);
+    const global = hasEffect(s, 'data_miner', 'dataminer_thr_caps');
+    // EXPOSE capstone: while a boss is alive, every enemy is considered in-aura.
+    const fullExposure = hasEffect(s, 'data_miner', 'dataminer_eco_caps')
+      && s.enemies.some((ee) => ee.alive && ee.isBoss);
+    inAura = global || fullExposure || dist <= rng;
+    if (inAura) {
+      // BREACH branch — raw amplification stack.
+      if (hasEffect(s, 'data_miner', 'dataminer_thr_key')) {
+        let amp = 0.15;
+        if (hasEffect(s, 'data_miner', 'throughput')) amp += 0.05;
+        if (hasEffect(s, 'data_miner', 'recursive')) amp += 0.10;
+        if (hasEffect(s, 'data_miner', 'uplink')) amp += 0.05;
+        if (hasEffect(s, 'data_miner', 'dataminer_thr_amp')) amp += 0.05;
+        decryptMult = 1 + amp;
+      } else if (hasEffect(s, 'data_miner', 'dataminer_eco_key')) {
+        // EXPOSE branch — mark-style bonus, separate scale.
+        decryptMult = hasEffect(s, 'data_miner', 'dataminer_eco_deep') ? 1.45 : 1.30;
+        if (hasEffect(s, 'data_miner', 'dataminer_eco_armor')) decryptBonusArmor = 3;
+      } else {
+        // No branch committed yet — base 15% aura.
+        decryptMult = 1.15;
+      }
+      // CORRUPT capstone — bosses take 2× aura amp.
+      if (e.isBoss && hasEffect(s, 'data_miner', 'dataminer_mta_caps')) {
+        decryptMult = 1 + (decryptMult - 1) * 2;
+      }
+    }
+  }
+  const effectiveArmor = e.armor;
+  if (decryptBonusArmor > 0) e.armor = Math.max(0, e.armor - decryptBonusArmor);
+  let final = applyResistanceAndArmor(e, dmg * brittleMult * decryptMult, type, isCrit);
+  if (decryptBonusArmor > 0) e.armor = effectiveArmor;
   if (final <= 0) {
     if (!silent) s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'IMMUNE', vy: -18, life: 0.8, maxLife: 0.8, color: '#6b8090', size: 12 });
     e.hitFlash = 0.12;

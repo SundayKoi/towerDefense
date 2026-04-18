@@ -130,17 +130,8 @@ export const SHOP_UPGRADES: ShopUpgradeDef[] = [
   },
 
   // ── ECONOMY ───────────────────────────────────────────────────────────────
-  {
-    id: 'protocol_audit',
-    name: 'PROTOCOL AUDIT',
-    description: 'Gain +3% XP from kills. Max 5 stacks — prior +50% cap blew past the draft pool before wave 20.',
-    icon: '▣',
-    baseCost: 60,
-    stackStep: 50,
-    maxStacks: 5,
-    category: 'economy',
-    effect: (save: SaveData, stacks: number) => { save.metaBoosts.xpBoostPct = stacks * 0.03; },
-  },
+  // PROTOCOL AUDIT removed — stacking XP boost past wave 20 blew past the
+  // draft pool even after nerfing the rate.
   {
     id: 'data_harvest',
     name: 'DATA HARVEST',

@@ -196,10 +196,12 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     special: 'Adjacent turrets gain +25% damage and +15% fire rate.',
   },
   data_miner: {
+    // Internal ID preserved for save compat; completely reworked from the old
+    // XP-generator into a damage-amplification aura. Display name DECRYPT NODE.
     id: 'data_miner',
-    name: 'DATA MINER',
+    name: 'DECRYPT NODE',
     damage: 0,
-    range: 0,
+    range: 2.0,
     fireRate: 1.0,
     projectileSpeed: 0,
     projectileColor: '#ffd600',
@@ -207,7 +209,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     baseColor: '#332700',
     accentColor: '#ffd600',
     damageType: 'energy',
-    description: 'Passive XP generator — mines data from the network. No combat capability.',
-    special: 'Generates 1 XP every 3 seconds during active waves.',
+    description: 'Passive damage aura — enemies inside take +15% damage from all sources. No combat.',
+    special: 'Enemies within aura take +15% damage from ALL sources.',
   },
 };

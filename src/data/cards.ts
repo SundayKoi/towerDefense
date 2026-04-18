@@ -146,11 +146,11 @@ const DEPLOY: CardDef[] = [
   },
   {
     id: 'deploy_data_miner',
-    name: 'DEPLOY: DATA MINER',
+    name: 'DEPLOY: DECRYPT NODE',
     rarity: 'rare',
     category: 'deploy',
     towerHint: 'data_miner',
-    description: 'Gain a DATA MINER token. Passive XP generator — 1 XP per 3s during waves.',
+    description: 'Gain a DECRYPT NODE token. Passive aura — enemies in range take +15% damage from ALL sources.',
     apply: (s) => { addToken(s, 'data_miner', 1); },
   },
 ];
@@ -987,58 +987,62 @@ const BRANCH_SPECS: BranchSpec[] = [];
   });
 }
 
-// ===== DATA MINER =====
+// ===== DECRYPT NODE (internal id 'data_miner', old DATA MINER reworked) =====
+// Three branches: BREACH (raw amplification), EXPOSE (mark + reveal),
+// CORRUPT (DoT + debuff). Aura base is 15%; branch cards push it higher
+// and add secondary effects. Card IDs keep the dataminer_ prefix for
+// save compatibility with the previous branches.
 {
   const T = 'data_miner' as TowerId;
-  const TL = 'DATA MINER';
+  const TL = 'DECRYPT NODE';
   BRANCH_SPECS.push({
-    tower: T, towerLabel: TL, branchKey: 'thr', branchLabel: 'THROUGHPUT', branchTagSuffix: 'throughput',
+    tower: T, towerLabel: TL, branchKey: 'thr', branchLabel: 'BREACH', branchTagSuffix: 'breach',
     cards: [
-      { shortName: 'HIGH THROUGHPUT', description: 'DATA MINER XP rate increases to 1 per second.',
+      { shortName: 'BREACH PROTOCOL', description: 'DECRYPT aura damage amplification +5% (20% total).',
         apply: (s) => { addEffect(s, T, 'dataminer_thr_key'); addEffect(s, T, 'throughput'); } },
-      { shortName: 'COMPRESSION', description: 'All enemy kills grant +20% bonus XP.',
-        apply: (s) => { addEffect(s, T, 'compress'); s.mods.xpMult *= 1.2; } },
-      { shortName: 'UPLINK', description: 'DATA MINER XP rate ×1.5 during waves.', rarity: 'rare',
-        apply: (s) => { addEffect(s, T, 'uplink'); } },
-      { shortName: 'RECURSIVE LEARNING', description: 'DATA MINER XP rate increases to 2 per second.',
+      { shortName: 'EXTENDED FIELD', description: 'DECRYPT aura range +0.5 cells.',
+        apply: (s) => { addEffect(s, T, 'dataminer_thr_1'); } },
+      { shortName: 'DEEP DECRYPT', description: 'DECRYPT aura amplification +10% (30% total).', rarity: 'rare',
         apply: (s) => { addEffect(s, T, 'recursive'); } },
-      { shortName: 'XP AMPLIFIER', description: 'All XP gains +15%.', rarity: 'rare',
-        apply: (s) => { s.mods.xpMult *= 1.15; addEffect(s, T, 'dataminer_thr_amp'); } },
-      { shortName: 'OVERCLOCKED MINE', description: 'DATA MINER XP rate floors at 2.5/s (3/s hard cap with UPLINK).',
+      { shortName: 'SUSTAINED BREACH', description: 'Aura amplification holds for 2s after leaving range.', rarity: 'rare',
+        apply: (s) => { addEffect(s, T, 'uplink'); } },
+      { shortName: 'SIGNAL AMP', description: 'Aura amplification +5% more (35% total with DEEP DECRYPT).',
+        apply: (s) => { addEffect(s, T, 'dataminer_thr_amp'); } },
+      { shortName: 'GLOBAL BREACH', description: 'DECRYPT aura covers the entire map.',
         apply: (s) => { addEffect(s, T, 'dataminer_thr_caps'); } },
     ],
   });
   BRANCH_SPECS.push({
-    tower: T, towerLabel: TL, branchKey: 'eco', branchLabel: 'ECONOMY', branchTagSuffix: 'economy',
+    tower: T, towerLabel: TL, branchKey: 'eco', branchLabel: 'EXPOSE', branchTagSuffix: 'expose',
     cards: [
-      { shortName: 'PROTOCOL EXTRACTOR', description: 'DATA MINER extracts +1 PROTOCOL per wave cleared.',
+      { shortName: 'EXPOSE PROTOCOL', description: 'Enemies inside DECRYPT aura are MARKED (+30% from all sources, not stacking with BREACH).',
         apply: (s) => { addEffect(s, T, 'dataminer_eco_key'); addEffect(s, T, 'protocol_mine'); } },
-      { shortName: 'AUDIT', description: 'All XP gains +10%.',
-        apply: (s) => { s.mods.xpMult *= 1.1; addEffect(s, T, 'dataminer_eco_audit'); } },
-      { shortName: 'BANDWIDTH', description: 'All XP gains +20%.', rarity: 'rare',
-        apply: (s) => { s.mods.xpMult *= 1.2; addEffect(s, T, 'dataminer_eco_bw'); } },
-      { shortName: 'PROTOCOL OVERCLOCK', description: 'DATA MINER extracts +2 PROTOCOLS per wave.',
-        apply: (s) => { addEffect(s, T, 'dataminer_eco_over'); } },
-      { shortName: 'BOSS HARVEST', description: 'Boss kills grant +5 protocols.', rarity: 'rare',
-        apply: (s) => { s.mods.bossProtocolBonus = (s.mods.bossProtocolBonus ?? 0) + 5; addEffect(s, T, 'dataminer_eco_boss'); } },
-      { shortName: 'PROTOCOL FLOOD', description: '+50% protocols earned this run (applied at end).',
+      { shortName: 'WIDE SCAN', description: 'DECRYPT aura range +0.5 cells.',
+        apply: (s) => { addEffect(s, T, 'dataminer_eco_1'); } },
+      { shortName: 'REVEAL', description: 'Enemies in aura lose all stealth/invis.', rarity: 'rare',
+        apply: (s) => { addEffect(s, T, 'dataminer_eco_reveal'); } },
+      { shortName: 'ARMOR SCAN', description: 'Aura-affected enemies have −3 effective armor.',
+        apply: (s) => { addEffect(s, T, 'dataminer_eco_armor'); } },
+      { shortName: 'DEEP SCAN', description: 'MARK bonus increases to +45% damage.', rarity: 'rare',
+        apply: (s) => { addEffect(s, T, 'dataminer_eco_deep'); } },
+      { shortName: 'FULL EXPOSURE', description: 'All enemies on the map are considered marked while a boss is alive.',
         apply: (s) => { addEffect(s, T, 'dataminer_eco_caps'); } },
     ],
   });
   BRANCH_SPECS.push({
-    tower: T, towerLabel: TL, branchKey: 'mta', branchLabel: 'META', branchTagSuffix: 'meta',
+    tower: T, towerLabel: TL, branchKey: 'mta', branchLabel: 'CORRUPT', branchTagSuffix: 'corrupt',
     cards: [
-      { shortName: 'META LEARNING', description: 'All towers gain +2% damage per placed turret.',
-        apply: (s) => { addEffect(s, T, 'dataminer_mta_key'); addEffect(s, T, 'dataminer_mta_learn'); } },
-      { shortName: 'META RATE', description: 'All towers gain +2% fire rate per placed turret.',
-        apply: (s) => { addEffect(s, T, 'dataminer_mta_rate'); } },
-      { shortName: 'META RANGE', description: 'All towers gain +1% range per placed turret.', rarity: 'rare',
-        apply: (s) => { addEffect(s, T, 'dataminer_mta_range'); } },
-      { shortName: 'META BUFF', description: 'Global +5% damage flat.',
-        apply: (s) => { s.mods.globalDamagePct += 0.05; addEffect(s, T, 'dataminer_mta_buff'); } },
-      { shortName: 'META CRIT', description: 'Global +5% crit chance.', rarity: 'rare',
-        apply: (s) => { s.mods.globalCritChance += 0.05; addEffect(s, T, 'dataminer_mta_crit'); } },
-      { shortName: 'OMNISCIENCE', description: 'All META bonuses double.',
+      { shortName: 'CORRUPT PROTOCOL', description: 'Aura-affected enemies take 4 dps corruption damage.',
+        apply: (s) => { addEffect(s, T, 'dataminer_mta_key'); } },
+      { shortName: 'SYSTEM SLOW', description: 'Aura applies 10% slow to non-immune enemies.',
+        apply: (s) => { addEffect(s, T, 'dataminer_mta_slow'); } },
+      { shortName: 'HEAVY CORRUPTION', description: 'Corruption DPS doubles to 8.', rarity: 'rare',
+        apply: (s) => { addEffect(s, T, 'dataminer_mta_heavy'); } },
+      { shortName: 'SYNC FIELD', description: 'Aura-affected enemies can\'t regenerate (shield / HP).',
+        apply: (s) => { addEffect(s, T, 'dataminer_mta_nosync'); } },
+      { shortName: 'STUTTER', description: 'Every 3s, all enemies in aura are briefly stunned (0.4s).', rarity: 'rare',
+        apply: (s) => { addEffect(s, T, 'dataminer_mta_stutter'); } },
+      { shortName: 'TOTAL CORRUPTION', description: 'Bosses take DOUBLE DECRYPT aura damage.',
         apply: (s) => { addEffect(s, T, 'dataminer_mta_caps'); } },
     ],
   });
