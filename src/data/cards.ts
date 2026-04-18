@@ -1375,6 +1375,11 @@ const PER_LEVEL: Record<string, number> = { common: 0, rare: 0.5, epic: 0.3, leg
 export interface DraftContext {
   placedTowerTypes: Set<TowerId>;
   towerCount: number;
+  // Tower IDs the player currently holds a deploy token for. Singleton rule makes
+  // a second deploy token for the same tower useless, so we filter those cards
+  // out of the draft pool (fixes the 'draft offers deploy_firewall on wave 1'
+  // bug players hit with the NEURAL BOOSTER starting-level perk).
+  tokensHeld?: Set<TowerId>;
 }
 
 function categoryWeight(category: string, level: number, ctx: DraftContext): number {
@@ -1394,8 +1399,14 @@ export function drawDraft(level: number, unlockedIds: Set<string>, context: Draf
     // Upgrade cards only appear if the relevant tower(s) are placed
     if (c.category === 'upgrade' && c.towerHint && !context.placedTowerTypes.has(c.towerHint)) return false;
     if (c.category === 'upgrade' && c.towerHint2 && !context.placedTowerTypes.has(c.towerHint2)) return false;
-    // Deploy cards filtered out for already-placed singleton tower types
-    if (c.category === 'deploy' && c.towerHint && context.placedTowerTypes.has(c.towerHint)) return false;
+    // Deploy cards filtered out for already-placed singleton tower types,
+    // OR when the player already holds a deploy token for that tower (the
+    // singleton rule means a second token is wasted — e.g. the first draft
+    // shouldn't offer deploy_firewall because every run starts with one).
+    if (c.category === 'deploy' && c.towerHint) {
+      if (context.placedTowerTypes.has(c.towerHint)) return false;
+      if (context.tokensHeld?.has(c.towerHint)) return false;
+    }
     // Non-deploy cards already picked this run are excluded (no duplicates)
     if (c.category !== 'deploy' && pickedIds.includes(c.id)) return false;
     // Cards with requires: all prerequisite card IDs must already be picked

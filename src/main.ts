@@ -513,10 +513,14 @@ function pauseRun() {
   );
 }
 
-function buildDraftContext(r: RunState): { placedTowerTypes: Set<TowerId>; towerCount: number } {
+function buildDraftContext(r: RunState): { placedTowerTypes: Set<TowerId>; towerCount: number; tokensHeld: Set<TowerId> } {
   const placed = new Set<TowerId>();
   for (const t of r.towers) placed.add(t.def);
-  return { placedTowerTypes: placed, towerCount: r.towers.length };
+  const tokensHeld = new Set<TowerId>();
+  for (const [id, count] of Object.entries(r.deployTokens)) {
+    if ((count as number) > 0) tokensHeld.add(id as TowerId);
+  }
+  return { placedTowerTypes: placed, towerCount: r.towers.length, tokensHeld };
 }
 
 function openLevelUpDraft() {
