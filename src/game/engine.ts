@@ -86,6 +86,14 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
     events.onNewEnemy(defId);
   }
 
+  // Sector modifiers — ENCRYPTED PAYLOADS gives a regenerating shield;
+  // STEALTH PROTOCOL randomly cloaks a fraction of spawns.
+  const mods = map.modifiers;
+  const shieldPct = mods?.encrypted ?? 0;
+  const maxShield = shieldPct > 0 ? Math.round(hp * shieldPct) : 0;
+  const stealthRoll = mods?.stealthChance ?? 0;
+  const isStealthSpawn = stealthRoll > 0 && Math.random() < stealthRoll;
+
   s.enemies.push({
     id: nextId(),
     def: defId,
@@ -101,9 +109,12 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
     alive: true,
     isBoss: isBoss || def.threat === 'BOSS' || def.threat === 'MEGA' || def.threat === 'FINAL',
     size: def.size,
-    invisTimer: 0,
+    invisTimer: isStealthSpawn ? 9999 : 0,  // permanent cloak for the run
     hitFlash: 0,
     angle: 0,
+    shield: maxShield > 0 ? maxShield : undefined,
+    maxShield: maxShield > 0 ? maxShield : undefined,
+    shieldRegenTimer: maxShield > 0 ? 0 : undefined,
   });
 }
 
@@ -392,6 +403,13 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
         e.collapseTimer = undefined;
       }
     }
+    // ENCRYPTED PAYLOADS: shield regenerates after 2s of no damage.
+    if (e.maxShield !== undefined && e.shield !== undefined) {
+      e.shieldRegenTimer = (e.shieldRegenTimer ?? 0) + dtSec;
+      if (e.shieldRegenTimer > 2 && e.shield < e.maxShield) {
+        e.shield = Math.min(e.maxShield, e.shield + e.maxShield * 0.5 * dtSec);
+      }
+    }
 
     // Honeypot coating: spread slow to adjacent enemies
     if (hasEffect(s, 'honeypot', 'coating') && e.speedMult < 0.9) {
@@ -465,6 +483,23 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
 
   // Puddle updates
   updatePuddles(s, dtSec);
+
+  // ROOTKIT INTRUSION sector modifier: while a boss is alive, jam a random tower every N seconds.
+  const mapForRootkit = getMap(s.mapId);
+  const rootkitInterval = mapForRootkit.modifiers?.rootkit ?? 0;
+  if (rootkitInterval > 0 && s.towers.length > 0) {
+    const bossAlive = s.enemies.some((e) => e.alive && e.isBoss);
+    if (bossAlive) {
+      (s as any).rootkitTimer = ((s as any).rootkitTimer ?? rootkitInterval) - dtSec;
+      if ((s as any).rootkitTimer <= 0) {
+        (s as any).rootkitTimer = rootkitInterval;
+        const target = s.towers[Math.floor(Math.random() * s.towers.length)];
+        applyTowerDebuff(s, target, 'jammed', 4);
+      }
+    } else {
+      (s as any).rootkitTimer = rootkitInterval;
+    }
+  }
 
   // Tower updates
   for (const t of s.towers) {
@@ -1669,11 +1704,23 @@ function applyResistanceAndArmor(e: EnemyInstance, raw: number, type: DamageType
 export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: boolean, type: DamageType, silent = false, source?: TowerId): number {
   // Brittle coating: slowed/frozen enemies take +15% from all sources
   const brittleMult = (hasEffect(s, 'ice', 'brittle') && e.speedMult < 1) ? 1.15 : 1.0;
-  const final = applyResistanceAndArmor(e, dmg * brittleMult, type, isCrit);
+  let final = applyResistanceAndArmor(e, dmg * brittleMult, type, isCrit);
   if (final <= 0) {
     if (!silent) s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'IMMUNE', vy: -18, life: 0.8, maxLife: 0.8, color: '#6b8090', size: 12 });
     e.hitFlash = 0.12;
     return 0;
+  }
+  // ENCRYPTED PAYLOADS sector modifier: shield absorbs damage before HP. Reset regen timer on hit.
+  if ((e.shield ?? 0) > 0) {
+    e.shieldRegenTimer = 0;
+    const absorbed = Math.min(e.shield!, final);
+    e.shield = e.shield! - absorbed;
+    final -= absorbed;
+    if (final <= 0) {
+      e.hitFlash = isCrit ? 0.25 : 0.18;
+      if (source) s.damageDealt[source] = (s.damageDealt[source] ?? 0) + absorbed;
+      return absorbed;
+    }
   }
   e.hp -= final;
   e.hitFlash = isCrit ? 0.25 : 0.18;
@@ -1696,6 +1743,14 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
     s.shakeAmp = 16;
     s.protocolsEarned += 5;
     s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.8 }, text: '+5 \u2b22 PROTOCOL', vy: -35, life: 1.8, maxLife: 1.8, color: '#ffd600', size: 20 });
+  }
+
+  // REPLICATION VIRUS sector modifier: chance dead enemies spawn an offspring at their location.
+  // Skip if this enemy is already a split-spawn (debuffTimer === -999) to avoid runaway chains.
+  const map = getMap(s.mapId);
+  const repChance = map.modifiers?.replication ?? 0;
+  if (repChance > 0 && e.debuffTimer !== -999 && !e.isBoss && Math.random() < repChance) {
+    spawnWormAt(s, e.pos, e.pathIndex, e.progress);
   }
 
   // Glitch: splits into 2 worms on death

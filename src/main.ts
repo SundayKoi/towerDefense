@@ -18,7 +18,7 @@ import { audio } from '@/audio/sfx';
 import { addToAllPeriods } from '@/data/contracts';
 import type { Difficulty, EnemyId, RunState, SaveData, TowerId } from '@/types';
 import { ENEMIES } from '@/data/enemies';
-import { getMap, isSurvival } from '@/data/maps';
+import { getMap, isSurvival, MAPS } from '@/data/maps';
 
 // ---------- Helpers ----------
 
@@ -92,6 +92,7 @@ window.addEventListener('pointerdown', startAudio, { once: true });
 
 function showStart() {
   mount(startScreen(
+    save,
     () => showMapSelect(),
     () => openSettingsModal(save, applySettings),
     () => openShopScreen(save, () => writeSave(save), showStart),
@@ -640,6 +641,26 @@ function finishRun(victory: boolean) {
             save.unlockedCards.push(c.id);
             unlocks.push({ kind: 'card', id: c.id, name: c.name, rarity: c.rarity });
           }
+        }
+      }
+      if (reward.type === 'protocols') {
+        const amount = parseInt(reward.id, 10) || 0;
+        save.protocols += amount;
+        save.stats.totalProtocolsEarned += amount;
+        unlocks.push({ kind: 'card', id: 'protocols_bonus', name: `+${amount} PROTOCOLS`, rarity: 'rare' });
+      }
+    }
+    // Prestige star check: did this hard clear complete all 5 maps in the sector?
+    if (run.difficulty === 'hard') {
+      const map = getMap(run.mapId);
+      if (map.sector !== undefined && !save.sectorClears[map.sector]) {
+        // Find every campaign map in this sector and check it's hard-cleared.
+        const sectorMaps = MAPS.filter((m) => m.sector === map.sector);
+        const allCleared = sectorMaps.every((m) => save.completed[m.id]?.hard);
+        if (allCleared) {
+          save.sectorClears[map.sector] = true;
+          save.prestigeStars = (save.prestigeStars ?? 0) + 1;
+          unlocks.push({ kind: 'card', id: 'prestige_star', name: `\u2605 SECTOR ${map.sector} PRESTIGE STAR`, rarity: 'legendary' });
         }
       }
     }

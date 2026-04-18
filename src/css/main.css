@@ -167,6 +167,28 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
 }
 .logo-flavor { color: var(--text-dim); font-size: 12px; letter-spacing: 1px; }
 
+.prestige-row {
+  margin-top: 8px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: var(--yellow);
+  text-shadow: 0 0 12px var(--yellow);
+}
+
+.sector-header {
+  display: flex; align-items: baseline; gap: 12px;
+  margin: 24px 0 8px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.04);
+  border-left: 3px solid var(--cyan);
+  font-family: 'Orbitron', sans-serif;
+}
+.sector-num { font-size: 12px; letter-spacing: 3px; color: var(--cyan); }
+.sector-name { font-size: 14px; letter-spacing: 2px; font-weight: 700; color: var(--text); }
+.sector-modifier { font-size: 11px; color: var(--text-dim); flex: 1; }
+.sector-star { font-size: 16px; color: var(--yellow); text-shadow: 0 0 10px var(--yellow); }
+
 .start-buttons {
   display: flex;
   flex-direction: column;

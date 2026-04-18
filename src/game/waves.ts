@@ -79,6 +79,13 @@ export function buildWaveSpawnQueue(map: MapDef, difficulty: 'easy' | 'medium' |
   const rng = Math.random;
   const count = waveCount(wave, difficulty);
   const delay = spawnDelay(wave);
+  // PACKET BURSTS sector modifier: chance each spawn drops a paired follow-up 0.1s later.
+  const burstChance = map.modifiers?.packetBursts ?? 0;
+  const maybeBurst = (entry: RunState['spawnQueue'][number]) => {
+    if (burstChance > 0 && Math.random() < burstChance) {
+      queue.push({ def: entry.def, pathIndex: entry.pathIndex, delay: 0.1, boss: entry.boss });
+    }
+  };
 
   const queue: RunState['spawnQueue'] = [];
   const boss = bossForWave(map, difficulty, wave);
@@ -95,13 +102,11 @@ export function buildWaveSpawnQueue(map: MapDef, difficulty: 'easy' | 'medium' |
     // Boss waves: minion softener (40% of count) + 1 boss
     const softener = Math.max(3, Math.floor(count * 0.4));
     for (let i = 0; i < softener; i++) {
-      queue.push({
-        def: pickEnemyForWave(map, wave, totalWaves, rng),
-        pathIndex: Math.floor(rng() * map.paths.length),
-        delay: i === 0 ? 0.5 : delay * 0.9,
-      });
+      const e = { def: pickEnemyForWave(map, wave, totalWaves, rng), pathIndex: Math.floor(rng() * map.paths.length), delay: i === 0 ? 0.5 : delay * 0.9 };
+      queue.push(e);
+      maybeBurst(e);
     }
-    // gap before boss
+    // gap before boss (no burst on boss itself)
     queue.push({ def: boss, pathIndex: 0, delay: delay * 2.5, boss: true });
     return queue;
   }
@@ -110,11 +115,9 @@ export function buildWaveSpawnQueue(map: MapDef, difficulty: 'easy' | 'medium' |
   if (isMiniBossWave(wave)) {
     const softener = Math.max(3, Math.floor(count * 0.5));
     for (let i = 0; i < softener; i++) {
-      queue.push({
-        def: pickEnemyForWave(map, wave, totalWaves, rng),
-        pathIndex: Math.floor(rng() * map.paths.length),
-        delay: i === 0 ? 0.4 : delay,
-      });
+      const e = { def: pickEnemyForWave(map, wave, totalWaves, rng), pathIndex: Math.floor(rng() * map.paths.length), delay: i === 0 ? 0.4 : delay };
+      queue.push(e);
+      maybeBurst(e);
     }
     queue.push({ def: 'trojan', pathIndex: 0, delay: delay * 2.0, boss: true });
     return queue;
@@ -122,11 +125,9 @@ export function buildWaveSpawnQueue(map: MapDef, difficulty: 'easy' | 'medium' |
 
   // Normal wave
   for (let i = 0; i < count; i++) {
-    queue.push({
-      def: pickEnemyForWave(map, wave, totalWaves, rng),
-      pathIndex: Math.floor(rng() * map.paths.length),
-      delay: i === 0 ? 0.5 : delay,
-    });
+    const e = { def: pickEnemyForWave(map, wave, totalWaves, rng), pathIndex: Math.floor(rng() * map.paths.length), delay: i === 0 ? 0.5 : delay };
+    queue.push(e);
+    maybeBurst(e);
   }
   return queue;
 }

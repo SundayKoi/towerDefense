@@ -52,6 +52,8 @@ export function defaultSave(): SaveData {
     },
     quests: { completed: [] },
     tutorial: { seen: [] },
+    prestigeStars: 0,
+    sectorClears: {},
     contracts: {
       daily:   { period: '', offered: [], claimed: [], stats: emptyPeriodStats() },
       weekly:  { period: '', offered: [], claimed: [], stats: emptyPeriodStats() },
@@ -87,6 +89,8 @@ export function loadSave(): SaveData {
       shopPurchased: parsed.shopPurchased ?? {},
       quests: parsed.quests ?? { completed: [] },
       tutorial: parsed.tutorial ?? { seen: [] },
+      prestigeStars: parsed.prestigeStars ?? 0,
+      sectorClears: parsed.sectorClears ?? {},
       contracts: parsed.contracts ?? d.contracts,
       stats: { ...d.stats, ...(parsed.stats ?? {}) },
       settings: { ...d.settings, ...(parsed.settings ?? {}) },
@@ -171,7 +175,8 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     spawnQueue: [],
     spawnElapsed: 0,
     mods: {
-      globalDamagePct: save.metaBoosts.globalDamagePct ?? 0,
+      // Each prestige star = permanent +1% global damage. Stacks with shop adaptive_weapons.
+      globalDamagePct: (save.metaBoosts.globalDamagePct ?? 0) + 0.01 * (save.prestigeStars ?? 0),
       globalRangePct: save.metaBoosts.globalRangePct ?? 0,
       globalRatePct: save.metaBoosts.globalRatePct ?? 0,
       globalCritChance: save.metaBoosts.globalCritChancePct ?? 0,

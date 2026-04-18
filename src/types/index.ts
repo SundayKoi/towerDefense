@@ -154,9 +154,20 @@ export interface MapDef {
   };
   bosses: Record<Difficulty, Record<number, EnemyId>>;
   rewards: {
-    easyClear?: { type: 'unlock-card' | 'unlock-tower'; id: string };
-    mediumClear?: { type: 'unlock-card' | 'unlock-tower'; id: string };
-    hardClear?: { type: 'unlock-card' | 'unlock-tower'; id: string };
+    easyClear?: { type: 'unlock-card' | 'unlock-tower' | 'protocols'; id: string };
+    mediumClear?: { type: 'unlock-card' | 'unlock-tower' | 'protocols'; id: string };
+    hardClear?: { type: 'unlock-card' | 'unlock-tower' | 'protocols'; id: string };
+  };
+  // Sector index for grouping (1–6). Used for prestige tracking + start-screen badges.
+  sector?: number;
+  // Cyberattack modifiers applied to every enemy spawned on this map.
+  // All optional; absent = vanilla behavior.
+  modifiers?: {
+    packetBursts?: number;     // chance (0–1) a spawn drops a second enemy 0.1s later
+    encrypted?: number;        // initial shield as % of max HP (0–1) — absorbed before HP damage
+    stealthChance?: number;    // chance (0–1) an enemy spawns permanently cloaked
+    replication?: number;      // chance (0–1) a killed enemy spawns a worm offspring
+    rootkit?: number;          // jam interval (sec) — every N seconds while a boss is alive, jam a random tower
   };
 }
 
@@ -198,6 +209,10 @@ export interface EnemyInstance {
   debuffTimer?: number;   // used by Rootkit to pace debuff application, -1 = signal has revived
   marked?: number;        // seconds remaining on mark debuff (takes +30% from all sources)
   collapseTimer?: number; // seconds until armor restoration after quantum collapse
+  // ENCRYPTED PAYLOADS sector modifier: enemies have a regenerating shield.
+  shield?: number;        // current shield value (absorbed before HP)
+  maxShield?: number;     // max shield value, for regen
+  shieldRegenTimer?: number; // seconds since last damage; regens after 2s of no damage
 }
 
 export interface Projectile {
@@ -302,6 +317,9 @@ export interface SaveData {
   metaBoosts: MetaBoosts;                   // derived from shop, cached for quick apply
   quests: { completed: string[] };          // quest IDs claimed
   tutorial: { seen: string[] };             // first-time popup IDs already shown
+  prestigeStars: number;                    // count of sector hard-clear stars (0–6); each = +1% global damage
+  sectorClears: Record<number, boolean>;    // sector index → all 5 maps hard-cleared
+
   contracts: {
     daily:   { period: string; offered: string[]; claimed: string[]; stats: PeriodStats };
     weekly:  { period: string; offered: string[]; claimed: string[]; stats: PeriodStats };

@@ -1,5 +1,5 @@
 import type { Screen } from './screens';
-import type { Difficulty, EnemyId, SaveData } from '@/types';
+import type { Difficulty, EnemyId, MapDef, SaveData } from '@/types';
 import { MAPS, isSurvival } from '@/data/maps';
 import { ENEMIES } from '@/data/enemies';
 import { audio } from '@/audio/sfx';
@@ -7,6 +7,15 @@ import { audio } from '@/audio/sfx';
 const THREAT_COLOR: Record<string, string> = {
   LOW: '#00ff88', MEDIUM: '#ffd600', HIGH: '#ff9900',
   EXTREME: '#ff3355', BOSS: '#ff2d95', MEGA: '#b847ff', FINAL: '#ffffff',
+};
+
+const SECTOR_INFO: Record<number, { name: string; modifier: string }> = {
+  1: { name: 'TRAINING SUBNET',     modifier: '' },
+  2: { name: 'CORPORATE BACKBONE',  modifier: 'PACKET BURSTS' },
+  3: { name: 'DEEP CORE',           modifier: 'ENCRYPTED PAYLOADS' },
+  4: { name: 'NEON UNDERGROUND',    modifier: 'STEALTH PROTOCOL' },
+  5: { name: 'VOID NETWORK',        modifier: 'REPLICATION VIRUS' },
+  6: { name: 'APEX RUIN',           modifier: 'ROOTKIT INTRUSION' },
 };
 
 function enemyChip(id: EnemyId): string {
@@ -33,8 +42,9 @@ export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficul
 
     const list = root.querySelector('#map-list') as HTMLElement;
 
+    // Campaign maps in order — used for sequential unlock chain.
+    const campaign = MAPS.filter((m) => !isSurvival(m.id)).slice().sort((a, b) => a.order - b.order);
     const unlockStatus: Record<string, boolean> = {};
-    const campaign = MAPS.filter((m) => !isSurvival(m.id));
     for (let i = 0; i < campaign.length; i++) {
       if (i === 0) { unlockStatus[campaign[i].id] = true; continue; }
       const prev = campaign[i - 1];
@@ -42,14 +52,24 @@ export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficul
     }
     unlockStatus['survival'] = !!save.completed['mainframe']?.easy;
 
-    for (const m of MAPS) {
+    // Group by sector. Maps without a sector (survival) go to the end.
+    const sectors = new Map<number, MapDef[]>();
+    const noSector: MapDef[] = [];
+    for (const m of campaign) {
+      if (m.sector === undefined) {
+        noSector.push(m);
+      } else {
+        if (!sectors.has(m.sector)) sectors.set(m.sector, []);
+        sectors.get(m.sector)!.push(m);
+      }
+    }
+
+    const renderMapRow = (m: MapDef) => {
       const unlocked = unlockStatus[m.id];
       const survival = isSurvival(m.id);
       const compl = save.completed[m.id] ?? {};
 
-      // Unique enemies across all phases
       const allEnemies = [...new Set([...m.enemyPool.phase1, ...m.enemyPool.phase2, ...m.enemyPool.phase3])] as EnemyId[];
-      // All unique boss IDs across difficulties
       const allBossIds = [...new Set(Object.values(m.bosses).flatMap((bMap) => Object.values(bMap)))] as EnemyId[];
 
       const row = document.createElement('div');
@@ -91,7 +111,27 @@ export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficul
         </div>
       `;
       list.appendChild(row);
+    };
+
+    const sortedSectors = [...sectors.keys()].sort((a, b) => a - b);
+    for (const sectorNum of sortedSectors) {
+      const info = SECTOR_INFO[sectorNum] ?? { name: `SECTOR ${sectorNum}`, modifier: '' };
+      const cleared = !!save.sectorClears[sectorNum];
+      const header = document.createElement('div');
+      header.className = `sector-header sector-${sectorNum}`;
+      header.innerHTML = `
+        <span class="sector-num">SECTOR ${sectorNum}</span>
+        <span class="sector-name">${info.name}</span>
+        <span class="sector-modifier">${info.modifier}</span>
+        ${cleared ? '<span class="sector-star">&#9733;</span>' : ''}
+      `;
+      list.appendChild(header);
+      const maps = sectors.get(sectorNum)!.slice().sort((a, b) => a.order - b.order);
+      for (const m of maps) renderMapRow(m);
     }
+
+    // Maps not assigned to a sector (survival) render at the bottom without a header.
+    for (const m of noSector) renderMapRow(m);
 
     list.querySelectorAll<HTMLButtonElement>('.diff-btn').forEach((btn) => {
       btn.addEventListener('click', () => {

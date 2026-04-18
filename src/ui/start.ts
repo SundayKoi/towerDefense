@@ -1,8 +1,11 @@
 import type { Screen } from './screens';
+import type { SaveData } from '@/types';
 import { audio } from '@/audio/sfx';
 
-export function startScreen(onJackIn: () => void, onSettings: () => void, onShop: () => void, onDatabank: () => void, onHowToPlay: () => void): Screen {
+export function startScreen(save: SaveData, onJackIn: () => void, onSettings: () => void, onShop: () => void, onDatabank: () => void, onHowToPlay: () => void): Screen {
   return (root) => {
+    const stars = save.prestigeStars ?? 0;
+    const prestigeMarkup = stars > 0 ? `&#9733; \u00D7 ${stars}` : '';
     root.innerHTML = `
       <div class="screen screen-center">
         <div class="start-logo">
@@ -12,6 +15,7 @@ export function startScreen(onJackIn: () => void, onSettings: () => void, onShop
           <div class="logo-sub">// INTRUSION DEFENSE</div>
           <div class="logo-line"></div>
           <div class="logo-flavor">A cyberpunk roguelike tower defense</div>
+          <div class="prestige-row" id="prestige-row"${stars === 0 ? ' style="display:none"' : ''}>${prestigeMarkup}</div>
         </div>
         <div class="start-buttons">
           <button class="btn btn-primary btn-lg" id="btn-jack-in">
