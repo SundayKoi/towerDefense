@@ -354,29 +354,38 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
 
 /* ------------- Game Screen ------------- */
 
+/* Game screen is one full-bleed canvas with absolutely-positioned HUD/tokens/
+   actions overlays anchored at the edges. Canvas fills the whole game-screen
+   so the map isn't letterboxed behind sidebars. */
 .game-screen {
   padding: 0;
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+  display: block;
+  position: relative;
 }
 
 .hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 20;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  padding: 6px 10px;
+  grid-template-columns: 1fr;
+  grid-auto-rows: min-content;
+  padding: 8px 12px;
   gap: 6px;
-  background: linear-gradient(180deg, rgba(10, 14, 24, 0.9), rgba(5, 6, 10, 0.7));
-  border-bottom: 1px solid rgba(0, 255, 240, 0.2);
-  backdrop-filter: blur(6px);
-  flex-shrink: 0;
+  min-width: 118px;
+  background: rgba(5, 8, 14, 0.72);
+  border: 1px solid rgba(0, 255, 240, 0.3);
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 16px rgba(0, 255, 240, 0.1);
 }
 .hud-cell {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 4px 2px;
+  align-items: flex-start;
+  padding: 2px 0;
 }
 .hud-cell .label {
   font-size: 9px;
@@ -386,26 +395,25 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
 }
 .hud-cell .value {
   font-family: 'Orbitron', sans-serif;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
-  margin-top: 2px;
+  margin-top: 1px;
   text-shadow: 0 0 6px currentColor;
+  line-height: 1;
 }
 .hud-cell.hp .value      { color: var(--red); }
 .hud-cell.credits .value { color: var(--yellow); }
 .hud-cell.wave .value    { color: var(--cyan); }
-.hud-cell.map .value     { color: var(--magenta); font-size: 14px; }
+.hud-cell.map .value     { color: var(--magenta); font-size: 12px; }
 
 .canvas-wrap {
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   display: flex;
   justify-content: center;
   align-items: center;
   overflow: hidden;
   background: radial-gradient(ellipse at center, rgba(0, 255, 240, 0.03), transparent 60%);
-  position: relative;
-  min-height: 0;
 }
 #game-canvas {
   image-rendering: crisp-edges;
@@ -414,18 +422,29 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
 }
 
 .action-bar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
   display: flex;
+  flex-direction: row;
   gap: 6px;
-  padding: 8px;
-  background: linear-gradient(0deg, rgba(10, 14, 24, 0.9), rgba(5, 6, 10, 0.7));
-  border-top: 1px solid rgba(0, 255, 240, 0.2);
-  backdrop-filter: blur(6px);
-  flex-shrink: 0;
+  padding: 6px 8px;
+  background: rgba(5, 8, 14, 0.72);
+  border: 1px solid rgba(0, 255, 240, 0.3);
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 16px rgba(0, 255, 240, 0.1);
 }
 .action-btn {
-  min-width: 52px;
-  padding: 10px 14px;
-  font-size: 16px;
+  min-width: 44px;
+  padding: 8px 10px;
+  font-size: 15px;
+}
+#btn-start-wave {
+  font-size: 13px;
+  padding: 8px 14px;
+  letter-spacing: 1.5px;
 }
 
 /* ------------- Palette ------------- */
@@ -1252,16 +1271,25 @@ html.pixel-mode .map-row {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* ------------- Tokens bar (between HUD and canvas) ------------- */
+/* ------------- Tokens bar (overlay, bottom-center) ------------- */
 
 .tokens-bar {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
   display: flex;
+  flex-direction: row;
   gap: 6px;
   padding: 6px 10px;
+  max-width: calc(100% - 32px);
   overflow-x: auto;
-  background: linear-gradient(0deg, rgba(5,6,10,0.7), rgba(10,14,24,0.9));
-  border-bottom: 1px solid rgba(0, 255, 240, 0.12);
-  flex-shrink: 0;
+  background: rgba(5, 8, 14, 0.72);
+  border: 1px solid rgba(0, 255, 240, 0.25);
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 16px rgba(0, 255, 240, 0.1);
   scrollbar-width: none;
 }
 .tokens-bar::-webkit-scrollbar { display: none; }
@@ -2090,61 +2118,9 @@ html, body { overscroll-behavior: none; }
 .htp-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--text); }
 .htp-list li { margin-bottom: 4px; }
 
-/* ═══════════════ LANDSCAPE LAYOUT ═══════════════
-   When the viewport is wider than it is tall (landscape phones + desktop +
-   tablets) we pivot the game screen from column-stacked HUD/canvas/actions
-   to a three-zone row layout: HUD sidebar | canvas | tokens+actions sidebar.
-   The canvas aspect ratio already letterboxes via Math.min(cellW, cellH) so
-   the portrait-shaped maps render centered in the middle zone. Portrait mode
-   (phones held vertically) keeps the current stacked layout untouched. */
+/* Palette (tower drawer) becomes a right-edge slide-in in landscape; stays as
+   a bottom sheet in portrait phones. Canvas itself is always full-bleed. */
 @media (min-aspect-ratio: 1/1) {
-  .game-screen {
-    flex-direction: row;
-  }
-  .hud {
-    grid-template-columns: 1fr;
-    grid-auto-rows: min-content;
-    width: 118px;
-    flex-shrink: 0;
-    border-bottom: none;
-    border-right: 1px solid rgba(0, 255, 240, 0.2);
-    padding: 8px 6px;
-    gap: 8px;
-    align-content: start;
-  }
-  .hud-cell { padding: 4px 2px; }
-  .hud-cell .value { font-size: 15px; }
-  .hud-cell .label { font-size: 8px; }
-  .hud-cell.map .value { font-size: 11px; }
-
-  .canvas-wrap { order: 2; flex: 1 1 auto; min-width: 0; min-height: 0; align-self: stretch; }
-
-  .tokens-bar {
-    order: 3;
-    flex-direction: column;
-    width: 132px;
-    flex-shrink: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    border-bottom: none;
-    border-left: 1px solid rgba(0, 255, 240, 0.12);
-    max-height: unset;
-  }
-  .token-chip { width: 100%; }
-
-  .action-bar {
-    order: 4;
-    flex-direction: column;
-    width: 118px;
-    flex-shrink: 0;
-    border-top: none;
-    border-left: 1px solid rgba(0, 255, 240, 0.2);
-    padding: 6px;
-    gap: 6px;
-  }
-  .action-btn, .btn-grow { width: 100%; }
-
-  /* Palette becomes a right-edge vertical drawer instead of bottom sheet. */
   .palette {
     left: auto;
     top: 0;
@@ -2157,17 +2133,6 @@ html, body { overscroll-behavior: none; }
     box-shadow: -20px 0 40px rgba(0, 0, 0, 0.6), 0 0 40px rgba(0, 255, 240, 0.15);
   }
   .palette.open { animation: slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
-}
-
-/* Extra breathing room on wide desktop — grow the sidebars rather than the
-   canvas so the map doesn't pixel-bloom to a cartoonish scale. */
-@media (min-aspect-ratio: 1/1) and (min-width: 1100px) {
-  .hud { width: 160px; padding: 12px 10px; }
-  .hud-cell .value { font-size: 18px; }
-  .hud-cell .label { font-size: 9px; }
-  .hud-cell.map .value { font-size: 13px; }
-  .tokens-bar { width: 180px; }
-  .action-bar { width: 150px; padding: 10px; gap: 8px; }
 }
 @keyframes slide-in-right {
   from { transform: translateX(100%); opacity: 0; }
