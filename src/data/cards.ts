@@ -66,7 +66,7 @@ const DEPLOY: CardDef[] = [
     category: 'deploy',
     towerHint: 'mine',
     description: 'Gain an ARTILLERY deploy token. Heavy AoE shells with long range.',
-    apply: (s) => { addToken(s, 'mine', 2); },
+    apply: (s) => { addToken(s, 'mine', 1); },
   },
   {
     id: 'deploy_chain',
@@ -1148,9 +1148,9 @@ const UPGRADE: CardDef[] = [
     apply: (s) => { addEffect(s, 'pulse', 'cryopulse'); addEffect(s, 'ice', 'cryopulse'); },
   },
   {
-    id: 'syn_rl_mn', name: 'KINETIC MINE', rarity: 'rare', category: 'upgrade', towerHint: 'railgun', towerHint2: 'mine',
-    description: '[RAILGUN + ARTILLERY] RAILGUN kills drop an ARTILLERY deploy token at the death location.',
-    apply: (s) => { addEffect(s, 'railgun', 'kinetic_mine'); addEffect(s, 'mine', 'kinetic_mine'); },
+    id: 'syn_rl_mn', name: 'BARRAGE STRIKE', rarity: 'rare', category: 'upgrade', towerHint: 'railgun', towerHint2: 'mine',
+    description: '[RAILGUN + ARTILLERY] RAILGUN kills trigger an ARTILLERY shell impact at the death location.',
+    apply: (s) => { addEffect(s, 'railgun', 'barrage_strike'); addEffect(s, 'mine', 'barrage_strike'); },
   },
   {
     id: 'syn_fw_se', name: 'BASTION PROTOCOL', rarity: 'epic', category: 'upgrade', towerHint: 'firewall', towerHint2: 'sentinel',

@@ -1121,6 +1121,23 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     if (rl) rl.cooldown = Math.max(0, rl.cooldown - 0.3);
   }
 
+  // Barrage strike synergy: RAILGUN kills trigger an ARTILLERY shell at the death point
+  if (p.fromTower === 'railgun' && !target.alive && hasEffect(s, 'railgun', 'barrage_strike')) {
+    const art = s.towers.find((tw) => tw.def === 'mine');
+    if (art) {
+      const aDef = TOWERS.mine;
+      const aDmg = effectiveDamage(s, art);
+      const aRad = (aDef.aoe?.radius ?? 1.5) * (hasEffect(s, 'mine', 'wide') ? 2 : 1);
+      spawnExplosion(s, { x: target.pos.x, y: target.pos.y }, aDef.projectileColor, aRad);
+      for (const e of s.enemies) {
+        if (!e.alive) continue;
+        if (Math.hypot(e.pos.x - target.pos.x, e.pos.y - target.pos.y) <= aRad) {
+          damageEnemy(s, e, aDmg * 0.75, false, 'aoe', false, 'mine');
+        }
+      }
+    }
+  }
+
   // Railgun armor pierce: extra damage vs armor (compensate for ignored armor)
   if (p.fromTower === 'railgun' && hasEffect(s, 'railgun', 'armor_pierce') && target.alive) {
     const armorMitigation = Math.min(6, ENEMIES[target.def].armor ?? 0);
