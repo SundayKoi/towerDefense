@@ -212,9 +212,10 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
   // Floaters
   drawFloaters(ctx, vp, s);
 
-  // Scanline overlay — CRT phosphor feel. Every 2nd row at ~14% opacity.
-  // Drawn in-shake so pixelate/bloom treat it as part of the frame.
-  drawScanlines(ctx, vp);
+  // Scanline overlay disabled — interacts poorly with the additive bloom pass
+  // on dark map backgrounds. CSS-layer scanlines in index.html already provide
+  // the CRT feel without touching the game canvas. Leaving the function defined
+  // so we can re-enable it after moving it outside the bloom-eligible layer.
 
   ctx.restore();
 }

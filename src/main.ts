@@ -175,16 +175,29 @@ function wireGameScreen() {
     // Primary: measure canvas-wrap directly
     let w = wrap.getBoundingClientRect().width;
     let hh = wrap.getBoundingClientRect().height;
-    // Fallback: game-screen is always sized (position:fixed derived) — subtract bar heights
+    // Fallback: game-screen is always sized (position:fixed derived). The math
+    // differs between portrait (column) and landscape (row) layouts — detect
+    // landscape via window aspect ratio and subtract the sidebar widths instead
+    // of the bar heights. Without this, landscape desktop hits the early-return
+    // and the canvas stays at default 300x150, showing bg-canvas behind.
     if (w < 4 || hh < 4) {
       const gs = wrap.closest('.game-screen') as HTMLElement | null;
       const gsRect = gs?.getBoundingClientRect();
       if (gsRect && gsRect.width > 4) {
-        w = gsRect.width;
-        const hudH = (document.querySelector('.hud') as HTMLElement | null)?.offsetHeight ?? 0;
-        const tokH = (document.getElementById('hud-tokens') as HTMLElement | null)?.offsetHeight ?? 0;
-        const actH = (document.querySelector('.action-bar') as HTMLElement | null)?.offsetHeight ?? 0;
-        hh = gsRect.height - hudH - tokH - actH;
+        const landscape = window.innerWidth >= window.innerHeight;
+        if (landscape) {
+          const hudW = (document.querySelector('.hud') as HTMLElement | null)?.offsetWidth ?? 0;
+          const tokW = (document.getElementById('hud-tokens') as HTMLElement | null)?.offsetWidth ?? 0;
+          const actW = (document.querySelector('.action-bar') as HTMLElement | null)?.offsetWidth ?? 0;
+          w = gsRect.width - hudW - tokW - actW;
+          hh = gsRect.height;
+        } else {
+          w = gsRect.width;
+          const hudH = (document.querySelector('.hud') as HTMLElement | null)?.offsetHeight ?? 0;
+          const tokH = (document.getElementById('hud-tokens') as HTMLElement | null)?.offsetHeight ?? 0;
+          const actH = (document.querySelector('.action-bar') as HTMLElement | null)?.offsetHeight ?? 0;
+          hh = gsRect.height - hudH - tokH - actH;
+        }
       }
     }
     if (w < 4 || hh < 4) return;
