@@ -153,6 +153,10 @@ export interface CardDef {
   requires?: string[];   // card IDs that must be in cardsPicked before this appears
   excludes?: string[];   // card IDs that LOCK this one out — used for branch commitment
   branch?: string;       // optional branch label (e.g. 'firewall.suppression') for UI grouping
+  // Repeatable cards bypass the "already picked this run" filter. Used for a
+  // handful of universal stat-bump cards that fill draft slots once the
+  // tower-specific pool thins out (esp. on early maps with few unlocks).
+  repeatable?: boolean;
   apply: (state: RunState) => void;
 }
 

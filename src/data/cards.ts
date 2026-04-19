@@ -1307,6 +1307,71 @@ const UPGRADE: CardDef[] = [
   ...NETLINKS,
 ];
 
+// ==================== UNIVERSAL REPEATABLE CARDS ====================
+// Tiny always-available stat bumps that bypass the "no-duplicates" filter.
+// Purpose: fill draft slots when the tower-specific pool runs dry — early
+// maps with limited unlocks or late-run branches that have locked out their
+// sibling cards. Each is common, category 'exotic' (so categoryWeight treats
+// them as low-priority but always-eligible), and flagged repeatable.
+// Intentionally modest (+2-4% each) so stacking a dozen still feels earned.
+
+const UNIVERSAL: CardDef[] = [
+  {
+    id: 'uni_micro_patch',
+    name: 'MICRO-PATCH',
+    rarity: 'common',
+    category: 'exotic',
+    description: '+3% global damage. Repeatable.',
+    repeatable: true,
+    apply: (s) => { s.mods.globalDamagePct += 0.03; },
+  },
+  {
+    id: 'uni_calibration',
+    name: 'CALIBRATION',
+    rarity: 'common',
+    category: 'exotic',
+    description: '+3% global fire rate. Repeatable.',
+    repeatable: true,
+    apply: (s) => { s.mods.globalRatePct += 0.03; },
+  },
+  {
+    id: 'uni_sensor_tune',
+    name: 'SENSOR TUNE',
+    rarity: 'common',
+    category: 'exotic',
+    description: '+2% global range. Repeatable.',
+    repeatable: true,
+    apply: (s) => { s.mods.globalRangePct += 0.02; },
+  },
+  {
+    id: 'uni_micro_heal',
+    name: 'MICRO-HEAL',
+    rarity: 'common',
+    category: 'heal',
+    description: 'Restore 2 integrity. Repeatable.',
+    repeatable: true,
+    apply: (s) => { s.hp = Math.min(s.maxHp, s.hp + 2); },
+  },
+  {
+    id: 'uni_crit_tune',
+    name: 'CRIT TUNE',
+    rarity: 'rare',
+    category: 'exotic',
+    description: '+2% global crit chance. Repeatable.',
+    repeatable: true,
+    apply: (s) => { s.mods.globalCritChance += 0.02; },
+  },
+  {
+    id: 'uni_xp_chip',
+    name: 'XP CHIP',
+    rarity: 'common',
+    category: 'exotic',
+    description: 'Instant +20 XP. Repeatable.',
+    repeatable: true,
+    apply: (s) => { s.xp += 20; },
+  },
+];
+
 // ==================== HEAL CARDS ====================
 
 const HEAL: CardDef[] = [
@@ -1397,6 +1462,7 @@ const EXOTIC: CardDef[] = [
 export const CARDS: CardDef[] = [
   ...DEPLOY,
   ...UPGRADE,
+  ...UNIVERSAL,
   ...HEAL,
   ...EXOTIC,
 ];
@@ -1445,6 +1511,9 @@ export const STARTING_UNLOCKED_CARDS = [
   ...cardsInBranch('antivirus', STARTER_BRANCH.antivirus).map((c) => c.id),
   // Non-legendary heals always available
   ...HEAL.filter((c) => c.rarity !== 'legendary').map((c) => c.id),
+  // Universal repeatable filler cards — always unlocked so drafts never
+  // run empty once the tower-specific pool thins out.
+  ...UNIVERSAL.map((c) => c.id),
   // One gentle exotic starter
   'exotic_overclock',
 ];
@@ -1496,8 +1565,10 @@ export function drawDraft(level: number, unlockedIds: Set<string>, context: Draf
       if (context.placedTowerTypes.has(c.towerHint)) return false;
       if (context.tokensHeld?.has(c.towerHint)) return false;
     }
-    // Non-deploy cards already picked this run are excluded (no duplicates)
-    if (c.category !== 'deploy' && pickedIds.includes(c.id)) return false;
+    // Non-deploy cards already picked this run are excluded (no duplicates).
+    // Repeatable cards bypass this — they're tiny universal stat bumps that
+    // fill draft slots on early maps when the tower-specific pool runs dry.
+    if (c.category !== 'deploy' && !c.repeatable && pickedIds.includes(c.id)) return false;
     // Cards with requires: all prerequisite card IDs must already be picked
     if (c.requires && !c.requires.every(r => pickedIds.includes(r))) return false;
     // Cards with excludes: any picked card in the excludes list locks this one out
