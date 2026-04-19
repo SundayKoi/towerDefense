@@ -1322,24 +1322,16 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
       && (hasSubnetLink(s, 'antivirus', 'quantum') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
     critChance += 0.15;
   }
-  // Quantum supercharge: +100% damage on the shot after a crit. Used to
-  // force a guaranteed crit here, but that crit's hit refreshed the ready
-  // flag (see hitEnemy) — creating an infinite crit chain. Switched to a
-  // plain damage multiplier so the follow-up isn't itself a crit and the
-  // loop breaks naturally.
+  // Quantum supercharge: +50% damage on the shot after a crit, then 5s
+  // cooldown before the trigger can re-arm. Used to force a guaranteed crit
+  // on the follow-up which fed an infinite crit chain (the forced crit re-
+  // armed itself in hitEnemy). Switched to a plain damage multiplier with a
+  // real cooldown window so the combo is episodic, not endless.
   let superchargeMult = 1;
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'supercharge') && (t.extras.superchargeReady ?? 0) > 0) {
-    superchargeMult = 2;
+    superchargeMult = 1.5;
     t.extras.superchargeReady = 0;
-  }
-  // Quantum resonance: +50% damage on the shot after a crit, then 5s cooldown
-  // before the trigger can re-arm (see hitEnemy for arming). Stacks with
-  // supercharge if both are picked (same SUPERPOSITION branch allows both).
-  let resonanceMult = 1;
-  if (t.def === 'quantum' && hasEffect(s, 'quantum', 'resonance') && (t.extras.resonanceArmed ?? 0) > 0) {
-    resonanceMult = 1.5;
-    t.extras.resonanceArmed = 0;
-    t.extras.resonanceReadyAt = s.elapsed + 5;
+    t.extras.superchargeReadyAt = s.elapsed + 5;
   }
   if (critChance > 0 && Math.random() < critChance) isCrit = true;
   // Precision matrix: ANTIVIRUS marks cause quantum guaranteed crit
@@ -1396,7 +1388,7 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   // the target's open port. Pops an EXPLOIT! floater so players can see the
   // pairing working in real time. Table lives in data/ports.ts.
   const portMult = exploitBonus(t.def, target.def);
-  const dmg = (isCrit ? baseDmg * critMult : baseDmg) * observerLensBonus * heatMult * portMult * superchargeMult * resonanceMult;
+  const dmg = (isCrit ? baseDmg * critMult : baseDmg) * observerLensBonus * heatMult * portMult * superchargeMult;
   if (portMult > 1 && Math.random() < 0.3) {
     s.floaters.push({
       pos: { x: target.pos.x, y: target.pos.y - 0.4 },
@@ -1532,7 +1524,8 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
     const shouldDouble = hasEffect(s, 'quantum', 'double') && Math.random() < 0.35;
     const quantumSightActive = hasEffect(s, 'quantum', 'quantum_sight') && (target.marked ?? 0) > 0;
     if (shouldDouble || quantumSightActive) {
-      s.projectiles.push({ ...proj, id: nextId(), pos: { x: t.grid.x, y: t.grid.y }, isCrit, trail: [] });
+      const extraIsCrit = (hasEffect(s, 'quantum', 'resonance') && isCrit) ? true : isCrit;
+      s.projectiles.push({ ...proj, id: nextId(), pos: { x: t.grid.x, y: t.grid.y }, isCrit: extraIsCrit, trail: [] });
     }
   }
 
@@ -2112,20 +2105,13 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     target.slowTimer = Math.max(target.slowTimer, 1.5);
   }
 
-  // Quantum supercharge: set next shot guaranteed crit
+  // Quantum supercharge: arm +50% next-shot damage on crit, respecting the
+  // 5s cooldown. superchargeReadyAt is an s.elapsed timestamp set when the
+  // bonus is CONSUMED in fire(), so re-arming is blocked until it passes.
   if (p.fromTower === 'quantum' && p.isCrit && hasEffect(s, 'quantum', 'supercharge')) {
     const qmTower = s.towers.find((tw) => tw.def === 'quantum');
-    if (qmTower) qmTower.extras.superchargeReady = 1;
-  }
-
-  // Quantum resonance: arm next-shot +50% damage bonus on crit. 5s cooldown
-  // between arms — resonanceReadyAt is an s.elapsed timestamp set when the
-  // bonus is CONSUMED (see fire), so re-arming is blocked until the game
-  // clock passes it.
-  if (p.fromTower === 'quantum' && p.isCrit && hasEffect(s, 'quantum', 'resonance')) {
-    const qmTower = s.towers.find((tw) => tw.def === 'quantum');
-    if (qmTower && s.elapsed >= (qmTower.extras.resonanceReadyAt ?? 0)) {
-      qmTower.extras.resonanceArmed = 1;
+    if (qmTower && s.elapsed >= (qmTower.extras.superchargeReadyAt ?? 0)) {
+      qmTower.extras.superchargeReady = 1;
     }
   }
 
