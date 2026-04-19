@@ -2154,13 +2154,17 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
     e.shield = e.shield! - absorbed;
     final -= absorbed;
     if (final <= 0) {
-      e.hitFlash = isCrit ? 0.25 : 0.18;
+      if (!silent) e.hitFlash = isCrit ? 0.25 : 0.18;
       if (source) s.damageDealt[source] = (s.damageDealt[source] ?? 0) + absorbed;
       return absorbed;
     }
   }
   e.hp -= final;
-  e.hitFlash = isCrit ? 0.25 : 0.18;
+  // Silent hits are DoT ticks (honeypot puddle, sentinel aura, decrypt CORRUPT).
+  // Keeping hitFlash pinned at 0.18 every frame meant the sprite was permanently
+  // white-tinted while standing in any damage field — unreadable. Only flash
+  // for explicit projectile / explosion hits.
+  if (!silent) e.hitFlash = isCrit ? 0.25 : 0.18;
   if (source) s.damageDealt[source] = (s.damageDealt[source] ?? 0) + final;
   // Damage number floater with physics — only for non-silent hits over 1 dmg
   // so DoT tick spam doesn't flood the screen. Crits are larger, yellow, and

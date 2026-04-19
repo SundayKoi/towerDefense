@@ -1082,14 +1082,33 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
     }
   }
 
-  // Slow tint overlay
+  // Slow indicator — a thin pulsing frost ellipse at the enemy's feet. The
+  // previous version was a 40% alpha filled circle the size of the sprite,
+  // which covered half the enemy and made the map unreadable through any
+  // honeypot/sentinel field. This reads as "frosty ground" without obscuring.
   if (e.speedMult < 1) {
-    ctx.globalAlpha = 0.4;
-    ctx.fillStyle = '#00aaff';
+    const slowPulse = 0.55 + 0.45 * Math.sin(t * 6 + e.id);
+    ctx.save();
+    ctx.globalAlpha = 0.75 * slowPulse;
+    ctx.strokeStyle = '#8fefff';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = '#00aaff';
+    ctx.shadowBlur = 6;
     ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.45, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+    ctx.ellipse(cx, cy + size * 0.3, size * 0.48, size * 0.16, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    // Three tiny frost-crystal pips on the ring.
+    ctx.globalAlpha = 0.9 * slowPulse;
+    ctx.fillStyle = '#d0f2ff';
+    for (let i = 0; i < 3; i++) {
+      const a = t * 1.5 + e.id + i * (Math.PI * 2 / 3);
+      const px = cx + Math.cos(a) * size * 0.48;
+      const py = cy + size * 0.3 + Math.sin(a) * size * 0.16;
+      ctx.beginPath();
+      ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   // HP bar
