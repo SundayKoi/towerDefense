@@ -2847,15 +2847,16 @@ html, body { overflow-x: hidden; }
 
   /* ── Selected-tower panel: compact right-anchored sidebar on landscape
    *    phones. Previously a full-bleed bottom sheet that ate half the
-   *    screen when you tapped a turret. Now a thin ~260px column pinned to
-   *    the right side, vertically scrollable if content overflows. ── */
+   *    screen. Anchored below the top action-bar so the close X never
+   *    hides under the menu/stats/speed/start-wave buttons, and above the
+   *    bottom tokens-bar so those stay tappable too. ── */
   .selected-tower {
     left: auto;
     right: 6px;
-    top: 6px;
+    top: 52px;
     bottom: auto;
-    width: min(260px, 48vw);
-    max-height: calc(100vh - 70px);
+    width: min(240px, 46vw);
+    max-height: calc(100vh - 120px);
     overflow-y: auto;
     padding: 6px 8px;
   }
