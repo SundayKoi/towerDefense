@@ -413,7 +413,11 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
   justify-content: center;
   align-items: center;
   overflow: hidden;
-  background: radial-gradient(ellipse at center, rgba(0, 255, 240, 0.03), transparent 60%);
+  /* Opaque dark base so the retrowave bg-canvas doesn't show through the
+     letterbox margins when the map aspect doesn't exactly match the viewport.
+     Per-run wireGameScreen overrides this with the active map's bgColor so
+     the margin visually merges with the map itself. */
+  background: #05060a;
 }
 #game-canvas {
   image-rendering: crisp-edges;

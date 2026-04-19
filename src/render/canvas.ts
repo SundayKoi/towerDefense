@@ -448,8 +448,12 @@ function drawEndPortal(ctx: CanvasRenderingContext2D, vp: RenderViewport, map: M
 
 function drawPortal(ctx: CanvasRenderingContext2D, vp: RenderViewport, g: Vec2, color: string, t: number, isEnd: boolean): void {
   const cs = vp.cellSize;
-  const cx = g.x * cs + cs / 2;
-  const cy = g.y * cs + cs / 2;
+  // Paths end at x=cols or y=rows (outside-edge exits). The portal decoration
+  // would draw half a cell past the canvas and clip against the viewport. Clamp
+  // the draw center so the ring stays fully visible on-canvas.
+  const marg = cs * 0.75;
+  const cx = Math.min(vp.width  - marg, Math.max(marg, g.x * cs + cs / 2));
+  const cy = Math.min(vp.height - marg, Math.max(marg, g.y * cs + cs / 2));
   ctx.save();
   // Slow expanding rings — 1 full cycle per ~1.8 seconds, with 3 rings phased for a steady, calm pulse.
   for (let i = 0; i < 3; i++) {
@@ -476,8 +480,10 @@ function drawPortal(ctx: CanvasRenderingContext2D, vp: RenderViewport, g: Vec2, 
 
 function drawCore(ctx: CanvasRenderingContext2D, vp: RenderViewport, g: Vec2, t: number): void {
   const cs = vp.cellSize;
-  const cx = g.x * cs + cs / 2;
-  const cy = g.y * cs + cs / 2;
+  // Clamp so edge-anchored cores (x=cols, y=rows) don't spill off-canvas.
+  const marg = cs * 0.75;
+  const cx = Math.min(vp.width  - marg, Math.max(marg, g.x * cs + cs / 2));
+  const cy = Math.min(vp.height - marg, Math.max(marg, g.y * cs + cs / 2));
   ctx.save();
   ctx.shadowColor = '#ff2d95';
   ctx.shadowBlur = 20;

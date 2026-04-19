@@ -171,6 +171,10 @@ function wireGameScreen() {
   // Viewport
   const vp = createViewport(h.canvas);
   const wrap = h.canvas.parentElement as HTMLElement;
+  // Paint the canvas-wrap with the current map's bgColor so the letterbox
+  // margins (when the map aspect doesn't perfectly match the viewport) blend
+  // with the playfield instead of revealing the retrowave bg-canvas behind.
+  wrap.style.background = getMap(r.mapId).bgColor;
   const doResize = () => {
     // HUD, tokens, and action-bar are absolute overlays — they don't eat flow
     // space — so the game canvas should always size to the full window. We
