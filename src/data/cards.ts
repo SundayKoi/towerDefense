@@ -263,8 +263,8 @@ const BRANCH_SPECS: BranchSpec[] = [];
         apply: (s) => { addEffect(s, T, 'incendiary'); } },
       { shortName: 'CHILL CASCADE', description: 'FIREWALL slow effect strengthened to 35% and applies to ricochets.', rarity: 'rare',
         apply: (s) => { addEffect(s, T, 'firewall_sup_chill'); } },
-      { shortName: 'TOTAL LOCKDOWN', description: 'FIREWALL crits fully stop enemies for 0.4s.',
-        apply: (s) => { addEffect(s, T, 'firewall_sup_caps'); } },
+      { shortName: 'TOTAL LOCKDOWN', description: 'FIREWALL +25% crit chance. Crits fully stop enemies for 0.4s.',
+        apply: (s) => { bumpCrit(s, T, 0.25); addEffect(s, T, 'firewall_sup_caps'); } },
     ],
   });
   BRANCH_SPECS.push({
