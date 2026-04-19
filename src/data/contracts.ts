@@ -1,5 +1,6 @@
-import type { Difficulty, MapDef, PeriodStats, SaveData } from '@/types';
+import type { Difficulty, MapDef, PeriodStats, SaveData, TowerId } from '@/types';
 import { MAPS, isSurvival } from '@/data/maps';
+import { TOWERS } from '@/data/towers';
 
 export type ContractFrequency = 'daily' | 'weekly' | 'monthly';
 
@@ -155,12 +156,26 @@ export interface DailyMutator {
   name: string;
   flavor: string;
   modifier: NonNullable<MapDef['modifiers']>;
+  // Optional unlock requirement. Returning false removes this mutator from the
+  // roll pool for this player. Used to gate mutators whose counterplay depends
+  // on a specific tower class — e.g. GHOST PROTOCOL needs AOE/chain to reveal.
+  availableFor?: (save: SaveData) => boolean;
+}
+
+// True iff the player has at least one unlocked tower matching the predicate.
+function hasTowerWith(save: SaveData, pred: (id: TowerId) => boolean): boolean {
+  return (save.unlockedTowers ?? []).some(pred);
 }
 
 export const DAILY_MUTATORS: DailyMutator[] = [
   { id: 'packet_storm',  name: 'PACKET STORM',       flavor: 'Enemies spawn in paired bursts.',                 modifier: { packetBursts: 0.4 } },
   { id: 'encrypted',     name: 'ENCRYPTED PAYLOADS', flavor: 'Every hostile carries a regenerating shield.',    modifier: { encrypted: 0.3 } },
-  { id: 'ghost_protocol',name: 'GHOST PROTOCOL',     flavor: '25% of spawns arrive cloaked.',                   modifier: { stealthChance: 0.25 } },
+  {
+    id: 'ghost_protocol', name: 'GHOST PROTOCOL',    flavor: '25% of spawns arrive cloaked.',                   modifier: { stealthChance: 0.25 },
+    // Requires at least one AOE or chain tower unlocked — otherwise cloaked
+    // spawns are literally untargetable by the player's roster.
+    availableFor: (save) => hasTowerWith(save, (id) => TOWERS[id]?.damageType === 'aoe' || TOWERS[id]?.damageType === 'chain'),
+  },
   { id: 'replicating',   name: 'REPLICATING VIRUS',  flavor: 'Killed hostiles spawn a worm offspring.',         modifier: { replication: 0.15 } },
   { id: 'rootkit',       name: 'ROOTKIT SWEEP',      flavor: 'A random turret jams every 4 seconds near bosses.', modifier: { rootkit: 4.0 } },
 ];
@@ -187,7 +202,13 @@ export function rollDailyContract(save: SaveData, period: string): NonNullable<S
                                  : completedCount >= 7 ? ['easy', 'medium', 'medium']
                                  : ['easy', 'easy', 'medium'];
   const difficulty = diffPool[Math.floor(rng() * diffPool.length)];
-  const mutator = DAILY_MUTATORS[Math.floor(rng() * DAILY_MUTATORS.length)];
+  // Mutator pool filtered by player unlocks — prevents rolling GHOST PROTOCOL
+  // when the player can't counter cloaked spawns. Deterministic per-save: two
+  // players with identical unlocks + same date get the same contract. Falls
+  // back to the first always-available mutator if every filtered out.
+  const mutatorPool = DAILY_MUTATORS.filter((m) => !m.availableFor || m.availableFor(save));
+  const pickPool = mutatorPool.length > 0 ? mutatorPool : [DAILY_MUTATORS[0]];
+  const mutator = pickPool[Math.floor(rng() * pickPool.length)];
   return { period, mapId: map.id, difficulty, mutator: mutator.id, attempts: 0, bestWave: 0, bestTimeSec: 0, completed: false };
 }
 
