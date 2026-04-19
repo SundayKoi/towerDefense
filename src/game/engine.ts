@@ -1322,11 +1322,17 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
       && (hasSubnetLink(s, 'antivirus', 'quantum') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
     critChance += 0.15;
   }
-  // Quantum supercharge: guaranteed crit after a crit
+  // Quantum supercharge: +100% damage on the shot after a crit. Used to
+  // force a guaranteed crit here, but that crit's hit refreshed the ready
+  // flag (see hitEnemy) — creating an infinite crit chain. Switched to a
+  // plain damage multiplier so the follow-up isn't itself a crit and the
+  // loop breaks naturally.
+  let superchargeMult = 1;
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'supercharge') && (t.extras.superchargeReady ?? 0) > 0) {
-    isCrit = true;
+    superchargeMult = 2;
     t.extras.superchargeReady = 0;
-  } else if (critChance > 0 && Math.random() < critChance) isCrit = true;
+  }
+  if (critChance > 0 && Math.random() < critChance) isCrit = true;
   // Precision matrix: ANTIVIRUS marks cause quantum guaranteed crit
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'precision_matrix') && (target.marked ?? 0) > 0) isCrit = true;
 
@@ -1381,7 +1387,7 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   // the target's open port. Pops an EXPLOIT! floater so players can see the
   // pairing working in real time. Table lives in data/ports.ts.
   const portMult = exploitBonus(t.def, target.def);
-  const dmg = (isCrit ? baseDmg * critMult : baseDmg) * observerLensBonus * heatMult * portMult;
+  const dmg = (isCrit ? baseDmg * critMult : baseDmg) * observerLensBonus * heatMult * portMult * superchargeMult;
   if (portMult > 1 && Math.random() < 0.3) {
     s.floaters.push({
       pos: { x: target.pos.x, y: target.pos.y - 0.4 },
