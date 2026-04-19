@@ -234,6 +234,13 @@ export interface EnemyInstance {
   // end, this counts UP from 0 to 0.8s. While > 0, drawEnemy pulses red→white.
   // On reaching 0.8s, the bomber detonates (handled in engine).
   detonateTimer?: number;
+  // Boss mechanic state. `bossSpawnTimer` ticks for SWARM QUEEN's periodic
+  // minion spawn. `bossTriggered` is a one-shot flag for HP-threshold events
+  // like DAEMON's 50% worm spawn. `regenCooldown` gates LEVIATHAN's damage-free
+  // regen so each new hit resets the timer.
+  bossSpawnTimer?: number;
+  bossTriggered?: boolean;
+  regenCooldown?: number;
 }
 
 export interface Projectile {

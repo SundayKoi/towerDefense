@@ -169,11 +169,25 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
     // phase shift fields (undefined).
     phaseShiftType: defId === 'voidlord' ? randomPhaseType(null) : undefined,
     phaseShiftTimer: defId === 'voidlord' ? 0 : undefined,
+    // Boss mechanic state — zero/false for non-bosses, read per-frame and on
+    // damage for DAEMON / SWARM / LEVIATHAN behaviors below.
+    bossSpawnTimer: defId === 'swarm' ? 0 : undefined,
+    bossTriggered: false,
+    regenCooldown: defId === 'leviathan' ? 0 : undefined,
   });
   // Haptic: boss spawn buzzes with a dread pattern so the player can feel the
-  // wave shift even if the sound is muted.
+  // wave shift even if the sound is muted. Also announce with a big on-map
+  // banner so the player knows what's coming and which counter to rely on.
   const spawnedIsBoss = isBoss || def.threat === 'BOSS' || def.threat === 'MEGA' || def.threat === 'FINAL';
-  if (spawnedIsBoss) haptics.fire('boss_spawn');
+  if (spawnedIsBoss) {
+    haptics.fire('boss_spawn');
+    s.floaters.push({
+      pos: { x: start.x, y: start.y - 1.0 },
+      text: `\u26A0 INCOMING: ${def.name}`,
+      vy: -12, life: 3.5, maxLife: 3.5,
+      color: def.accent, size: 22,
+    });
+  }
   // Telegraph VOIDLORD's starting immunity so the player reacts at spawn, not
   // after the first 12s rotation.
   if (defId === 'voidlord') {
@@ -519,6 +533,28 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       if (e.collapseTimer <= 0) {
         e.armor = ENEMIES[e.def].armor ?? 0;
         e.collapseTimer = undefined;
+      }
+    }
+    // ─── Boss mechanics ───────────────────────────────────────────────
+    // SWARM QUEEN — spawns a CRAWLER every 1.5s while alive. Adds pressure;
+    // makes killing her feel meaningful because the brood stops when she dies.
+    if (e.def === 'swarm' && e.bossSpawnTimer !== undefined) {
+      e.bossSpawnTimer += dtSec;
+      if (e.bossSpawnTimer >= 1.5) {
+        e.bossSpawnTimer = 0;
+        spawnWormAt(s, e.pos, e.pathIndex, e.progress);
+        // Re-tag the last spawn as a crawler instead of a worm.
+        const brood = s.enemies[s.enemies.length - 1];
+        if (brood) brood.def = 'spider';
+      }
+    }
+    // LEVIATHAN — regenerates 1.5% maxHp/s if undamaged for >1s. regenCooldown
+    // is reset in damageEnemy on any incoming damage so sustained DPS denies
+    // the regen, but a brief pause lets it claw back meaningful chunks.
+    if (e.def === 'leviathan' && e.regenCooldown !== undefined) {
+      e.regenCooldown += dtSec;
+      if (e.regenCooldown > 1.0 && e.hp < e.maxHp) {
+        e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.015 * dtSec);
       }
     }
     // VOIDLORD phase shift — rotate the immune damage type every 12s while alive.
@@ -2159,12 +2195,28 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
       return absorbed;
     }
   }
+  const hpBefore = e.hp;
   e.hp -= final;
   // Silent hits are DoT ticks (honeypot puddle, sentinel aura, decrypt CORRUPT).
   // Keeping hitFlash pinned at 0.18 every frame meant the sprite was permanently
   // white-tinted while standing in any damage field — unreadable. Only flash
   // for explicit projectile / explosion hits.
   if (!silent) e.hitFlash = isCrit ? 0.25 : 0.18;
+  // LEVIATHAN regen gating: every incoming damage resets the "undamaged"
+  // timer so sustained DPS denies healing but a lull lets it claw HP back.
+  if (e.def === 'leviathan') e.regenCooldown = 0;
+  // DAEMON 50%-HP trigger: spawn 3 worms at its position and telegraph with a
+  // floater. One-shot via bossTriggered flag so it fires exactly once.
+  if (e.def === 'daemon' && !e.bossTriggered && hpBefore / e.maxHp >= 0.5 && e.hp / e.maxHp < 0.5) {
+    e.bossTriggered = true;
+    for (let i = 0; i < 3; i++) spawnWormAt(s, e.pos, e.pathIndex, e.progress);
+    s.floaters.push({
+      pos: { x: e.pos.x, y: e.pos.y - 0.8 },
+      text: 'SPAWN BROOD',
+      vy: -20, life: 1.6, maxLife: 1.6,
+      color: '#ff2d95', size: 18,
+    });
+  }
   if (source) s.damageDealt[source] = (s.damageDealt[source] ?? 0) + final;
   // Damage number floater with physics — only for non-silent hits over 1 dmg
   // so DoT tick spam doesn't flood the screen. Crits are larger, yellow, and

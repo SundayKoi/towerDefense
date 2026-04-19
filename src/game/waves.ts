@@ -46,7 +46,10 @@ export function waveBonus(wave: number): number {
 // Old easy (+15%/wave) hit 3.85× at wave 20; new easy (+10%/wave) hits 2.9× — winnable with a
 // starter loadout. Medium/hard stay noticeably steeper so difficulty tiers feel distinct.
 export function hpScale(wave: number, difficulty: Difficulty): number {
-  const p = { easy: 0.10, medium: 0.17, hard: 0.24 }[difficulty];
+  // Easy bumped from 0.10 → 0.13/wave so later easy waves actually escalate.
+  // Old wave 20 easy = 2.9× → new = 3.47×. Still winnable with a starter loadout,
+  // but no longer so soft that a fresh draft trivializes it.
+  const p = { easy: 0.13, medium: 0.17, hard: 0.24 }[difficulty];
   return 1 + (wave - 1) * p;
 }
 
@@ -56,9 +59,12 @@ export function speedScale(wave: number, difficulty: Difficulty): number {
   return 1 + (wave - 1) * p * 0.05;
 }
 
-// Boss HP formula (§9.3)
+// Boss HP formula — chunky floor so bosses don't get one-shot on easy, then
+// an accelerating curve for later waves. Old formula: 1 + (w/10-1) * 0.6 meant
+// wave-10 bosses rendered at 1.0x base HP and evaporated under any real build.
+// New curve: wave 10 = 1.6x, wave 20 = 2.3x, wave 30 = 3.0x, wave 40 = 3.7x.
 export function bossHpMult(wave: number): number {
-  return 1 + (wave / 10 - 1) * 0.6;
+  return 1.6 + (wave / 10 - 1) * 0.7;
 }
 
 // Determine if this wave has a boss.
