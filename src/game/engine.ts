@@ -623,24 +623,24 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     e.pos.y = pos.y;
     e.angle = pos.angle;
 
-    // Rootkit: periodically infects nearby towers
+    // Rootkit: periodically infects nearby towers. Capped to the 2 closest
+    // so a single rootkit walking past a clustered subnet doesn't infect 6
+    // towers at once. Duration dropped 5s → 3s.
     if (e.def === 'rootkit') {
       e.debuffTimer = (e.debuffTimer ?? 4) - dtSec;
       if (e.debuffTimer <= 0) {
         e.debuffTimer = 4;
-        for (const t of s.towers) {
-          if (Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) <= 2.5) {
-            applyTowerDebuff(s, t, 'infected', 5);
-          }
-        }
+        applyAreaDebuffToClosest(s, e.pos, 2.5, 'infected', 3, 2);
       }
     }
 
-    // Parasite: infects nearest tower on close approach then dies
+    // Parasite: infects nearest tower on close approach then dies. Duration
+    // trimmed 6s → 4s since it's a run-committed suicide attack and shouldn't
+    // nuke a tower for a full 6-second window.
     if (e.def === 'parasite') {
       for (const t of s.towers) {
         if (Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) <= 0.6) {
-          applyTowerDebuff(s, t, 'infected', 6);
+          applyTowerDebuff(s, t, 'infected', 4);
           e.alive = false;
           spawnDeathBurst(s, e.pos, ENEMIES.parasite.color, ENEMIES.parasite.accent, 8);
           s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'INFECTED!', vy: -22, life: 1.5, maxLife: 1.5, color: '#a800ff', size: 16 });
@@ -689,7 +689,9 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       if ((s as any).rootkitTimer <= 0) {
         (s as any).rootkitTimer = rootkitInterval;
         const target = s.towers[Math.floor(Math.random() * s.towers.length)];
-        applyTowerDebuff(s, target, 'jammed', 4);
+        // Sector rootkit is already single-target; just shortened to 2s so it
+        // reads as a flicker, not a crippling outage.
+        applyTowerDebuff(s, target, 'jammed', 2);
       }
     } else {
       (s as any).rootkitTimer = rootkitInterval;
@@ -706,7 +708,14 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     if (t.def === 'pulse') {
       // debuff ticking (in-place splice to avoid per-frame array allocation)
       for (const d of t.debuffs) d.timeLeft -= dtSec;
-      for (let i = t.debuffs.length - 1; i >= 0; i--) { if (t.debuffs[i].timeLeft <= 0) t.debuffs.splice(i, 1); }
+      for (let i = t.debuffs.length - 1; i >= 0; i--) {
+        if (t.debuffs[i].timeLeft <= 0) {
+          t.debuffCooldowns[t.debuffs[i].kind] = 2.0; // 2s grace
+          t.debuffs.splice(i, 1);
+        }
+      }
+      if ((t.debuffCooldowns.jammed ?? 0) > 0) t.debuffCooldowns.jammed = Math.max(0, (t.debuffCooldowns.jammed ?? 0) - dtSec);
+      if ((t.debuffCooldowns.infected ?? 0) > 0) t.debuffCooldowns.infected = Math.max(0, (t.debuffCooldowns.infected ?? 0) - dtSec);
       updatePulseTower(s, t, dtSec);
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
       continue;
@@ -991,6 +1000,11 @@ function tickOverdrive(t: TowerInstance, dt: number): boolean {
 }
 
 export function applyTowerDebuff(s: RunState, t: TowerInstance, kind: 'jammed' | 'infected', duration: number): void {
+  // Grace-period immunity: if this tower just recovered from the same kind of
+  // debuff, skip. Stops cascading re-applications (phantom death + rootkit
+  // aura + sector modifier firing back-to-back) from looking like permanent
+  // lockdown on a clustered subnet.
+  if ((t.debuffCooldowns[kind] ?? 0) > 0) return;
   const existing = t.debuffs.find((d) => d.kind === kind);
   if (existing) { existing.timeLeft = Math.max(existing.timeLeft, duration); return; }
   t.debuffs.push({ kind, timeLeft: duration });
@@ -1005,10 +1019,38 @@ export function applyTowerDebuff(s: RunState, t: TowerInstance, kind: 'jammed' |
   });
 }
 
+// AOE debuff helper — sort towers by distance, apply debuff to the N closest
+// within radius. Caps cascade damage on clustered subnet builds so one phantom
+// death doesn't shut down a 6-tower cluster for 3 seconds.
+function applyAreaDebuffToClosest(
+  s: RunState, origin: Vec2, radius: number,
+  kind: 'jammed' | 'infected', duration: number, maxTargets: number,
+): void {
+  const inRange: { t: TowerInstance; d: number }[] = [];
+  for (const t of s.towers) {
+    const d = Math.hypot(t.pos.x - origin.x, t.pos.y - origin.y);
+    if (d <= radius) inRange.push({ t, d });
+  }
+  inRange.sort((a, b) => a.d - b.d);
+  for (let i = 0; i < Math.min(maxTargets, inRange.length); i++) {
+    applyTowerDebuff(s, inRange[i].t, kind, duration);
+  }
+}
+
 function updateTower(s: RunState, t: TowerInstance, dt: number): void {
   for (const d of t.debuffs) d.timeLeft -= dt;
-  // In-place splice to avoid per-frame array allocation per tower
-  for (let i = t.debuffs.length - 1; i >= 0; i--) { if (t.debuffs[i].timeLeft <= 0) t.debuffs.splice(i, 1); }
+  // In-place splice to avoid per-frame array allocation per tower. When a
+  // debuff expires, start a 2s grace period during which the tower can't be
+  // re-hit with the same debuff kind — breaks the phantom+rootkit+sector-mod
+  // cascade that used to chain-lock entire subnet clusters.
+  for (let i = t.debuffs.length - 1; i >= 0; i--) {
+    if (t.debuffs[i].timeLeft <= 0) {
+      t.debuffCooldowns[t.debuffs[i].kind] = 2.0;
+      t.debuffs.splice(i, 1);
+    }
+  }
+  if ((t.debuffCooldowns.jammed ?? 0) > 0) t.debuffCooldowns.jammed = Math.max(0, (t.debuffCooldowns.jammed ?? 0) - dt);
+  if ((t.debuffCooldowns.infected ?? 0) > 0) t.debuffCooldowns.infected = Math.max(0, (t.debuffCooldowns.infected ?? 0) - dt);
   // Overdrive timers — when offline, skip firing entirely.
   if (!tickOverdrive(t, dt)) { t.cooldown = Math.max(0, t.cooldown - dt); return; }
   t.cooldown = Math.max(0, t.cooldown - dt);
@@ -2300,13 +2342,11 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
     s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'SPLIT!', vy: -22, life: 0.8, maxLife: 0.8, color: '#00ffcc', size: 14 });
   }
 
-  // Phantom death: EMP burst jams nearby towers for 3s
+  // Phantom death: EMP burst jams the 2 closest towers for 1.5s. Was 3s
+  // jam on every tower within 3.5 tiles — a subnet cluster would go dark
+  // for 3 whole seconds on a single kill.
   if (e.def === 'phantom') {
-    for (const t of s.towers) {
-      if (Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) <= 3.5) {
-        applyTowerDebuff(s, t, 'jammed', 3);
-      }
-    }
+    applyAreaDebuffToClosest(s, e.pos, 2.5, 'jammed', 1.5, 2);
   }
 
   // Honeypot detonation: death inside puddle explodes
@@ -2530,6 +2570,7 @@ export function placeTower(s: RunState, defId: keyof typeof TOWERS, grid: Vec2):
     recoil: 0,
     targetMode: defaultTargetMode(defId),
     debuffs: [],
+    debuffCooldowns: {},
     extras: {},
   };
   s.towers.push(t);

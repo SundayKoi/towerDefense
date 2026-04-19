@@ -50,6 +50,10 @@ export type TargetMode = 'first' | 'strong' | 'weak' | 'close';
 
 // Active debuff on a tower instance from enemy abilities.
 export type TowerDebuff = { kind: 'jammed' | 'infected'; timeLeft: number };
+// Per-tower grace-period cooldowns keyed by debuff kind. When a debuff expires
+// the tower is immune to that same kind for ~2s, which stops cascading re-jams
+// from phantom death bursts + rootkit aura + sector modifier firing in sequence.
+export interface TowerDebuffCooldowns { jammed?: number; infected?: number }
 
 // Persistent ground effect dropped by towers on hit.
 export interface Puddle {
@@ -197,6 +201,7 @@ export interface TowerInstance {
   recoil: number;
   targetMode: TargetMode;
   debuffs: TowerDebuff[];
+  debuffCooldowns: TowerDebuffCooldowns; // grace-period immunity after a debuff expires
   extras: Record<string, number>; // flexible per-tower state (shot counters, charge timers, etc.)
 }
 
