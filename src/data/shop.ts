@@ -95,33 +95,33 @@ export const SHOP_UPGRADES: ShopUpgradeDef[] = [
   {
     id: 'suppression_field',
     name: 'SUPPRESSION FIELD',
-    description: '-1% enemy speed per stack. Max 10 stacks (-10%).',
+    description: '-1% enemy speed per stack. Max 5 stacks (-5%).',
     icon: '⇓',
-    baseCost: 70,
-    stackStep: 80,
-    maxStacks: 10,
+    baseCost: 90,
+    stackStep: 100,
+    maxStacks: 5,
     category: 'loadout',
     effect: (save: SaveData, stacks: number) => { save.metaBoosts.enemySpeedDebuff = stacks * 0.01; },
   },
   {
     id: 'repair_protocol',
     name: 'REPAIR PROTOCOL',
-    description: '+1 HP/wave per stack. Max 10 stacks (+10 HP/wave).',
+    description: '+1 HP/wave per stack. Max 5 stacks (+5 HP/wave).',
     icon: '♥',
-    baseCost: 80,
-    stackStep: 90,
-    maxStacks: 10,
+    baseCost: 100,
+    stackStep: 120,
+    maxStacks: 5,
     category: 'loadout',
     effect: (save: SaveData, stacks: number) => { save.metaBoosts.hpRegenPerWave = stacks * 1; },
   },
   {
     id: 'armor_crack',
     name: 'ARMOR CRACK',
-    description: '-1 enemy armor per stack. Max 3 stacks — a full -3 already shifts mid-game weighting.',
+    description: '-1 enemy armor per stack. Max 2 stacks — each point shifts whole mid-game matchups.',
     icon: '⚔',
-    baseCost: 120,
-    stackStep: 160,
-    maxStacks: 3,
+    baseCost: 300,
+    stackStep: 400,
+    maxStacks: 2,
     category: 'loadout',
     effect: (save: SaveData, stacks: number) => { save.metaBoosts.globalArmorReduction = stacks; },
   },
@@ -151,17 +151,10 @@ export const SHOP_UPGRADES: ShopUpgradeDef[] = [
   },
 
   // ── UTILITY ───────────────────────────────────────────────────────────────
-  {
-    id: 'card_bandwidth',
-    name: 'CARD BANDWIDTH',
-    description: '+1 card option per draft. Max 2 stacks — each extra pick heavily weights RNG.',
-    icon: '●●',
-    baseCost: 400,
-    stackStep: 700,
-    maxStacks: 2,
-    category: 'utility',
-    effect: (save: SaveData, stacks: number) => { save.metaBoosts.extraDraftCards = stacks; },
-  },
+  // CARD BANDWIDTH removed — +1 draft option stacked too aggressively with the
+  // difficulty profile's own draft counts. Players leaned on it instead of
+  // engaging with rerolls. REROLL CACHE covers the same RNG-soften need at a
+  // tighter scope.
   {
     id: 'reroll_cache',
     name: 'REROLL CACHE',
