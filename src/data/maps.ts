@@ -84,10 +84,16 @@ export const MAPS: MapDef[] = [
     accentColor: '#00fff0',
     secondaryColor: '#00aaff',
     difficulties: STANDARD_DIFFICULTIES,
+    // Tutorial pool — no rootkits here. The player only has the 3 starter
+    // turrets on their first run and rootkit's 260 HP + 5 armor + 0.45×
+    // kinetic resist eats too much time with just firewall/antivirus.
+    // Rootkits show up starting on Map 2 (nexus) where the pressure is
+    // implicit-permission-granted via the BOOSTER NODE unlock from clearing
+    // this map. Medium+ still sees rootkits to keep re-runs spicy.
     enemyPool: {
       phase1: ['worm', 'spider'],
       phase2: ['worm', 'spider', 'trojan'],
-      phase3: ['trojan', 'rootkit'],
+      phase3: ['trojan', 'glitch'],
     },
     bosses: {
       easy:   { 10: 'kernel', 20: 'daemon' },
