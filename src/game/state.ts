@@ -2,19 +2,27 @@ import type { Difficulty, RunState, SaveData, TowerId } from '@/types';
 import { getMap } from '@/data/maps';
 import { CARDS_BY_ID, STARTING_UNLOCKED_CARDS } from '@/data/cards';
 import { recomputeMetaBoosts } from '@/data/shop';
-import { emptyPeriodStats } from '@/data/contracts';
+import { emptyPeriodStats, DAILY_MUTATORS_BY_ID } from '@/data/contracts';
+import { RUNNERS } from '@/data/runners';
+import { computeAscensionMods } from '@/data/ascension';
+import { CHROMAS_BY_ID } from '@/data/chromas';
+
+export const NG_PLUS_MAX = 5;
+export function ngPlusHpMult(tier: number): number { return 1 + 0.5 * Math.max(0, Math.min(NG_PLUS_MAX, tier | 0)); }
 import { DIFFICULTY_PROFILE } from '@/game/waves';
 
-// v3 key rotation = hard reset. The overhaul sessions re-shaped branch gating,
-// scattered turret unlocks, added new reward types, reworked difficulty tiers,
-// and landed substantial juice/audio changes. Rather than migrate players
-// forward onto inconsistent save shapes, we cut a clean slate under a new key
-// and purge the old ones so abandoned data doesn't linger in localStorage.
-export const SAVE_KEY = 'netrunner_meta_v3';
+// v4 key rotation = hard reset. The 15-feature overhaul (program deck,
+// runners, ascension, NG+, chromas, ports, packet loot, kernel phases, wave
+// preview, heat buildup, support visuals, daily contract, etc.) restructures
+// enough run-state and save fields that forward-migrating existing players
+// onto the new shape was messier than just cutting a clean slate. Old keys
+// are cleared so localStorage doesn't leak abandoned data.
+export const SAVE_KEY = 'netrunner_meta_v4';
 
 try {
   localStorage.removeItem('netrunner_meta_v1');
   localStorage.removeItem('netrunner_meta_v2');
+  localStorage.removeItem('netrunner_meta_v3');
 } catch { /* storage disabled */ }
 
 // XP threshold for reaching (level+1). Exponential-ish so early levels come fast, late ones earn more.
@@ -24,7 +32,7 @@ export function xpForLevel(level: number): number {
 
 export function defaultSave(): SaveData {
   return {
-    version: 5,
+    version: 6,
     completed: {},
     unlockedCards: STARTING_UNLOCKED_CARDS.slice(),
     // Three starter turrets — firewall (kinetic frontline), honeypot (slow + goo),
@@ -154,6 +162,11 @@ export function loadSave(): SaveData {
       s.sectorClears = {};
       s.version = 5;
     }
+    // v5 → v6: daily contract infrastructure added. No migration needed — field
+    // is optional and lazy-initialized by ensureDailyContract() on first read.
+    if ((parsed.version ?? 0) < 6) {
+      s.version = 6;
+    }
     recomputeMetaBoosts(s);
     return s;
   } catch {
@@ -165,11 +178,20 @@ export function writeSave(s: SaveData): void {
   localStorage.setItem(SAVE_KEY, JSON.stringify(s));
 }
 
-export function createRun(mapId: string, difficulty: Difficulty, save: SaveData): RunState {
+export function createRun(mapId: string, difficulty: Difficulty, save: SaveData, options?: { dailyContract?: boolean; mutator?: NonNullable<import('@/types').SaveData['dailyContract']>['mutator'] }): RunState {
   const map = getMap(mapId);
   const d = map.difficulties[difficulty];
   const prof = DIFFICULTY_PROFILE[difficulty];
   const level = 1 + (save.metaBoosts.startingLevel ?? 0);
+  // Daily-contract runs override the player's runner with the default ('glitch')
+  // so today's challenge is the same for everyone — the leaderboard is only fair
+  // if the runner passive isn't a variable.
+  const runnerId = options?.dailyContract ? 'glitch' : (save.selectedRunner ?? 'glitch');
+  const runner = RUNNERS[runnerId];
+  // Ascension stacks on top of the difficulty curve. Dailies never ascend so the
+  // leaderboard stays on a single axis; campaign/survival use save.ascensionLevel.
+  const ascensionLevel = options?.dailyContract ? 0 : Math.max(0, Math.min(save.ascensionMax ?? 0, save.ascensionLevel ?? 0));
+  const asc = computeAscensionMods(ascensionLevel);
 
   // Hard-mode turret lock: pick N random non-starter, non-FIREWALL unlocked turrets to lock
   // out this run. FIREWALL stays available because every run begins with a firewall token;
@@ -183,6 +205,22 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
       lockedTurrets.push(shuffled[i]);
     }
   }
+  // Runner ban: also lock this runner's banned tower, unless it's firewall (never
+  // lockable since every run starts with a firewall token).
+  if (runner.bannedTower !== 'firewall' && !lockedTurrets.includes(runner.bannedTower)) {
+    lockedTurrets.push(runner.bannedTower);
+  }
+  // Ascension extra turret locks — pick more random non-FIREWALL towers, avoiding
+  // already-locked ones. Clamped to (unlocked - 2) so the player always has at
+  // least 2 viable towers even at max ascension.
+  if (asc.extraTurretLocks > 0 && lockable.length >= 4) {
+    const remaining = lockable.filter((t) => !lockedTurrets.includes(t));
+    const shuffled = remaining.slice().sort(() => Math.random() - 0.5);
+    const maxAdditional = Math.min(asc.extraTurretLocks, Math.max(0, lockable.length - 2 - lockedTurrets.length));
+    for (let i = 0; i < maxAdditional && i < shuffled.length; i++) {
+      lockedTurrets.push(shuffled[i]);
+    }
+  }
 
   // Starting deploy tokens: always grant 1 Firewall minimum + any meta-boost starters.
   // Skip tokens for locked turrets — the lockout must be consistent across all sources.
@@ -191,8 +229,13 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     if (lockedTurrets.includes(k as TowerId)) continue;
     tokens[k as TowerId] = (tokens[k as TowerId] ?? 0) + (v as number);
   }
+  // Runner bonus tokens — stacked on top of shop-granted starters.
+  for (const [k, v] of Object.entries(runner.bonusStartingTokens ?? {})) {
+    if (lockedTurrets.includes(k as TowerId)) continue;
+    tokens[k as TowerId] = (tokens[k as TowerId] ?? 0) + (v as number);
+  }
 
-  const startHp = d.startHp + (save.metaBoosts.bonusStartingHp ?? 0);
+  const startHp = d.startHp + (save.metaBoosts.bonusStartingHp ?? 0) + runner.bonusStartingHp;
 
   return {
     mapId,
@@ -216,9 +259,9 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     spawnElapsed: 0,
     mods: {
       // Each prestige star = permanent +1% global damage. Stacks with shop adaptive_weapons.
-      globalDamagePct: (save.metaBoosts.globalDamagePct ?? 0) + 0.01 * (save.prestigeStars ?? 0),
+      globalDamagePct: (save.metaBoosts.globalDamagePct ?? 0) + 0.01 * (save.prestigeStars ?? 0) + runner.passiveDamagePct,
       globalRangePct: save.metaBoosts.globalRangePct ?? 0,
-      globalRatePct: save.metaBoosts.globalRatePct ?? 0,
+      globalRatePct: (save.metaBoosts.globalRatePct ?? 0) + runner.passiveRatePct,
       globalCritChance: save.metaBoosts.globalCritChancePct ?? 0,
       enemySpeedMult: 1 - (save.metaBoosts.enemySpeedDebuff ?? 0),
       xpMult: 1 + (save.metaBoosts.xpBoostPct ?? 0),
@@ -242,11 +285,14 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     elapsed: 0,
     // NEURAL BOOSTER: each startingLevel stack grants an immediate pending level-up so the
     // player actually gets the promised draft options at run start, not when they hit level+2.
-    pendingLevelUps: save.metaBoosts.startingLevel ?? 0,
+    // Runner architect adds its own starting level-up on top.
+    pendingLevelUps: (save.metaBoosts.startingLevel ?? 0) + runner.bonusStartingLevels,
     lockedTurrets,
     cardsPicked: [],
     autoStartTimer: null,
     puddles: [],
+    packets: [],
+    packetBuffs: { dmgMult: 1, rateMult: 1, xpMult: 1, timeLeft: 0 },
     towerEffects: {},
     damageDealt: {},
     seenThisRun: new Set(),
@@ -254,5 +300,32 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData)
     bossKillsThisRun: 0,
     xpThisRun: 0,
     legendariesThisRun: 0,
+    isDailyContract: options?.dailyContract ?? false,
+    contractMutators: options?.mutator ? DAILY_MUTATORS_BY_ID[options.mutator]?.modifier : undefined,
+    runStartMs: typeof performance !== 'undefined' ? performance.now() : 0,
+    ascensionLevel,
+    ascensionHpMult: asc.hpMult * ngPlusHpMult(save.mapNgPlus?.[mapId]?.current ?? 0),
+    ascensionSpeedMult: asc.speedMult,
+    ngPlusTier: options?.dailyContract ? 0 : (save.mapNgPlus?.[mapId]?.current ?? 0),
+    chromaColors: (() => {
+      const out: Partial<Record<TowerId, { accent: string; projectile: string; trail: string }>> = {};
+      for (const [towerId, chromaId] of Object.entries(save.equippedChromas ?? {})) {
+        if (!chromaId) continue;
+        const c = CHROMAS_BY_ID[chromaId];
+        if (!c) continue;
+        out[towerId as TowerId] = { accent: c.accent, projectile: c.projectile, trail: c.trail };
+      }
+      return out;
+    })(),
+    // Grant the full starter deck for v1. Drafting new programs via cards is
+    // future work — for now players always have access to the four base verbs.
+    // Runner-specified "ready at start" programs override the default 0-CD.
+    programs: [
+      { id: 'emp_burst', cooldownLeft: runner.bonusProgramCooldownReady?.includes('emp_burst') ? 0 : 0 },
+      { id: 'patch', cooldownLeft: runner.bonusProgramCooldownReady?.includes('patch') ? 0 : 0 },
+      { id: 'kernel_panic', cooldownLeft: runner.bonusProgramCooldownReady?.includes('kernel_panic') ? 0 : 0 },
+      { id: 'trace', cooldownLeft: runner.bonusProgramCooldownReady?.includes('trace') ? 0 : 0 },
+    ],
+    runnerId,
   };
 }

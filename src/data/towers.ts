@@ -13,7 +13,8 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     baseColor: '#0a2630',
     accentColor: '#00fff0',
     damageType: 'kinetic',
-    description: 'Kinetic rounds. Reliable frontline, cheap to field.',
+    description: 'Kinetic rounds. HEAT BUILDUP: +10% damage per consecutive shot on same target, up to +50% at streak 6.',
+    special: 'Streak resets when target changes — keeps the firewall welded onto a single threat.',
   },
   honeypot: {
     id: 'honeypot',

@@ -1,4 +1,5 @@
-import type { PeriodStats, SaveData } from '@/types';
+import type { Difficulty, MapDef, PeriodStats, SaveData } from '@/types';
+import { MAPS, isSurvival } from '@/data/maps';
 
 export type ContractFrequency = 'daily' | 'weekly' | 'monthly';
 
@@ -143,4 +144,58 @@ export function addToAllPeriods(save: SaveData, patch: (s: PeriodStats) => void)
   patch(save.contracts.daily.stats);
   patch(save.contracts.weekly.stats);
   patch(save.contracts.monthly.stats);
+}
+
+// ─── DAILY CONTRACT (seeded challenge run) ────────────────────────────────
+// Pick a single map + difficulty + flavor mutator deterministically from today's
+// period id, so every player worldwide sees the same challenge today.
+
+export interface DailyMutator {
+  id: string;
+  name: string;
+  flavor: string;
+  modifier: NonNullable<MapDef['modifiers']>;
+}
+
+export const DAILY_MUTATORS: DailyMutator[] = [
+  { id: 'packet_storm',  name: 'PACKET STORM',       flavor: 'Enemies spawn in paired bursts.',                 modifier: { packetBursts: 0.4 } },
+  { id: 'encrypted',     name: 'ENCRYPTED PAYLOADS', flavor: 'Every hostile carries a regenerating shield.',    modifier: { encrypted: 0.3 } },
+  { id: 'ghost_protocol',name: 'GHOST PROTOCOL',     flavor: '25% of spawns arrive cloaked.',                   modifier: { stealthChance: 0.25 } },
+  { id: 'replicating',   name: 'REPLICATING VIRUS',  flavor: 'Killed hostiles spawn a worm offspring.',         modifier: { replication: 0.15 } },
+  { id: 'rootkit',       name: 'ROOTKIT SWEEP',      flavor: 'A random turret jams every 4 seconds near bosses.', modifier: { rootkit: 4.0 } },
+];
+
+export const DAILY_MUTATORS_BY_ID: Record<string, DailyMutator> = Object.fromEntries(DAILY_MUTATORS.map((m) => [m.id, m]));
+
+// Roll today's daily contract — map, difficulty, mutator — deterministically from
+// the calendar date. Filters to maps the player has unlocked campaign-wise so it
+// doesn't send a fresh player to act-7 mazes; uses completion data as the gate.
+export function rollDailyContract(save: SaveData, period: string): NonNullable<SaveData['dailyContract']> {
+  const campaignMaps = MAPS.filter((m) => !isSurvival(m.id));
+  const unlocked = campaignMaps.filter((m) => save.completed[m.id]?.easy || save.completed[m.id]?.medium || save.completed[m.id]?.hard);
+  const pool = unlocked.length > 0 ? unlocked : campaignMaps.slice(0, 3);
+  let seed = hashString('daily:' + period);
+  const rng = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  const map = pool[Math.floor(rng() * pool.length)];
+  // Difficulty: bias toward medium/hard as you complete more maps, so the daily
+  // scales with mastery.
+  const completedCount = unlocked.length;
+  const diffPool: Difficulty[] = completedCount >= 14 ? ['medium', 'hard', 'hard']
+                                 : completedCount >= 7 ? ['easy', 'medium', 'medium']
+                                 : ['easy', 'easy', 'medium'];
+  const difficulty = diffPool[Math.floor(rng() * diffPool.length)];
+  const mutator = DAILY_MUTATORS[Math.floor(rng() * DAILY_MUTATORS.length)];
+  return { period, mapId: map.id, difficulty, mutator: mutator.id, attempts: 0, bestWave: 0, bestTimeSec: 0, completed: false };
+}
+
+export function ensureDailyContract(save: SaveData): boolean {
+  const period = currentPeriodId('daily');
+  if (!save.dailyContract || save.dailyContract.period !== period) {
+    save.dailyContract = rollDailyContract(save, period);
+    return true;
+  }
+  return false;
 }

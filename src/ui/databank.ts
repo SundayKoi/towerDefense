@@ -2,6 +2,8 @@ import type { SaveData, TowerId, EnemyId } from '@/types';
 import { TOWERS } from '@/data/towers';
 import { ENEMIES } from '@/data/enemies';
 import { CARDS } from '@/data/cards';
+import { ENEMY_PORT, TOWER_EXPLOITS } from '@/data/ports';
+import { CHROMAS, CHROMAS_BY_ID } from '@/data/chromas';
 import { mount, type Screen } from './screens';
 import { audio } from '@/audio/sfx';
 
@@ -54,6 +56,8 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
           const critTxt = t.crit ? `<span>CRIT ${Math.round(t.crit.chance * 100)}% &times;${t.crit.mult}</span>` : '';
           const aoeTxt = t.aoe ? `<span>AOE ${t.aoe.radius}</span>` : '';
           const chainTxt = t.chain ? `<span>CHAIN ${t.chain.jumps} jumps</span>` : '';
+          const exploit = TOWER_EXPLOITS[id];
+          const exploitTxt = exploit ? `<span class="db-port">EXPLOIT ${exploit}</span>` : '';
           body += `
             <div class="db-entry" style="--accent:${t.accentColor}">
               <div class="db-entry-icon" style="color:${t.accentColor}">&#9650;</div>
@@ -65,9 +69,21 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
                   <span>RNG ${t.range}</span>
                   <span>RATE ${t.fireRate.toFixed(2)}/s</span>
                   <span>TYPE ${t.damageType.toUpperCase()}</span>
-                  ${slowTxt}${critTxt}${aoeTxt}${chainTxt}
+                  ${slowTxt}${critTxt}${aoeTxt}${chainTxt}${exploitTxt}
                 </div>
                 ${t.special ? `<div class="db-special">&#9733; ${t.special}</div>` : ''}
+                ${(() => {
+                  const towerChromas = CHROMAS.filter((c) => c.tower === id);
+                  if (towerChromas.length === 0) return '';
+                  const equippedId = save.equippedChromas?.[id];
+                  const chips = towerChromas.map((c) => {
+                    const unlocked = save.unlockedChromas?.includes(c.id) ?? false;
+                    const isEquipped = equippedId === c.id;
+                    const cls = `db-chroma${unlocked ? '' : ' db-chroma-locked'}${isEquipped ? ' db-chroma-equipped' : ''}`;
+                    return `<button class="${cls}" data-chroma="${c.id}" data-tower="${id}" style="--accent:${c.accent}" title="${c.unlockDescription}">${c.name}${isEquipped ? ' &check;' : unlocked ? '' : ' &#128274;'}</button>`;
+                  }).join('');
+                  return `<div class="db-chromas">CHROMAS ${chips}</div>`;
+                })()}
               </div>
             </div>
           `;
@@ -93,16 +109,27 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
             `;
             continue;
           }
-          const resList = e.resistances ? Object.entries(e.resistances)
-            .map(([k, v]) => {
-              const n = v as number;
-              const label = n === 0 ? 'IMMUNE' : n < 1 ? `RESIST ${Math.round((1 - n) * 100)}%` : `WEAK +${Math.round((n - 1) * 100)}%`;
-              return `<span class="db-res">${k.toUpperCase()} ${label}</span>`;
-            }).join('') : '';
+          const dmgTypes: Array<'kinetic' | 'pierce' | 'energy' | 'aoe' | 'chain'> = ['kinetic', 'pierce', 'energy', 'aoe', 'chain'];
+          const matchupRow = dmgTypes.map((k) => {
+            const n = (e.resistances?.[k] ?? 1) as number;
+            let label: string;
+            let cls: string;
+            if (n === 0) { label = 'IMMUNE'; cls = 'mu-immune'; }
+            else if (n < 0.7) { label = `${Math.round(n * 100)}%`; cls = 'mu-strong'; }
+            else if (n < 1) { label = `${Math.round(n * 100)}%`; cls = 'mu-resist'; }
+            else if (n > 1.2) { label = `${Math.round(n * 100)}%`; cls = 'mu-weak-strong'; }
+            else if (n > 1) { label = `${Math.round(n * 100)}%`; cls = 'mu-weak'; }
+            else { label = '100%'; cls = 'mu-normal'; }
+            return `<span class="db-mu ${cls}"><b>${k.toUpperCase()}</b>${label}</span>`;
+          }).join('');
+          const critBypass = e.critIgnoresResist ? `<span class="db-mu mu-note">CRITS BYPASS RESIST</span>` : '';
+          const resList = `${matchupRow}${critBypass}`;
           const flags: string[] = [];
           if (e.slowImmune) flags.push('SLOW-IMMUNE');
           if (e.invisChance) flags.push(`STEALTH ${Math.round(e.invisChance * 100)}%`);
           if (e.bossScale) flags.push('BOSS-SCALED');
+          const openPort = ENEMY_PORT[id];
+          const portTxt = openPort ? `<span class="db-port">PORT ${openPort} OPEN</span>` : '';
           body += `
             <div class="db-entry" style="--accent:${e.color}">
               <div class="db-entry-icon" style="color:${e.color}">&#9830;</div>
@@ -119,6 +146,7 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
                   <span>XP ${e.xp}</span>
                   ${e.armor ? `<span>ARMOR ${e.armor}</span>` : ''}
                   ${flags.map((f) => `<span>${f}</span>`).join('')}
+                  ${portTxt}
                 </div>
                 ${resList ? `<div class="db-resists">${resList}</div>` : ''}
                 <div class="db-tip">COUNTER: ${e.counterTip}</div>
@@ -189,6 +217,20 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
         btn.onclick = () => {
           activeTab = btn.dataset.tab as Tab;
           audio.play('ui_hover');
+          render();
+        };
+      });
+      root.querySelectorAll<HTMLButtonElement>('.db-chroma').forEach((btn) => {
+        btn.onclick = () => {
+          if (btn.classList.contains('db-chroma-locked')) { audio.play('sell'); return; }
+          const chromaId = btn.dataset.chroma!;
+          const tower = btn.dataset.tower! as TowerId;
+          if (!save.equippedChromas) save.equippedChromas = {};
+          const equipped = save.equippedChromas;
+          // Click-equipped → unequip; click-unequipped → equip.
+          if (equipped[tower] === chromaId) { delete equipped[tower]; }
+          else { equipped[tower] = CHROMAS_BY_ID[chromaId].id; }
+          audio.play('ui_click');
           render();
         };
       });

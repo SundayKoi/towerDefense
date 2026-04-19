@@ -11,9 +11,26 @@ import {
 import { audio } from '@/audio/sfx';
 import { haptics } from '@/audio/haptics';
 import { xpForLevel } from './state';
+import { tickPrograms, PROGRAMS, type ProgramId } from './programs';
+import { exploitBonus } from '@/data/ports';
 
 let entityIdSeq = 1;
 export const nextId = () => entityIdSeq++;
+
+// Merge map base modifiers with per-run contract mutators. Daily-contract runs
+// stack their mutator on top of the map's own flavor (a packet-storm contract on
+// an already-encrypted map gets both). Called everywhere modifiers are read.
+export function getEffectiveModifiers(s: RunState): NonNullable<ReturnType<typeof getMap>['modifiers']> {
+  const base = getMap(s.mapId).modifiers ?? {};
+  const extra = s.contractMutators ?? {};
+  return {
+    packetBursts: (base.packetBursts ?? 0) + (extra.packetBursts ?? 0),
+    encrypted: (base.encrypted ?? 0) + (extra.encrypted ?? 0),
+    stealthChance: Math.min(1, (base.stealthChance ?? 0) + (extra.stealthChance ?? 0)),
+    replication: (base.replication ?? 0) + (extra.replication ?? 0),
+    rootkit: base.rootkit ?? extra.rootkit ?? 0,
+  };
+}
 
 function hasEffect(s: RunState, tower: TowerId, tag: string): boolean {
   return s.towerEffects[tower]?.has(tag) ?? false;
@@ -63,7 +80,7 @@ export function hasSubnetLink(s: RunState, a: TowerId, b: TowerId): boolean {
 export function startWave(s: RunState): void {
   s.wave += 1;
   const map = getMap(s.mapId);
-  s.spawnQueue = buildWaveSpawnQueue(map, s.difficulty, s.wave, s.totalWaves);
+  s.spawnQueue = buildWaveSpawnQueue(map, s.difficulty, s.wave, s.totalWaves, s.contractMutators);
   s.spawnElapsed = 0;
   s.phase = 'wave';
   audio.play('wave_start');
@@ -127,7 +144,10 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
       hp *= hpScale(s.wave, s.difficulty);
     }
   }
-  const speed = def.speed * (s.mods.enemySpeedMult) * (1 + Math.min(0.3, (s.wave - 1) * 0.01));
+  // Ascension stacks on top of base scaling — cleanly multiplicative so the
+  // player sees "8% more HP per level" directly in their run feel.
+  if (s.ascensionHpMult && s.ascensionHpMult > 1) hp *= s.ascensionHpMult;
+  const speed = def.speed * (s.mods.enemySpeedMult) * (1 + Math.min(0.3, (s.wave - 1) * 0.01)) * (s.ascensionSpeedMult ?? 1);
   const path = map.paths[pathIndex] ?? map.paths[0];
   const start = path.points[0];
 
@@ -138,11 +158,13 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
   }
 
   // Sector modifiers — ENCRYPTED PAYLOADS gives a regenerating shield;
-  // STEALTH PROTOCOL randomly cloaks a fraction of spawns.
-  const mods = map.modifiers;
-  const shieldPct = mods?.encrypted ?? 0;
+  // STEALTH PROTOCOL randomly cloaks a fraction of spawns. Read via
+  // getEffectiveModifiers so daily-contract mutators stack on top of the
+  // map's own modifiers.
+  const mods = getEffectiveModifiers(s);
+  const shieldPct = mods.encrypted ?? 0;
   const maxShield = shieldPct > 0 ? Math.round(hp * shieldPct) : 0;
-  const stealthRoll = mods?.stealthChance ?? 0;
+  const stealthRoll = mods.stealthChance ?? 0;
   const isStealthSpawn = stealthRoll > 0 && Math.random() < stealthRoll;
 
   s.enemies.push({
@@ -225,6 +247,63 @@ function grantXp(s: RunState, amount: number): void {
     s.xpToNext = xpForLevel(s.level);
     s.pendingLevelUps += 1;
   }
+}
+
+// ======================= Packets =======================
+// Expire loot packets that weren't picked up, and decay any active packet buffs.
+function updatePackets(s: RunState, dt: number): void {
+  for (let i = s.packets.length - 1; i >= 0; i--) {
+    const p = s.packets[i];
+    p.timeLeft -= dt;
+    if (p.timeLeft <= 0) s.packets.splice(i, 1);
+  }
+  if (s.packetBuffs.timeLeft > 0) {
+    s.packetBuffs.timeLeft -= dt;
+    if (s.packetBuffs.timeLeft <= 0) {
+      s.packetBuffs.dmgMult = 1;
+      s.packetBuffs.rateMult = 1;
+      s.packetBuffs.xpMult = 1;
+    }
+  }
+}
+
+// Click a packet (by screen coord converted to world). Consumes the packet and
+// applies its buff. Returns true if a packet was collected.
+export function tryCollectPacket(s: RunState, worldX: number, worldY: number, radius = 0.7): boolean {
+  let bestIdx = -1;
+  let bestDist = radius;
+  for (let i = 0; i < s.packets.length; i++) {
+    const p = s.packets[i];
+    const d = Math.hypot(p.pos.x - worldX, p.pos.y - worldY);
+    if (d <= bestDist) { bestDist = d; bestIdx = i; }
+  }
+  if (bestIdx < 0) return false;
+  const pkt = s.packets[bestIdx];
+  s.packets.splice(bestIdx, 1);
+  applyPacketBuff(s, pkt.kind);
+  return true;
+}
+
+function applyPacketBuff(s: RunState, kind: 'dmg' | 'rate' | 'xp' | 'hp'): void {
+  const BUFF_DUR = 8;
+  if (kind === 'dmg') {
+    s.packetBuffs.dmgMult = 1.5;
+    s.packetBuffs.timeLeft = BUFF_DUR;
+    s.floaters.push({ pos: { x: 8, y: 4 }, text: '+50% DMG (8s)', vy: -20, life: 1.4, maxLife: 1.4, color: '#ff2d95', size: 18 });
+  } else if (kind === 'rate') {
+    s.packetBuffs.rateMult = 1.5;
+    s.packetBuffs.timeLeft = BUFF_DUR;
+    s.floaters.push({ pos: { x: 8, y: 4 }, text: '+50% RATE (8s)', vy: -20, life: 1.4, maxLife: 1.4, color: '#00fff0', size: 18 });
+  } else if (kind === 'xp') {
+    grantXp(s, 15);
+    s.floaters.push({ pos: { x: 8, y: 4 }, text: '+15 XP', vy: -20, life: 1.4, maxLife: 1.4, color: '#00ff88', size: 18 });
+  } else if (kind === 'hp') {
+    if (s.hp < s.maxHp) {
+      s.hp = Math.min(s.maxHp, s.hp + 5);
+      s.floaters.push({ pos: { x: 8, y: 4 }, text: '+5 INTEGRITY', vy: -20, life: 1.4, maxLife: 1.4, color: '#00ff88', size: 18 });
+    }
+  }
+  audio.play('ui_click');
 }
 
 // ======================= Puddles =======================
@@ -488,6 +567,7 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
   s.elapsed += dtSec;
 
   if (s.shakeTime > 0) s.shakeTime = Math.max(0, s.shakeTime - dtSec);
+  tickPrograms(s, dtSec);
 
   // Hit-pause: freeze world sim but keep FX ticking so the player sees the
   // satisfying micro-freeze without losing the death particles/floaters.
@@ -604,6 +684,26 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       }
     }
 
+    // LEECH — heal aura: restores HP to nearby non-boss allies. Was previously
+    // just a description; now actually behaves per its bestiary entry. Heals up
+    // to 2 closest enemies within 1.4 tiles, 6 hp/s each. Makes LEECH a genuine
+    // priority target (per counterTip: "Priority kill. HONEYPOT slows them...").
+    if (e.def === 'leech') {
+      const candidates: EnemyInstance[] = [];
+      for (const other of s.enemies) {
+        if (!other.alive || other.id === e.id || other.isBoss) continue;
+        if (other.hp >= other.maxHp) continue;
+        const d = Math.hypot(other.pos.x - e.pos.x, other.pos.y - e.pos.y);
+        if (d <= 1.4) candidates.push(other);
+      }
+      // Heal the 2 lowest-HP candidates (prioritize the most-hurt, not closest).
+      candidates.sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
+      for (let i = 0; i < Math.min(2, candidates.length); i++) {
+        const tgt = candidates[i];
+        tgt.hp = Math.min(tgt.maxHp, tgt.hp + 6 * dtSec);
+      }
+    }
+
     // Honeypot coating: spread slow to adjacent enemies
     if (hasEffect(s, 'honeypot', 'coating') && e.speedMult < 0.9) {
       for (const other of s.enemies) {
@@ -678,10 +778,10 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
 
   // Puddle updates
   updatePuddles(s, dtSec);
+  updatePackets(s, dtSec);
 
   // ROOTKIT INTRUSION sector modifier: while a boss is alive, jam a random tower every N seconds.
-  const mapForRootkit = getMap(s.mapId);
-  const rootkitInterval = mapForRootkit.modifiers?.rootkit ?? 0;
+  const rootkitInterval = getEffectiveModifiers(s).rootkit ?? 0;
   if (rootkitInterval > 0 && s.towers.length > 0) {
     const bossAlive = s.enemies.some((e) => e.alive && e.isBoss);
     if (bossAlive) {
@@ -816,6 +916,8 @@ function effectiveDamage(s: RunState, t: TowerInstance): number {
   dmg *= (t.extras.subnetMult ?? 1);
   // Overdrive: +200% damage for the boost duration.
   if ((t.extras.overdriveActive ?? 0) > 0) dmg *= 3;
+  // Packet buff — short-lived pickup buff applied globally.
+  if (s.packetBuffs.timeLeft > 0) dmg *= s.packetBuffs.dmgMult;
   // Booster Node aura: each in-range booster adds its damage buff. Stacks across boosters.
   if (t.def !== 'booster_node' && t.def !== 'data_miner') {
     for (const b of s.towers) {
@@ -854,6 +956,7 @@ function effectiveFireRate(s: RunState, t: TowerInstance, dt = 0): number {
   }
   let rate = def.fireRate * (1 + s.mods.globalRatePct + specificRate + metaPct);
   if (t.debuffs.some((d) => d.kind === 'jammed')) rate *= 0.35;
+  if (s.packetBuffs.timeLeft > 0) rate *= s.packetBuffs.rateMult;
   // Scrambler feedback: +0.5 fire rate per debuffed enemy in range
   if (t.def === 'scrambler' && hasEffect(s, 'scrambler', 'feedback')) {
     const range = effectiveRange(s, t);
@@ -970,6 +1073,75 @@ export function canOverdrive(t: TowerInstance): boolean {
   // nothing to toggle against. They also never tick the offline timer down
   // (since they bypass updateTower), which would leave them stuck burning.
   return t.def !== 'booster_node' && t.def !== 'data_miner';
+}
+
+// Fire a program (active ability). No-op if the program is on cooldown or if
+// the effect short-circuits (patch on full HP). Returns whether the CD was
+// actually spent so callers can play a "fizzle" cue on failure.
+export function triggerProgram(s: RunState, id: ProgramId): boolean {
+  const slot = s.programs?.find((p) => p.id === id);
+  if (!slot) return false;
+  if (slot.cooldownLeft > 0) return false;
+  const def = PROGRAMS[id];
+  if (!def) return false;
+
+  let fired = false;
+  if (id === 'emp_burst') {
+    let hit = 0;
+    for (const e of s.enemies) {
+      if (!e.alive) continue;
+      damageEnemy(s, e, 80, false, 'energy', false);
+      hit++;
+    }
+    if (hit > 0) {
+      s.floaters.push({ pos: { x: s.enemies[0]?.pos.x ?? 8, y: s.enemies[0]?.pos.y ?? 4 }, text: 'EMP BURST', vy: -14, life: 1.4, maxLife: 1.4, color: '#ffd600', size: 22 });
+      s.shakeTime = Math.max(s.shakeTime, 0.3);
+      s.shakeAmp = Math.max(s.shakeAmp, 6);
+      audio.play('explode');
+      fired = true;
+    }
+  } else if (id === 'patch') {
+    if (s.hp < s.maxHp) {
+      s.hp = Math.min(s.maxHp, s.hp + 12);
+      s.floaters.push({ pos: { x: 4, y: 4 }, text: '+12 INTEGRITY', vy: -18, life: 1.4, maxLife: 1.4, color: '#00ff88', size: 20 });
+      audio.play('upgrade');
+      fired = true;
+    }
+  } else if (id === 'kernel_panic') {
+    let applied = 0;
+    for (const e of s.enemies) {
+      if (!e.alive) continue;
+      const def = ENEMIES[e.def];
+      if (def.slowImmune) {
+        damageEnemy(s, e, 30, false, 'energy', false);
+      } else {
+        e.slowTimer = Math.max(e.slowTimer, 2.5);
+        e.speedMult = 0.05;
+      }
+      applied++;
+    }
+    if (applied > 0) {
+      s.floaters.push({ pos: { x: 8, y: 4 }, text: 'KERNEL PANIC', vy: -14, life: 1.6, maxLife: 1.6, color: '#b847ff', size: 22 });
+      audio.play('boss_spawn');
+      fired = true;
+    }
+  } else if (id === 'trace') {
+    let applied = 0;
+    for (const e of s.enemies) {
+      if (!e.alive) continue;
+      e.invisTimer = 0;
+      e.marked = Math.max(e.marked ?? 0, 6);
+      applied++;
+    }
+    if (applied > 0) {
+      s.floaters.push({ pos: { x: 8, y: 4 }, text: 'TRACE ROUTE', vy: -14, life: 1.2, maxLife: 1.2, color: '#00fff0', size: 20 });
+      audio.play('ui_click');
+      fired = true;
+    }
+  }
+
+  if (fired) slot.cooldownLeft = def.cooldown;
+  return fired;
 }
 
 export function triggerOverdrive(s: RunState, t: TowerInstance): boolean {
@@ -1179,7 +1351,34 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
     if (hasEffect(s, 'quantum', 'quantum_obs_lens')) observerLensBonus = 1.30;
     t.extras.observerCharge = 0;
   }
-  const dmg = (isCrit ? baseDmg * critMult : baseDmg) * observerLensBonus;
+  // FIREWALL HEAT BUILDUP — the new signature mechanic. Consecutive shots on the
+  // same target ramp damage up to +50% at a 6-shot streak. Resets the instant
+  // the target changes. Gives firewall a "weld onto a threat" feel that
+  // antivirus (burst pierce) can't match, fixing the tier-1→tier-2 obsolescence
+  // the audit flagged.
+  let heatMult = 1;
+  if (t.def === 'firewall') {
+    if (t.extras.heatTargetId === target.id) {
+      t.extras.heatStreak = Math.min(6, (t.extras.heatStreak ?? 1) + 1);
+    } else {
+      t.extras.heatStreak = 1;
+      t.extras.heatTargetId = target.id;
+    }
+    heatMult = 1 + 0.10 * ((t.extras.heatStreak ?? 1) - 1);
+  }
+  // Port/Protocol exploit bonus — +25% dmg when the turret's exploit matches
+  // the target's open port. Pops an EXPLOIT! floater so players can see the
+  // pairing working in real time. Table lives in data/ports.ts.
+  const portMult = exploitBonus(t.def, target.def);
+  const dmg = (isCrit ? baseDmg * critMult : baseDmg) * observerLensBonus * heatMult * portMult;
+  if (portMult > 1 && Math.random() < 0.3) {
+    s.floaters.push({
+      pos: { x: target.pos.x, y: target.pos.y - 0.4 },
+      text: 'EXPLOIT!',
+      vy: -30, life: 0.7, maxLife: 0.7,
+      color: '#ffd600', size: 12,
+    });
+  }
   // QUANTUM crit XP netlink: +3 XP per crit when subnet-linked with data_miner
   if (t.def === 'quantum' && isCrit && hasEffect(s, 'quantum', 'netlink_quantum_data_miner')
       && (hasSubnetLink(s, 'quantum', 'data_miner') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
@@ -1220,8 +1419,8 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
     targetPos: { x: target.pos.x, y: target.pos.y },
     damage: dmg,
     speed: projSpeed,
-    color: def.projectileColor,
-    trailColor: def.trailColor,
+    color: s.chromaColors?.[t.def]?.projectile ?? def.projectileColor,
+    trailColor: s.chromaColors?.[t.def]?.trail ?? def.trailColor,
     fromTower: t.def,
     damageType: def.damageType,
     aoe,
@@ -2249,6 +2448,27 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
   // LEVIATHAN regen gating: every incoming damage resets the "undamaged"
   // timer so sustained DPS denies healing but a lull lets it claw HP back.
   if (e.def === 'leviathan') e.regenCooldown = 0;
+  // WRAITH — below-60% teleport. When first dipped under 60% HP, jump forward
+  // along the path. One-shot via bossTriggered flag. Telegraphed with a JUMP
+  // floater so players see the displacement, not just a surprise warp.
+  if (e.def === 'wraith' && !e.bossTriggered && hpBefore / e.maxHp >= 0.6 && e.hp / e.maxHp < 0.6) {
+    e.bossTriggered = true;
+    const path = getMap(s.mapId).paths[e.pathIndex] ?? getMap(s.mapId).paths[0];
+    const totalLen = pathLength(path);
+    const jumpDist = 1.2;
+    const newProgress = Math.min(totalLen - 0.1, e.progress + jumpDist);
+    e.progress = newProgress;
+    const pos = posOnPath(path, newProgress);
+    e.pos.x = pos.x;
+    e.pos.y = pos.y;
+    s.floaters.push({
+      pos: { x: e.pos.x, y: e.pos.y - 0.7 },
+      text: 'PHASE JUMP',
+      vy: -18, life: 1.2, maxLife: 1.2,
+      color: '#ff2d95', size: 16,
+    });
+  }
+
   // DAEMON 50%-HP trigger: spawn 3 worms at its position and telegraph with a
   // floater. One-shot via bossTriggered flag so it fires exactly once.
   if (e.def === 'daemon' && !e.bossTriggered && hpBefore / e.maxHp >= 0.5 && e.hp / e.maxHp < 0.5) {
@@ -2260,6 +2480,41 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
       vy: -20, life: 1.6, maxLife: 1.6,
       color: '#ff2d95', size: 18,
     });
+  }
+  // KERNEL multi-phase boss. Previously a pure HP sponge — now it PANICS at 66%
+  // (jam closest 2 towers 3s + spawn 3 worms) and ENRAGES at 33% (perm +35%
+  // speed, spawn 3 spiders, jam closest 3 towers 2s). Uses a numeric phase
+  // counter since bossTriggered can only gate one threshold.
+  if (e.def === 'kernel') {
+    const phase = e.bossPhase ?? 0;
+    if (phase < 1 && hpBefore / e.maxHp >= 0.66 && e.hp / e.maxHp < 0.66) {
+      e.bossPhase = 1;
+      for (let i = 0; i < 3; i++) spawnWormAt(s, e.pos, e.pathIndex, e.progress);
+      applyAreaDebuffToClosest(s, e.pos, 4.0, 'jammed', 3, 2);
+      s.floaters.push({
+        pos: { x: e.pos.x, y: e.pos.y - 0.8 },
+        text: 'KERNEL PANIC',
+        vy: -18, life: 1.8, maxLife: 1.8,
+        color: '#ffd600', size: 20,
+      });
+      s.shakeTime = Math.max(s.shakeTime, 0.25);
+      s.shakeAmp = Math.max(s.shakeAmp, 6);
+    }
+    if (phase < 2 && hpBefore / e.maxHp >= 0.33 && e.hp / e.maxHp < 0.33) {
+      e.bossPhase = 2;
+      e.enraged = true;
+      e.speedMult = Math.max(e.speedMult, 1.35);
+      for (let i = 0; i < 3; i++) spawnWormAt(s, e.pos, e.pathIndex, e.progress);
+      applyAreaDebuffToClosest(s, e.pos, 4.5, 'jammed', 2, 3);
+      s.floaters.push({
+        pos: { x: e.pos.x, y: e.pos.y - 0.9 },
+        text: 'CORE DUMP // ENRAGED',
+        vy: -16, life: 2.2, maxLife: 2.2,
+        color: '#ff6600', size: 22,
+      });
+      s.shakeTime = Math.max(s.shakeTime, 0.4);
+      s.shakeAmp = Math.max(s.shakeAmp, 9);
+    }
   }
   if (source) s.damageDealt[source] = (s.damageDealt[source] ?? 0) + final;
   // Damage number floater with physics — only for non-silent hits over 1 dmg
@@ -2325,10 +2580,24 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
     spawnPulseRing(s, e.pos, ENEMIES[e.def].color, 4);
   }
 
+  // Packet-drop roll — 8% of non-boss kills drop a collectible buff packet.
+  // Bosses always drop one (unmissable ceremony). Kind is random from the pool.
+  const dropRoll = e.isBoss ? 1.0 : 0.08;
+  if (Math.random() < dropRoll) {
+    const kinds: ('dmg' | 'rate' | 'xp' | 'hp')[] = ['dmg', 'rate', 'xp', 'hp'];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    s.packets.push({
+      id: nextId(),
+      pos: { x: e.pos.x, y: e.pos.y },
+      kind,
+      timeLeft: 5,
+      maxTime: 5,
+    });
+  }
+
   // REPLICATION VIRUS sector modifier: chance dead enemies spawn an offspring at their location.
   // Skip if this enemy is already a split-spawn (debuffTimer === -999) to avoid runaway chains.
-  const map = getMap(s.mapId);
-  const repChance = map.modifiers?.replication ?? 0;
+  const repChance = getEffectiveModifiers(s).replication ?? 0;
   if (repChance > 0 && e.debuffTimer !== -999 && !e.isBoss && Math.random() < repChance) {
     spawnWormAt(s, e.pos, e.pathIndex, e.progress);
   }

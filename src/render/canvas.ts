@@ -132,7 +132,13 @@ export function applyBloom(vp: RenderViewport, intensity: number, pixelated: boo
 
 // ================================================================================
 
+// Module-local pointer to the current run — lets drawTower / drawProjectile
+// look up the per-tower chroma override without changing every signature.
+// Safe because rendering is single-threaded and set before any draws start.
+let _currentRenderRun: RunState | null = null;
+
 export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | null): void {
+  _currentRenderRun = s;
   const { ctx } = vp;
   const map = getMap(s.mapId);
   ctx.save();
@@ -207,6 +213,9 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
 
   // Particles
   drawParticles(ctx, vp, s);
+
+  // Loot packets (above enemies so they're tappable/visible).
+  drawPackets(ctx, vp, s);
 
   // Floaters
   drawFloaters(ctx, vp, s);
@@ -604,6 +613,12 @@ function drawSubnetLinks(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: R
   ctx.restore();
 }
 
+// Resolve an active chroma for a tower at render time. Returns the override
+// triplet, or null to fall back to TOWERS[id] defaults.
+function getTowerChroma(id: import('@/types').TowerId): { accent: string; projectile: string; trail: string } | null {
+  return _currentRenderRun?.chromaColors?.[id] ?? null;
+}
+
 function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerInstance): void {
   const cs = vp.cellSize;
   const cx = t.grid.x * cs + cs / 2;
@@ -615,9 +630,50 @@ function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerIn
   const idleBob = t.fireFlash > 0 ? 0 : Math.sin(now * 4.8 + idlePhase) * 0.9;
   const cy = t.grid.y * cs + cs / 2 + idleBob;
   const def = TOWERS[t.def];
+  const chroma = getTowerChroma(t.def);
+  const accentColor = chroma?.accent ?? def.accentColor;
   const sprite = getTowerSprite(t.def);
 
   ctx.save();
+  // Support-tower aura rings — booster and decrypt nodes show their reach as a
+  // dashed pulsing ring so placement is legible. Without this, support towers
+  // feel invisible: the audit called this out as "useless-seeming" because
+  // buffs landed silently with no on-tower indicator.
+  if (t.def === 'booster_node' || t.def === 'data_miner') {
+    const auraColor = t.def === 'booster_node' ? '#00ffaa' : '#ffd600';
+    const auraRange = def.range * cs;
+    const auraPulse = 0.55 + 0.45 * Math.sin(performance.now() / 480);
+    ctx.save();
+    ctx.globalAlpha = 0.22 + auraPulse * 0.12;
+    ctx.strokeStyle = auraColor;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.shadowColor = auraColor;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(cx, cy, auraRange, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+  // Buffed-turret indicator — a small "+" dot at the top-right corner for any
+  // non-support tower currently receiving a subnet bonus. Makes booster's
+  // effect visible on the TARGETS, not just the source.
+  if (t.def !== 'booster_node' && t.def !== 'data_miner'
+      && (t.extras.subnetMult ?? 1) > 1) {
+    const pipX = t.grid.x * cs + cs - 6;
+    const pipY = t.grid.y * cs + 6;
+    const pipPulse = 0.65 + 0.35 * Math.sin(performance.now() / 260);
+    ctx.save();
+    ctx.globalAlpha = 0.95 * pipPulse;
+    ctx.fillStyle = '#00ffaa';
+    ctx.shadowColor = '#00ffaa';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(pipX, pipY, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   // Overdrive state ring — drawn under the halo so it reads as a status indicator.
   const odActive = (t.extras.overdriveActive ?? 0) > 0;
   const odOffline = (t.extras.overdriveOffline ?? 0) > 0;
@@ -638,7 +694,7 @@ function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerIn
   // Glow halo underneath
   ctx.globalAlpha = 0.4;
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cs * 0.55);
-  grad.addColorStop(0, def.accentColor);
+  grad.addColorStop(0, accentColor);
   grad.addColorStop(1, 'transparent');
   ctx.fillStyle = grad;
   ctx.fillRect(t.grid.x * cs, t.grid.y * cs, cs, cs);
@@ -1482,6 +1538,38 @@ function drawMark(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIns
   ctx.beginPath();
   ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.restore();
+}
+
+// Draw loot packets — a pulsing square with a colored glyph, fading out as
+// timeLeft approaches 0. Tap-collectible via tryCollectPacket in engine.
+function drawPackets(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: RunState): void {
+  if (!s.packets || s.packets.length === 0) return;
+  const cs = vp.cellSize;
+  const now = performance.now() / 1000;
+  const glyphs = { dmg: '+D', rate: '+R', xp: 'XP', hp: '+H' } as const;
+  const colors = { dmg: '#ff2d95', rate: '#00fff0', xp: '#00ff88', hp: '#ffd600' } as const;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '700 ' + Math.round(cs * 0.28) + 'px "Orbitron", sans-serif';
+  for (const p of s.packets) {
+    const cx = p.pos.x * cs;
+    const cy = p.pos.y * cs;
+    const pct = p.timeLeft / p.maxTime;
+    const alpha = pct < 0.25 ? (pct / 0.25) : 1;
+    const pulse = 0.7 + 0.3 * Math.sin(now * 7 + p.id);
+    const color = colors[p.kind];
+    const r = cs * 0.28 * pulse;
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = color;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#0b0114';
+    ctx.fillText(glyphs[p.kind], cx, cy);
+  }
   ctx.restore();
 }
 

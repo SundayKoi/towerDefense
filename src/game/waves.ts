@@ -97,13 +97,56 @@ function pickEnemyForWave(map: MapDef, difficulty: Difficulty, wave: number, tot
   return pool[Math.floor(rng() * pool.length)];
 }
 
-// Build the spawn queue for a wave.
-export function buildWaveSpawnQueue(map: MapDef, difficulty: Difficulty, wave: number, totalWaves: number): RunState['spawnQueue'] {
+// Preview data for the upcoming wave — no RNG commit. Used by the pre-wave HUD so
+// players can see what's coming and retool before starting. Returns the pool of
+// enemies that CAN spawn (given gates + phase), approximate count, boss id if any,
+// and active map modifiers as readable tags.
+export interface WavePreview {
+  wave: number;
+  totalWaves: number;
+  approxCount: number;
+  boss: EnemyId | null;
+  isMiniBoss: boolean;
+  pool: EnemyId[];
+  modifiers: string[];
+}
+export function getWavePreview(map: MapDef, difficulty: Difficulty, wave: number, totalWaves: number): WavePreview {
+  const prof = DIFFICULTY_PROFILE[difficulty];
+  const progress = wave / totalWaves;
+  let pool: EnemyId[];
+  if (progress < prof.phaseThresholds[0]) pool = [...map.enemyPool.phase1];
+  else if (progress < prof.phaseThresholds[1]) pool = [...map.enemyPool.phase2];
+  else pool = [...map.enemyPool.phase3];
+  pool = pool.filter((e) => {
+    const gate = prof.enemyGates[e as string];
+    return gate === undefined || wave >= gate;
+  });
+  const modTags: string[] = [];
+  const mods = map.modifiers;
+  if (mods?.packetBursts) modTags.push(`PACKET BURSTS ${Math.round(mods.packetBursts * 100)}%`);
+  if (mods?.encrypted) modTags.push(`ENCRYPTED +${Math.round(mods.encrypted * 100)}% HP SHIELD`);
+  if (mods?.stealthChance) modTags.push(`STEALTH ${Math.round(mods.stealthChance * 100)}%`);
+  if (mods?.replication) modTags.push(`REPLICATION ${Math.round(mods.replication * 100)}%`);
+  if (mods?.rootkit) modTags.push(`ROOTKIT JAM ${mods.rootkit}s`);
+  return {
+    wave,
+    totalWaves,
+    approxCount: waveCount(wave, difficulty),
+    boss: bossForWave(map, difficulty, wave),
+    isMiniBoss: isMiniBossWave(wave),
+    pool,
+    modifiers: modTags,
+  };
+}
+
+// Build the spawn queue for a wave. `extraMods` are merged on top of the map's
+// own modifiers — daily-contract mutators pass through this path.
+export function buildWaveSpawnQueue(map: MapDef, difficulty: Difficulty, wave: number, totalWaves: number, extraMods?: MapDef['modifiers']): RunState['spawnQueue'] {
   const rng = Math.random;
   const count = waveCount(wave, difficulty);
   const delay = spawnDelay(wave);
   // PACKET BURSTS sector modifier: chance each spawn drops a paired follow-up 0.1s later.
-  const burstChance = map.modifiers?.packetBursts ?? 0;
+  const burstChance = (map.modifiers?.packetBursts ?? 0) + (extraMods?.packetBursts ?? 0);
   const maybeBurst = (entry: RunState['spawnQueue'][number]) => {
     if (burstChance > 0 && Math.random() < burstChance) {
       queue.push({ def: entry.def, pathIndex: entry.pathIndex, delay: 0.1, boss: entry.boss });

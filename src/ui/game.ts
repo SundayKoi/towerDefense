@@ -3,7 +3,10 @@
 
 import type { RunState, SaveData, TargetMode, TowerId, TowerInstance } from '@/types';
 import { TOWERS } from '@/data/towers';
+import { ENEMIES } from '@/data/enemies';
 import { getMap } from '@/data/maps';
+import { getWavePreview } from '@/game/waves';
+import { PROGRAMS, type ProgramId } from '@/game/programs';
 import { audio } from '@/audio/sfx';
 import type { Screen } from './screens';
 import { getTowerDataUrl } from '@/render/sprites';
@@ -36,6 +39,8 @@ export interface GameScreenHandles {
   hudWave: HTMLElement;
   hudMap: HTMLElement;
   hudTokens: HTMLElement;
+  programDeck: HTMLElement;
+  wavePreview: HTMLElement;
   startBtn: HTMLButtonElement;
   pauseBtn: HTMLButtonElement;
   buildBtn: HTMLButtonElement;
@@ -65,6 +70,10 @@ export function gameScreen(s: RunState, _save: SaveData): Screen & { handles: ()
         </header>
 
         <div class="tokens-bar" id="hud-tokens"></div>
+
+        <div class="program-deck" id="program-deck"></div>
+
+        <div class="wave-preview" id="wave-preview"></div>
 
         <div class="canvas-wrap">
           <canvas id="game-canvas"></canvas>
@@ -104,6 +113,8 @@ export function gameScreen(s: RunState, _save: SaveData): Screen & { handles: ()
       hudWave: root.querySelector('#hud-wave') as HTMLElement,
       hudMap: root.querySelector('#hud-map') as HTMLElement,
       hudTokens: root.querySelector('#hud-tokens') as HTMLElement,
+      programDeck: root.querySelector('#program-deck') as HTMLElement,
+      wavePreview: root.querySelector('#wave-preview') as HTMLElement,
       startBtn: root.querySelector('#btn-start-wave') as HTMLButtonElement,
       pauseBtn: root.querySelector('#btn-pause') as HTMLButtonElement,
       buildBtn: root.querySelector('#btn-build') as HTMLButtonElement,
@@ -221,10 +232,10 @@ function overdriveDisplay(t: TowerInstance): { label: string; cls: string; disab
   const odActive = (t.extras.overdriveActive ?? 0) > 0;
   const odOffline = (t.extras.overdriveOffline ?? 0) > 0;
   const odCharge = t.extras.overdriveCharge ?? 0;
-  if (odActive) return { label: `BURNING (${(t.extras.overdriveActive).toFixed(1)}s)`, cls: 'btn btn-primary', disabled: true };
+  if (odActive) return { label: `\u26A1 BURNING (${(t.extras.overdriveActive).toFixed(1)}s)`, cls: 'btn btn-primary', disabled: true };
   if (odOffline) return { label: `OFFLINE (${(t.extras.overdriveOffline).toFixed(1)}s)`, cls: 'btn btn-danger', disabled: true };
   if (odCharge > 0) return { label: `CHARGING (${odCharge.toFixed(0)}s)`, cls: 'btn btn-ghost', disabled: true };
-  return { label: 'OVERDRIVE', cls: 'btn btn-primary', disabled: false };
+  return { label: 'OVERDRIVE <span class="hk">[O]</span>', cls: 'btn btn-primary', disabled: false };
 }
 
 // Lightweight refresh: only updates dynamic parts of the panel (overdrive button +
@@ -239,7 +250,7 @@ export function refreshSelectedTowerLive(handles: GameScreenHandles, s: RunState
   const odBtn = box.querySelector('#sel-overdrive') as HTMLButtonElement | null;
   if (odBtn) {
     const od = overdriveDisplay(t);
-    odBtn.textContent = od.label;
+    odBtn.innerHTML = od.label;
     odBtn.className = od.cls;
     odBtn.disabled = od.disabled;
   }
@@ -316,4 +327,90 @@ export function renderSelectedTower(
   (box.querySelector('#sel-remove') as HTMLButtonElement).onclick = () => { audio.play('ui_click'); onRemove(); };
   const odBtn = box.querySelector('#sel-overdrive') as HTMLButtonElement | null;
   if (odBtn) odBtn.onclick = () => { if (!odDisabled) onOverdrive(); };
+}
+
+// Program deck chips — active abilities the player can trigger with hotkeys
+// or taps. Cooldown is rendered as a decreasing numeric on the chip; clicking
+// a ready chip fires the program. Mirrors the research "active verbs" goal.
+export function renderProgramDeck(handles: GameScreenHandles, s: RunState, onTrigger: (id: ProgramId) => void): void {
+  const box = handles.programDeck;
+  if (!box) return;
+  if (!s.programs || s.programs.length === 0) { box.innerHTML = ''; return; }
+  const chips = s.programs.map((slot) => {
+    const def = PROGRAMS[slot.id];
+    if (!def) return '';
+    const ready = slot.cooldownLeft <= 0;
+    const pct = ready ? 0 : Math.min(100, Math.round((slot.cooldownLeft / def.cooldown) * 100));
+    return `
+      <button class="prog-chip${ready ? '' : ' prog-cooling'}" data-id="${slot.id}" style="--accent:${def.color}" title="${def.description}">
+        <span class="prog-hk">${def.hotkey}</span>
+        <span class="prog-body">
+          <span class="prog-name">${def.name}</span>
+          <span class="prog-cd">${ready ? 'READY' : `${slot.cooldownLeft.toFixed(0)}s`}</span>
+        </span>
+        <span class="prog-fill" style="transform:scaleY(${pct / 100})"></span>
+      </button>
+    `;
+  }).join('');
+  // innerHTML-ish update: only rebuild if chip count/id-set changed; otherwise
+  // update the cd text + fill attribute in place so the button never steals
+  // focus between a pointerdown and pointerup.
+  const wantIds = s.programs.map((p) => p.id).join(',');
+  if (box.getAttribute('data-ids') !== wantIds) {
+    box.innerHTML = chips;
+    box.setAttribute('data-ids', wantIds);
+    box.querySelectorAll<HTMLButtonElement>('.prog-chip').forEach((btn) => {
+      const id = btn.dataset.id as ProgramId;
+      btn.onpointerdown = (ev) => { ev.preventDefault(); audio.play('ui_click'); onTrigger(id); };
+    });
+  } else {
+    // Update live: cooldown label + fill %.
+    const btns = box.querySelectorAll<HTMLButtonElement>('.prog-chip');
+    for (let i = 0; i < btns.length; i++) {
+      const btn = btns[i];
+      const slot = s.programs[i];
+      const def = PROGRAMS[slot.id];
+      const ready = slot.cooldownLeft <= 0;
+      const pct = ready ? 0 : Math.min(100, Math.round((slot.cooldownLeft / def.cooldown) * 100));
+      btn.classList.toggle('prog-cooling', !ready);
+      const cd = btn.querySelector('.prog-cd') as HTMLElement | null;
+      if (cd) cd.textContent = ready ? 'READY' : `${slot.cooldownLeft.toFixed(0)}s`;
+      const fill = btn.querySelector('.prog-fill') as HTMLElement | null;
+      if (fill) fill.style.transform = `scaleY(${pct / 100})`;
+    }
+  }
+}
+
+// Pre-wave preview: shows the player what's incoming so they can retool.
+// Called during prep phase; hidden during the wave. Shows enemy-pool chips,
+// boss banner, and sector-modifier tags.
+export function renderWavePreview(handles: GameScreenHandles, s: RunState): void {
+  const box = handles.wavePreview;
+  if (!box) return;
+  if (s.phase !== 'prep') { box.classList.remove('open'); box.innerHTML = ''; return; }
+  const nextWave = s.wave + 1;
+  if (nextWave > s.totalWaves && s.totalWaves > 0) { box.classList.remove('open'); box.innerHTML = ''; return; }
+  const map = getMap(s.mapId);
+  const preview = getWavePreview(map, s.difficulty, nextWave, s.totalWaves || nextWave + 10);
+  const bossChip = preview.boss
+    ? `<div class="wp-boss"><span class="wp-boss-lbl">BOSS</span><span class="wp-boss-name">${ENEMIES[preview.boss].name}</span></div>`
+    : preview.isMiniBoss
+      ? `<div class="wp-boss wp-mini"><span class="wp-boss-lbl">ELITE</span><span class="wp-boss-name">TROJAN</span></div>`
+      : '';
+  const poolChips = preview.pool.map((id) => {
+    const e = ENEMIES[id];
+    const threatCls = `wp-t-${e.threat.toLowerCase()}`;
+    return `<span class="wp-chip ${threatCls}" style="--accent:${e.color}" title="${e.counterTip}">${e.name}</span>`;
+  }).join('');
+  const modChips = preview.modifiers.map((m) => `<span class="wp-mod">${m}</span>`).join('');
+  box.innerHTML = `
+    <div class="wp-head">
+      <span class="wp-wave">WAVE ${nextWave}/${s.totalWaves || '\u221e'}</span>
+      <span class="wp-count">~${preview.approxCount} HOSTILES</span>
+      ${bossChip}
+    </div>
+    <div class="wp-pool">${poolChips || '<span class="wp-empty">scouting\u2026</span>'}</div>
+    ${modChips ? `<div class="wp-mods">${modChips}</div>` : ''}
+  `;
+  box.classList.add('open');
 }

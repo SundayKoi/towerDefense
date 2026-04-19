@@ -2,6 +2,9 @@ import type { Screen } from './screens';
 import type { Difficulty, EnemyId, MapDef, SaveData } from '@/types';
 import { MAPS, isSurvival } from '@/data/maps';
 import { ENEMIES } from '@/data/enemies';
+import { TOWERS } from '@/data/towers';
+import { RUNNERS, RUNNER_IDS, type RunnerId } from '@/data/runners';
+import { ASCENSION_MAX, ASCENSION_DESCRIPTIONS } from '@/data/ascension';
 import { audio } from '@/audio/sfx';
 
 const THREAT_COLOR: Record<string, string> = {
@@ -27,19 +30,79 @@ function enemyChip(id: EnemyId): string {
 
 export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficulty: Difficulty) => void, onBack: () => void): Screen {
   return (root) => {
+    const rerender = () => renderMapSelect(root, save, onPlay, onBack, rerender);
+    rerender();
+  };
+}
+
+function renderMapSelect(root: HTMLElement, save: SaveData, onPlay: (mapId: string, difficulty: Difficulty) => void, onBack: () => void, rerender: () => void): void {
+  {
     root.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'screen screen-scroll';
+    const selectedRunner: RunnerId = save.selectedRunner ?? 'glitch';
+    const runnerCards = RUNNER_IDS.map((id) => {
+      const r = RUNNERS[id];
+      const active = id === selectedRunner;
+      const bannedName = TOWERS[r.bannedTower]?.name ?? r.bannedTower.toUpperCase();
+      const buffBits: string[] = [];
+      if (r.passiveDamagePct) buffBits.push(`+${Math.round(r.passiveDamagePct * 100)}% DMG`);
+      if (r.passiveRatePct) buffBits.push(`+${Math.round(r.passiveRatePct * 100)}% RATE`);
+      if (r.bonusStartingHp) buffBits.push(`+${r.bonusStartingHp} HP`);
+      if (r.bonusStartingLevels) buffBits.push(`+${r.bonusStartingLevels} LEVEL`);
+      const extraTokens = Object.entries(r.bonusStartingTokens).map(([k, v]) => `+${v} ${TOWERS[k as keyof typeof TOWERS]?.name ?? k}`).join(' / ');
+      return `
+        <button class="runner-card${active ? ' runner-active' : ''}" data-runner="${id}" style="--accent:${r.color}">
+          <div class="runner-name">${r.name}</div>
+          <div class="runner-role">${r.role}</div>
+          <div class="runner-flavor">${r.flavor}</div>
+          <div class="runner-stats">${buffBits.join(' &middot; ')}${extraTokens ? ' &middot; ' + extraTokens : ''}</div>
+          <div class="runner-ban">BANS: ${bannedName}</div>
+        </button>
+      `;
+    }).join('');
+    const ascMax = save.ascensionMax ?? 0;
+    const ascLevel = Math.max(0, Math.min(ascMax, save.ascensionLevel ?? 0));
+    const ascMods = ascLevel > 0 ? ASCENSION_DESCRIPTIONS[ascLevel].join(' &middot; ') : 'None — clear any HARD map to unlock ICE DEPTH 1.';
+    const ascBar = ascMax > 0 ? `
+      <div class="asc-bar">
+        <div class="asc-head">
+          <span class="asc-lbl">ICE DEPTH</span>
+          <span class="asc-value">${ascLevel}<span class="asc-cap">/${Math.min(ascMax, ASCENSION_MAX)}</span></span>
+        </div>
+        <div class="asc-mods">${ascMods}</div>
+        <div class="asc-controls">
+          <button class="btn btn-ghost btn-sm" id="asc-down" ${ascLevel <= 0 ? 'disabled' : ''}>&minus;</button>
+          <button class="btn btn-ghost btn-sm" id="asc-up" ${ascLevel >= ascMax ? 'disabled' : ''}>+</button>
+        </div>
+      </div>
+    ` : '';
     wrap.innerHTML = `
       <header class="topbar">
         <button class="btn btn-ghost" id="back-btn">&larr; BACK</button>
         <div class="topbar-title">SELECT INTRUSION</div>
         <div style="width:80px"></div>
       </header>
+      <div class="runner-bar">
+        <div class="runner-bar-head">RUNNER</div>
+        <div class="runner-bar-grid">${runnerCards}</div>
+      </div>
+      ${ascBar}
       <div class="map-list" id="map-list"></div>
     `;
     root.appendChild(wrap);
     (root.querySelector('#back-btn') as HTMLButtonElement).onclick = () => { audio.play('ui_click'); onBack(); };
+    root.querySelectorAll<HTMLButtonElement>('.runner-card').forEach((card) => {
+      card.onclick = () => {
+        audio.play('ui_click');
+        save.selectedRunner = card.dataset.runner as RunnerId;
+        rerender();
+      };
+    });
+    const ascUp = root.querySelector('#asc-up') as HTMLButtonElement | null;
+    const ascDn = root.querySelector('#asc-down') as HTMLButtonElement | null;
+    if (ascUp) ascUp.onclick = () => { audio.play('ui_click'); save.ascensionLevel = Math.min(save.ascensionMax ?? 0, (save.ascensionLevel ?? 0) + 1); rerender(); };
+    if (ascDn) ascDn.onclick = () => { audio.play('ui_click'); save.ascensionLevel = Math.max(0, (save.ascensionLevel ?? 0) - 1); rerender(); };
 
     const list = root.querySelector('#map-list') as HTMLElement;
 
@@ -113,6 +176,22 @@ export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficul
             </button>`;
           }).join('')}
         </div>
+        ${(() => {
+          const ng = save.mapNgPlus?.[m.id];
+          if (!ng || ng.max === 0) return '';
+          const cur = Math.min(ng.current, ng.max);
+          const hpPct = Math.round((1 + 0.5 * cur - 1) * 100);
+          const rewardPct = Math.round(0.25 * cur * 100);
+          return `
+            <div class="ng-row" data-map="${m.id}">
+              <span class="ng-lbl">NG+</span>
+              <button class="ng-step" data-act="down" data-map="${m.id}" ${cur <= 0 ? 'disabled' : ''}>&minus;</button>
+              <span class="ng-value">${cur}<span class="ng-max">/${ng.max}</span></span>
+              <button class="ng-step" data-act="up" data-map="${m.id}" ${cur >= ng.max ? 'disabled' : ''}>+</button>
+              <span class="ng-desc">${cur === 0 ? 'Standard run' : `+${hpPct}% enemy HP &middot; +${rewardPct}% protocols`}</span>
+            </div>
+          `;
+        })()}
       `;
       list.appendChild(row);
     };
@@ -146,7 +225,19 @@ export function mapSelectScreen(save: SaveData, onPlay: (mapId: string, difficul
       });
       btn.addEventListener('mouseenter', () => audio.play('ui_hover'));
     });
-  };
+    list.querySelectorAll<HTMLButtonElement>('.ng-step').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mapId = btn.dataset.map!;
+        const dir = btn.dataset.act === 'up' ? 1 : -1;
+        if (!save.mapNgPlus) save.mapNgPlus = {};
+        const entry = save.mapNgPlus[mapId] ?? { current: 0, max: 0 };
+        entry.current = Math.max(0, Math.min(entry.max, entry.current + dir));
+        save.mapNgPlus[mapId] = entry;
+        audio.play('ui_click');
+        rerender();
+      });
+    });
+  }
 }
 
 function prevDiff(d: Difficulty): Difficulty {

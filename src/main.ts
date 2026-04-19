@@ -2,14 +2,15 @@ import '@/css/main.css';
 import { loadSave, writeSave, createRun, defaultSave } from '@/game/state';
 import { CARDS_BY_ID, drawDraft, STARTER_BRANCH, cardsInBranch } from '@/data/cards';
 import { TOWERS } from '@/data/towers';
-import { cycleTargetMode, placeTower, removeTower, startWave, triggerOverdrive, updateRun } from '@/game/engine';
+import { cycleTargetMode, placeTower, removeTower, startWave, triggerOverdrive, triggerProgram, tryCollectPacket, updateRun } from '@/game/engine';
+import { PROGRAMS, type ProgramId } from '@/game/programs';
 import { DIFFICULTY_PROFILE } from '@/game/waves';
 import { applyBloom, applyPixelate, canPlaceAt, createViewport, renderRun, resizeViewport } from '@/render/canvas';
 import { preloadSprites } from '@/render/sprites';
 import { initBackground } from '@/render/background';
 import { startScreen } from '@/ui/start';
 import { mapSelectScreen } from '@/ui/mapSelect';
-import { gameScreen, refreshSelectedTowerLive, renderPalette, renderSelectedTower, renderTokensBar, type GameScreenHandles } from '@/ui/game';
+import { gameScreen, refreshSelectedTowerLive, renderPalette, renderProgramDeck, renderSelectedTower, renderTokensBar, renderWavePreview, type GameScreenHandles } from '@/ui/game';
 import { openBuildStats, openCardDraft, openEnemyIntel, openGameOver, openPauseMenu, openSettingsModal } from '@/ui/modals';
 import { openShopScreen } from '@/ui/shop';
 import { openDatabankScreen } from '@/ui/databank';
@@ -17,7 +18,8 @@ import { openHowToPlayScreen, showTutorialIfNew, showActBriefingIfNew } from '@/
 import { mount } from '@/ui/screens';
 import { audio } from '@/audio/sfx';
 import { haptics } from '@/audio/haptics';
-import { addToAllPeriods } from '@/data/contracts';
+import { addToAllPeriods, currentPeriodId, ensureDailyContract } from '@/data/contracts';
+import { refreshChromaUnlocks } from '@/data/chromas';
 import type { CardDef, Difficulty, EnemyId, RunState, SaveData, TowerId } from '@/types';
 import { ENEMIES } from '@/data/enemies';
 import { getMap, isSurvival, MAPS } from '@/data/maps';
@@ -106,6 +108,7 @@ const startAudio = () => {
 window.addEventListener('pointerdown', startAudio, { once: true });
 
 function showStart() {
+  ensureDailyContract(save);
   mount(startScreen(
     save,
     () => showMapSelect(),
@@ -113,7 +116,14 @@ function showStart() {
     () => openShopScreen(save, () => writeSave(save), showStart),
     () => openDatabankScreen(save, showStart),
     () => openHowToPlayScreen(showStart),
+    () => startDailyContract(),
   ));
+}
+
+function startDailyContract() {
+  ensureDailyContract(save);
+  const dc = save.dailyContract!;
+  startRun(dc.mapId, dc.difficulty, { dailyContract: true, mutator: dc.mutator });
 }
 
 function showMapSelect() {
@@ -138,10 +148,10 @@ function runRunCleanups() {
   runCleanups = [];
 }
 
-function startRun(mapId: string, difficulty: Difficulty) {
+function startRun(mapId: string, difficulty: Difficulty, contractOpts?: { dailyContract?: boolean; mutator?: string }) {
   save.stats.totalRuns += 1;
   writeSave(save);
-  run = createRun(mapId, difficulty, save);
+  run = createRun(mapId, difficulty, save, contractOpts);
   const ge = gameScreen(run, save);
   mount(ge);
   runHandles = ge.handles();
@@ -368,6 +378,12 @@ function wireGameScreen() {
     const gy = Math.floor(py / vp.cellSize);
     hoverCell = { x: gx, y: gy };
 
+    // Packet pickup takes priority over other tap handlers — click a glowing
+    // packet to claim its buff. Tolerance radius covers finger-sized taps.
+    const worldX = px / vp.cellSize;
+    const worldY = py / vp.cellSize;
+    if (tryCollectPacket(run, worldX, worldY, 0.8)) return;
+
     if (run.selection.kind === 'placing') {
       const defId = run.selection.def;
       if (tryPlaceAt(defId, gx, gy)) {
@@ -420,6 +436,37 @@ function wireGameScreen() {
   runCleanups.push(() => h.canvas.removeEventListener('pointerdown', onTap));
   runCleanups.push(() => h.canvas.removeEventListener('pointermove', onMove));
 
+  // Desktop keybinds. Overdrive is the main active verb — hotkey it so players
+  // don't have to tap-through-panel to use it every 30s. Space starts the next
+  // wave (matches the START WAVE button). Ignored while typing in inputs or
+  // while a modal is open.
+  const onKey = (ev: KeyboardEvent) => {
+    if (!run) return;
+    const tgt = ev.target as HTMLElement | null;
+    if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
+    if (document.querySelector('.modal-backdrop')) return;
+    if (ev.code === 'KeyO' || ev.key === 'o' || ev.key === 'O') {
+      if (run.selection.kind === 'tower') {
+        const t = run.towers.find((x) => x.id === (run!.selection as { kind: 'tower'; towerId: number }).towerId);
+        if (t) { triggerOverdrive(run, t); ev.preventDefault(); }
+      }
+    } else if (ev.code === 'Space') {
+      if (run.phase === 'prep') { startWave(run); ev.preventDefault(); }
+    } else if (/^Digit[1-4]$/.test(ev.code)) {
+      const idx = parseInt(ev.code.slice(5), 10) - 1;
+      const prog = run.programs?.[idx];
+      if (prog) {
+        const def = PROGRAMS[prog.id as ProgramId];
+        if (def) {
+          triggerProgram(run, prog.id as ProgramId);
+          ev.preventDefault();
+        }
+      }
+    }
+  };
+  window.addEventListener('keydown', onKey);
+  runCleanups.push(() => window.removeEventListener('keydown', onKey));
+
   (wireGameScreen as any).__vp = vp;
   // The two function-object properties below capture the run state and the canvas
   // viewport. If we don't clear them on run end, the old run + its canvas backing
@@ -454,6 +501,8 @@ function updateHud() {
     runHandles.startBtn.classList.remove('btn-boss');
   }
   runHandles.startBtn.disabled = run.phase !== 'prep';
+  renderWavePreview(runHandles, run);
+  renderProgramDeck(runHandles, run, (id) => { triggerProgram(run!, id); });
   // Refresh ONLY the live parts of the selected tower panel (overdrive countdown,
   // subnet readout). Full rebuild here would destroy the close button between a
   // user's pointerdown and pointerup, breaking the close action.
@@ -559,7 +608,7 @@ function openLevelUpDraft() {
   // Tutorial: explain card drafts on the player's first ever level-up.
   showTutorialIfNew(save, () => writeSave(save), 'first_levelup');
   const unlocked = new Set(save.unlockedCards);
-  const cardCount = DIFFICULTY_PROFILE[r.difficulty].draftSize + (save.metaBoosts.extraDraftCards ?? 0);
+  const cardCount = Math.max(1, DIFFICULTY_PROFILE[r.difficulty].draftSize + (save.metaBoosts.extraDraftCards ?? 0) - Math.floor((r.ascensionLevel ?? 0) / 3));
   const ctx = buildDraftContext(r);
   r.draftOptions = drawDraft(r.level, unlocked, ctx, cardCount, r.cardsPicked);
   r.draftSource = 'level';
@@ -612,8 +661,30 @@ function finishRun(victory: boolean) {
   save.stats.totalKills = (save.stats.totalKills ?? 0) + run.killsThisRun;
   save.stats.bossKills = (save.stats.bossKills ?? 0) + run.bossKillsThisRun;
   save.stats.totalXpEarned = (save.stats.totalXpEarned ?? 0) + run.xpThisRun;
+  // Chroma unlock check — new entries auto-equip so the player sees them
+  // immediately. Floaters/toasts can be added later; for now the databank
+  // surface is how unlocks are discovered.
+  const newChromas = refreshChromaUnlocks(save);
+  for (const c of newChromas) {
+    haptics.fire('level_up');
+    console.log('[chroma] unlocked', c.id);
+  }
   if (isSurvival(run.mapId) && run.wave > (save.stats.survivalBestWave ?? 0)) {
     save.stats.survivalBestWave = run.wave;
+  }
+
+  // Daily contract score tracking. Records bestWave (always) and bestTimeSec
+  // (only on victory). Locked to the current period so a run started yesterday
+  // doesn't retroactively post to today's contract.
+  if (run.isDailyContract && save.dailyContract && save.dailyContract.period === currentPeriodId('daily')) {
+    const dc = save.dailyContract;
+    dc.attempts += 1;
+    if (run.wave > dc.bestWave) dc.bestWave = run.wave;
+    if (victory) {
+      const elapsedSec = run.runStartMs ? Math.round((performance.now() - run.runStartMs) / 1000) : 0;
+      if (!dc.completed || elapsedSec < dc.bestTimeSec || dc.bestTimeSec === 0) dc.bestTimeSec = elapsedSec;
+      dc.completed = true;
+    }
   }
 
   // Update per-period contract stats for daily/weekly/monthly
@@ -643,8 +714,28 @@ function finishRun(victory: boolean) {
     const c = (save.completed[run.mapId] ?? {});
     c[run.difficulty] = true;
     save.completed[run.mapId] = c;
-    // Clear bonus protocols
-    const clearBonus = run.difficulty === 'hard' ? 100 : run.difficulty === 'medium' ? 50 : 20;
+    // Ascension unlock: hard-win at the current max bumps it by one, up to
+    // ASCENSION_MAX. Non-hard or non-max wins don't advance the ladder.
+    if (run.difficulty === 'hard' && !run.isDailyContract) {
+      const curLevel = run.ascensionLevel ?? 0;
+      const max = save.ascensionMax ?? 0;
+      if (curLevel >= max && max < 10) {
+        save.ascensionMax = max + 1;
+      }
+    }
+    // NG+ unlock / bump. Any-difficulty victory unlocks NG+1 for this map; if
+    // the run was already at the current max NG+ tier, bump max to current+1.
+    // Dailies don't advance NG+ (the leaderboard stays on a single tier).
+    if (!run.isDailyContract) {
+      if (!save.mapNgPlus) save.mapNgPlus = {};
+      const entry = save.mapNgPlus[run.mapId] ?? { current: 0, max: 0 };
+      const ran = run.ngPlusTier ?? 0;
+      if (ran >= entry.max && entry.max < 5) entry.max = entry.max + 1;
+      save.mapNgPlus[run.mapId] = entry;
+    }
+    // Clear bonus protocols — NG+ tiers multiply the reward by (1 + 0.25 * tier).
+    const baseClearBonus = run.difficulty === 'hard' ? 100 : run.difficulty === 'medium' ? 50 : 20;
+    const clearBonus = Math.round(baseClearBonus * (1 + 0.25 * (run.ngPlusTier ?? 0)));
     save.protocols += clearBonus;
     save.stats.totalProtocolsEarned += clearBonus;
     run.protocolsEarned += clearBonus;

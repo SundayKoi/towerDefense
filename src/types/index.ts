@@ -45,6 +45,14 @@ export type Difficulty = 'easy' | 'medium' | 'hard';
 // Damage classification — enemies may resist or be weak to each type.
 export type DamageType = 'kinetic' | 'energy' | 'aoe' | 'chain' | 'pierce';
 
+// Port/Protocol — a secondary "open vulnerability" tag on enemies + "exploit"
+// tag on turrets. When a turret fires at an enemy with matching port, damage
+// gains a bonus (see PORT_EXPLOIT_MULT in engine). This layer is orthogonal to
+// damage types: it rewards diverse turret builds where each specialist has one
+// enemy they're particularly lethal against, on top of the type-resist system.
+export type Port = 'SSH' | 'HTTP' | 'DNS' | 'SMB' | 'ICMP';
+export const ALL_PORTS: readonly Port[] = ['SSH', 'HTTP', 'DNS', 'SMB', 'ICMP'] as const;
+
 // Per-tower target priority.
 export type TargetMode = 'first' | 'strong' | 'weak' | 'close';
 
@@ -54,6 +62,18 @@ export type TowerDebuff = { kind: 'jammed' | 'infected'; timeLeft: number };
 // the tower is immune to that same kind for ~2s, which stops cascading re-jams
 // from phantom death bursts + rootkit aura + sector modifier firing in sequence.
 export interface TowerDebuffCooldowns { jammed?: number; infected?: number }
+
+// Packet-drop loot — drops from a small % of enemy kills. Tap within the
+// window to claim a timed buff. Rewards attention during waves without
+// punishing AFK play (missed packets just fade).
+export type PacketKind = 'dmg' | 'rate' | 'xp' | 'hp';
+export interface Packet {
+  id: number;
+  pos: Vec2;
+  kind: PacketKind;
+  timeLeft: number;
+  maxTime: number;
+}
 
 // Persistent ground effect dropped by towers on hit.
 export interface Puddle {
@@ -246,6 +266,11 @@ export interface EnemyInstance {
   bossSpawnTimer?: number;
   bossTriggered?: boolean;
   regenCooldown?: number;
+  // Multi-phase bosses (KERNEL) use a numeric phase counter since a single boolean
+  // can't gate a 66% and a 33% trigger. Defaults to 0; incremented when a threshold
+  // fires. Also drives enraged speed/resist multipliers on tick.
+  bossPhase?: number;
+  enraged?: boolean;
 }
 
 export interface Projectile {
@@ -364,6 +389,35 @@ export interface SaveData {
     weekly:  { period: string; offered: string[]; claimed: string[]; stats: PeriodStats };
     monthly: { period: string; offered: string[]; claimed: string[]; stats: PeriodStats };
   };
+  // Seeded daily contract. Same (map, difficulty, mutator) for all players on the
+  // same local date. Tracks attempts + best wave reached + best clear time so
+  // players have a personal leaderboard to push against each day.
+  dailyContract?: {
+    period: string;        // YYYY-MM-DD local
+    mapId: string;
+    difficulty: Difficulty;
+    mutator: string;       // mutator id — rotates daily, defines flavor
+    attempts: number;
+    bestWave: number;
+    bestTimeSec: number;   // 0 = not yet cleared
+    completed: boolean;
+  };
+  // Selected runner persona for regular runs. Each runner applies a distinct
+  // passive + banned tower at run start. Default 'glitch' for returning saves.
+  selectedRunner?: import('@/data/runners').RunnerId;
+  // Ascension — post-campaign stacked difficulty. Each level ratchets enemy HP
+  // + speed + turret locks + draft reduction. `ascensionLevel` is what the next
+  // run will use; `ascensionMax` is the highest unlocked. Unlock next level by
+  // hard-clearing at the current level.
+  ascensionLevel?: number;
+  ascensionMax?: number;
+  // Cosmetic chromas — unlocked via lifetime milestones, equipped per-tower.
+  unlockedChromas?: string[];
+  equippedChromas?: Partial<Record<TowerId, string>>;
+  // NG+ per-map state. Unlocks after any-difficulty clear (max=1), bumps by
+  // 1 each victory at the current tier, capped at NG_PLUS_MAX in state.ts.
+  // current = tier the next run will use. Enemies +50% HP per tier.
+  mapNgPlus?: Record<string, { current: number; max: number }>;
   stats: {
     totalRuns: number;
     totalWins: number;
@@ -411,6 +465,9 @@ export interface RunState {
   enemies: EnemyInstance[];
   projectiles: Projectile[];
   puddles: Puddle[];
+  packets: Packet[];
+  // Short-lived run buffs from picking up packets. Ticked down per frame.
+  packetBuffs: { dmgMult: number; rateMult: number; xpMult: number; timeLeft: number };
   // Active behavioral upgrades per tower type, applied via card picks.
   towerEffects: Partial<Record<TowerId, Set<string>>>;
   particles: Particle[];
@@ -468,4 +525,24 @@ export interface RunState {
   bossKillsThisRun: number;
   xpThisRun: number;
   legendariesThisRun: number;
+  // Daily-contract runs pipe their mutator modifiers through here. Merged with
+  // the map's base modifiers at read time via getEffectiveModifiers(). Also
+  // signals to the run-end hook to write bestWave/bestTime back to save.
+  isDailyContract?: boolean;
+  contractMutators?: MapDef['modifiers'];
+  runStartMs?: number;   // performance.now() at run start, for daily best-time
+  // Program deck: active abilities the player triggers with 1-4 hotkeys or by
+  // clicking the program chip. Each entry pairs a program id with its current
+  // cooldownLeft. Initialized in createRun with the starter deck.
+  programs?: { id: import('@/game/programs').ProgramId; cooldownLeft: number }[];
+  runnerId?: import('@/data/runners').RunnerId;
+  // Ascension multipliers, folded in at spawn time. 1.0 = no ascension.
+  ascensionLevel?: number;
+  ascensionHpMult?: number;
+  ascensionSpeedMult?: number;
+  // Per-tower chroma color overrides (accent/projectile/trail) — read by the
+  // renderer to tint turrets the player has cosmetically customized. Keyed on
+  // TowerId; missing entry means vanilla colors.
+  chromaColors?: Partial<Record<TowerId, { accent: string; projectile: string; trail: string }>>;
+  ngPlusTier?: number; // 0 = base run, each tier multiplies enemy HP by (1 + 0.5 * tier)
 }
