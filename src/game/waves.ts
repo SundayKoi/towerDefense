@@ -19,11 +19,23 @@ export const DIFFICULTY_PROFILE: Record<Difficulty, DifficultyProfile> = {
 };
 
 // Compute number of enemies for a given wave.
-export function waveCount(wave: number, difficulty: Difficulty = 'medium'): number {
+// Scales by wave AND by map act — later acts in a campaign flood harder than
+// early acts, so a wave-10 Act-1 run and a wave-10 Act-7 run feel noticeably
+// different. The previous cap of 22 on medium was being hit by wave ~16 and
+// never grew, which made mid-and-late-game rounds feel short.
+//
+// New growth curve (examples, medium):
+//   Act 1 wave  5: ~14       (was 10)
+//   Act 1 wave 20: ~36       (was capped 22)
+//   Act 4 wave 10: ~30       (was 16)
+//   Act 7 wave 20: ~55-70    (was capped 22)
+export function waveCount(wave: number, difficulty: Difficulty = 'medium', mapAct = 1): number {
   if (wave === 1) return 4;
-  // Per-difficulty caps keep easy from flooding a player with limited turret variety.
-  const cap = { easy: 18, medium: 22, hard: 25 }[difficulty];
-  return Math.max(5, Math.min(cap, 5 + Math.floor(wave * 1.1)));
+  const actMult = 1 + (mapAct - 1) * 0.15;              // act1=1x, act7=1.9x
+  const base = 6 + Math.floor(wave * 1.5);               // faster growth than old 1.1
+  const baseCap = { easy: 30, medium: 40, hard: 50 }[difficulty];
+  const cap = Math.floor(baseCap * actMult);             // act scales cap too
+  return Math.max(5, Math.min(cap, Math.floor(base * actMult)));
 }
 
 // Spawn delay in seconds per §9.6.
@@ -131,7 +143,7 @@ export function getWavePreview(map: MapDef, difficulty: Difficulty, wave: number
   return {
     wave,
     totalWaves,
-    approxCount: waveCount(wave, difficulty),
+    approxCount: waveCount(wave, difficulty, map.act ?? 1),
     boss: bossForWave(map, difficulty, wave),
     isMiniBoss: isMiniBossWave(wave),
     pool,
@@ -143,7 +155,7 @@ export function getWavePreview(map: MapDef, difficulty: Difficulty, wave: number
 // own modifiers — daily-contract mutators pass through this path.
 export function buildWaveSpawnQueue(map: MapDef, difficulty: Difficulty, wave: number, totalWaves: number, extraMods?: MapDef['modifiers']): RunState['spawnQueue'] {
   const rng = Math.random;
-  const count = waveCount(wave, difficulty);
+  const count = waveCount(wave, difficulty, map.act ?? 1);
   const delay = spawnDelay(wave);
   // PACKET BURSTS sector modifier: chance each spawn drops a paired follow-up 0.1s later.
   const burstChance = (map.modifiers?.packetBursts ?? 0) + (extraMods?.packetBursts ?? 0);

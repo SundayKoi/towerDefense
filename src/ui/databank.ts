@@ -264,7 +264,7 @@ function renderProgressionTab(save: SaveData): string {
   // ── DIFFICULTY TIERS ────────────────────────────────────────────────
   const diffs: Difficulty[] = ['easy', 'medium', 'hard'];
   out.push(`<div class="progress-section"><div class="progress-head">DIFFICULTY TIERS</div>`);
-  out.push(`<div class="progress-sub">Picked per-map on the intrusion select screen. Waves, draft size, and enemy scaling shift per tier.</div>`);
+  out.push(`<div class="progress-sub">Picked per-map on the intrusion select screen. Waves, draft size, and enemy scaling shift per tier. Later acts spawn up to +90% more enemies per wave than Act 1.</div>`);
   out.push(`<table class="progress-table"><thead><tr>
     <th></th>
     <th class="t-easy">EASY</th>
