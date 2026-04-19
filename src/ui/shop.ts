@@ -26,6 +26,21 @@ function fmtCountdown(ms: number): string {
   return `RESETS IN ${m}m`;
 }
 
+// Compact progress bar + numeric label. Width scales with current/target.
+// When complete, renders a full-green bar with "DONE" flag so the player
+// can tell at-a-glance which rows are claimable vs in-flight.
+function renderProgressBar(current: number, target: number, done: boolean): string {
+  const clamped = Math.max(0, Math.min(target, current));
+  const pct = target > 0 ? Math.round((clamped / target) * 100) : 0;
+  const fmt = (n: number) => n >= 1000 ? n.toLocaleString() : String(n);
+  return `
+    <div class="quest-progress${done ? ' done' : ''}">
+      <div class="qp-fill" style="width:${pct}%"></div>
+      <span class="qp-text">${fmt(clamped)} / ${fmt(target)}${pct >= 100 ? ' · DONE' : ''}</span>
+    </div>
+  `;
+}
+
 const FREQ_LABELS: Record<ContractFrequency, string> = {
   daily: 'DAILY CONTRACTS',
   weekly: 'WEEKLY CONTRACTS',
@@ -140,11 +155,14 @@ function shopScreen(save: SaveData, persist: () => void, onBack: () => void): Sc
             const done = c.check(bucket.stats);
             const claimed = bucket.claimed.includes(id);
             const claimable = done && !claimed;
+            const prog = c.progress?.(bucket.stats);
+            const progBar = prog ? renderProgressBar(prog[0], prog[1], done) : '';
             html += `
               <div class="quest-item ${claimed ? 'claimed' : done ? 'claimable' : 'locked'}">
                 <div class="quest-body">
                   <div class="quest-name">${c.name}</div>
                   <div class="quest-desc">${c.description}</div>
+                  ${progBar}
                 </div>
                 <div class="quest-reward">
                   <span class="quest-proto">+${c.reward}◇</span>
@@ -172,11 +190,14 @@ function shopScreen(save: SaveData, persist: () => void, onBack: () => void): Sc
             const done = q.check(save);
             const claimed = save.quests.completed.includes(q.id);
             const claimable = done && !claimed;
+            const prog = q.progress?.(save);
+            const progBar = prog ? renderProgressBar(prog[0], prog[1], done) : '';
             html += `
               <div class="quest-item ${claimed ? 'claimed' : done ? 'claimable' : 'locked'}">
                 <div class="quest-body">
                   <div class="quest-name">${q.name}</div>
                   <div class="quest-desc">${q.description}</div>
+                  ${progBar}
                 </div>
                 <div class="quest-reward">
                   <span class="quest-proto">+${q.reward}◇</span>

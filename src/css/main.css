@@ -2165,6 +2165,39 @@ html, body { overscroll-behavior: none; }
   color: var(--text-dim);
   line-height: 1.4;
 }
+.quest-progress {
+  position: relative;
+  margin-top: 6px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 240, 0.25);
+  overflow: hidden;
+}
+.quest-progress .qp-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, rgba(0, 255, 240, 0.35), rgba(0, 255, 240, 0.15));
+  transition: width 0.25s ease-out;
+}
+.quest-progress .qp-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9.5px;
+  letter-spacing: 1.4px;
+  color: var(--text);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+.quest-progress.done {
+  border-color: var(--green);
+}
+.quest-progress.done .qp-fill {
+  background: linear-gradient(90deg, rgba(0, 255, 136, 0.55), rgba(0, 255, 136, 0.25));
+}
+.quest-progress.done .qp-text { color: var(--green); font-weight: 700; }
 .quest-reward {
   display: flex;
   flex-direction: column;
@@ -2338,6 +2371,65 @@ html, body { overscroll-behavior: none; }
   cursor: not-allowed;
   filter: grayscale(0.7);
 }
+
+/* ── Progression tab ── */
+.progress-section {
+  margin: 14px 0 20px;
+  padding: 10px 12px;
+  background: rgba(5, 8, 14, 0.58);
+  border: 1px solid rgba(0, 255, 240, 0.18);
+}
+.progress-head {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  letter-spacing: 2.5px;
+  color: var(--cyan);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.progress-sub {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+.progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.8px;
+}
+.progress-table th {
+  text-align: left;
+  padding: 6px 8px;
+  color: var(--text-dim);
+  font-size: 9.5px;
+  letter-spacing: 1.6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.progress-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+.progress-table tr:last-child td { border-bottom: none; }
+.progress-table-compact th,
+.progress-table-compact td { padding: 4px 6px; font-size: 10px; }
+.progress-table .t-easy { color: var(--green); }
+.progress-table .t-med { color: var(--yellow); }
+.progress-table .t-hard { color: var(--red); }
+.progress-table .db-row-locked { opacity: 0.45; }
+.progress-table .db-row-locked td { color: var(--text-dim); }
+.db-dim { color: var(--text-dim); opacity: 0.6; }
+.db-map-id { font-weight: 700; letter-spacing: 1.5px; }
+.db-reward-tower { color: var(--cyan); font-weight: 700; }
+.db-reward-card { color: var(--magenta); }
+.db-reward-branch { color: var(--purple); font-weight: 700; }
+.db-reward-proto { color: var(--yellow); font-weight: 700; }
+.db-asc-level { color: var(--purple); font-weight: 700; letter-spacing: 1px; }
+.db-accent { font-weight: 700; letter-spacing: 1px; }
 .db-special {
   border: 1px solid rgba(0, 255, 136, 0.3);
   background: rgba(0, 255, 136, 0.05);

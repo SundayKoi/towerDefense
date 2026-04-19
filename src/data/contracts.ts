@@ -11,41 +11,56 @@ export interface ContractDef {
   frequency: ContractFrequency;
   reward: number;
   check: (stats: PeriodStats) => boolean;
+  // Numeric progress tuple [current, target] for rendering X/Y progress bars.
+  // If the contract's check is already satisfied, callers should clamp current
+  // to target. Every contract below provides this — the field is typed optional
+  // for forward-compat only.
+  progress?: (stats: PeriodStats) => [number, number];
 }
 
 // ─── POOL ─────────────────────────────────────────────────────────────────
 
+// Factory: accepts a stat extractor + target; emits both check and progress
+// together so every contract stays consistent.
+function numericContract(id: string, name: string, description: string, frequency: ContractFrequency, reward: number, extract: (s: PeriodStats) => number, target: number): ContractDef {
+  return {
+    id, name, description, frequency, reward,
+    check: (s) => extract(s) >= target,
+    progress: (s) => [Math.min(target, extract(s)), target],
+  };
+}
+
 export const CONTRACTS: ContractDef[] = [
   // ── DAILY (reward 15–35) ─────────────────────────────────────────────────
-  { id: 'd_run',            name: 'TEST RUN',            description: 'Complete any run today.',                      frequency: 'daily', reward: 15, check: (s) => s.runs >= 1 },
-  { id: 'd_win',            name: 'QUICK BREACH',        description: 'Win a run today.',                             frequency: 'daily', reward: 20, check: (s) => s.wins >= 1 },
-  { id: 'd_win_medium',     name: 'ESCALATE',            description: 'Win a Medium+ run today.',                     frequency: 'daily', reward: 30, check: (s) => s.mediumWins + s.hardWins >= 1 },
-  { id: 'd_win_hard',       name: 'APEX BREACH',         description: 'Win a Hard run today.',                        frequency: 'daily', reward: 35, check: (s) => s.hardWins >= 1 },
-  { id: 'd_kill_100',       name: 'EXTERMINATION',       description: 'Eliminate 100 enemies today.',                 frequency: 'daily', reward: 20, check: (s) => s.kills >= 100 },
-  { id: 'd_kill_300',       name: 'DELETE STREAK',       description: 'Eliminate 300 enemies today.',                 frequency: 'daily', reward: 30, check: (s) => s.kills >= 300 },
-  { id: 'd_boss_2',         name: 'BOSS PATROL',         description: 'Defeat 2 bosses today.',                       frequency: 'daily', reward: 25, check: (s) => s.bossKills >= 2 },
-  { id: 'd_waves_20',       name: 'WAVE RUNNER',         description: 'Clear 20 waves today.',                        frequency: 'daily', reward: 20, check: (s) => s.wavesCleared >= 20 },
-  { id: 'd_waves_40',       name: 'WAVE CRUSHER',        description: 'Clear 40 waves today.',                        frequency: 'daily', reward: 30, check: (s) => s.wavesCleared >= 40 },
-  { id: 'd_proto_50',       name: 'DAILY TAKE',          description: 'Earn 50 protocols today.',                     frequency: 'daily', reward: 20, check: (s) => s.protocolsEarned >= 50 },
-  { id: 'd_legendary',      name: 'RARE FIND',           description: 'Draft a Legendary card today.',                frequency: 'daily', reward: 25, check: (s) => s.legendaryDrafts >= 1 },
-  { id: 'd_towers_3',       name: 'MIXED ARSENAL',       description: 'Deploy 3 different tower types today.',        frequency: 'daily', reward: 25, check: (s) => s.uniqueTowersDeployed.length >= 3 },
+  numericContract('d_run',            'TEST RUN',            'Complete any run today.',                      'daily', 15, (s) => s.runs, 1),
+  numericContract('d_win',            'QUICK BREACH',        'Win a run today.',                             'daily', 20, (s) => s.wins, 1),
+  numericContract('d_win_medium',     'ESCALATE',            'Win a Medium+ run today.',                     'daily', 30, (s) => s.mediumWins + s.hardWins, 1),
+  numericContract('d_win_hard',       'APEX BREACH',         'Win a Hard run today.',                        'daily', 35, (s) => s.hardWins, 1),
+  numericContract('d_kill_100',       'EXTERMINATION',       'Eliminate 100 enemies today.',                 'daily', 20, (s) => s.kills, 100),
+  numericContract('d_kill_300',       'DELETE STREAK',       'Eliminate 300 enemies today.',                 'daily', 30, (s) => s.kills, 300),
+  numericContract('d_boss_2',         'BOSS PATROL',         'Defeat 2 bosses today.',                       'daily', 25, (s) => s.bossKills, 2),
+  numericContract('d_waves_20',       'WAVE RUNNER',         'Clear 20 waves today.',                        'daily', 20, (s) => s.wavesCleared, 20),
+  numericContract('d_waves_40',       'WAVE CRUSHER',        'Clear 40 waves today.',                        'daily', 30, (s) => s.wavesCleared, 40),
+  numericContract('d_proto_50',       'DAILY TAKE',          'Earn 50 protocols today.',                     'daily', 20, (s) => s.protocolsEarned, 50),
+  numericContract('d_legendary',      'RARE FIND',           'Draft a Legendary card today.',                'daily', 25, (s) => s.legendaryDrafts, 1),
+  numericContract('d_towers_3',       'MIXED ARSENAL',       'Deploy 3 different tower types today.',        'daily', 25, (s) => s.uniqueTowersDeployed.length, 3),
 
   // ── WEEKLY (reward 60–120) ───────────────────────────────────────────────
-  { id: 'w_wins_5',         name: 'PROLIFIC',            description: 'Win 5 runs this week.',                        frequency: 'weekly', reward: 80,  check: (s) => s.wins >= 5 },
-  { id: 'w_hard_3',         name: 'HARD MODE',           description: 'Win 3 Hard runs this week.',                   frequency: 'weekly', reward: 120, check: (s) => s.hardWins >= 3 },
-  { id: 'w_kill_1k',        name: 'SLAUGHTERFEST',       description: 'Eliminate 1,000 enemies this week.',           frequency: 'weekly', reward: 80,  check: (s) => s.kills >= 1000 },
-  { id: 'w_boss_15',        name: 'BOSS RUSH',           description: 'Defeat 15 bosses this week.',                  frequency: 'weekly', reward: 100, check: (s) => s.bossKills >= 15 },
-  { id: 'w_waves_150',      name: 'WAVE VETERAN',        description: 'Clear 150 waves this week.',                   frequency: 'weekly', reward: 75,  check: (s) => s.wavesCleared >= 150 },
-  { id: 'w_protocols_400',  name: 'BANKROLL',            description: 'Earn 400 protocols this week.',                frequency: 'weekly', reward: 100, check: (s) => s.protocolsEarned >= 400 },
-  { id: 'w_legendary_3',    name: 'LEGEND CHASER',       description: 'Draft 3 Legendary cards this week.',           frequency: 'weekly', reward: 90,  check: (s) => s.legendaryDrafts >= 3 },
-  { id: 'w_towers_8',       name: 'ARSENAL MASTER',      description: 'Deploy 8 different tower types this week.',    frequency: 'weekly', reward: 100, check: (s) => s.uniqueTowersDeployed.length >= 8 },
+  numericContract('w_wins_5',         'PROLIFIC',            'Win 5 runs this week.',                        'weekly', 80,  (s) => s.wins, 5),
+  numericContract('w_hard_3',         'HARD MODE',           'Win 3 Hard runs this week.',                   'weekly', 120, (s) => s.hardWins, 3),
+  numericContract('w_kill_1k',        'SLAUGHTERFEST',       'Eliminate 1,000 enemies this week.',           'weekly', 80,  (s) => s.kills, 1000),
+  numericContract('w_boss_15',        'BOSS RUSH',           'Defeat 15 bosses this week.',                  'weekly', 100, (s) => s.bossKills, 15),
+  numericContract('w_waves_150',      'WAVE VETERAN',        'Clear 150 waves this week.',                   'weekly', 75,  (s) => s.wavesCleared, 150),
+  numericContract('w_protocols_400',  'BANKROLL',            'Earn 400 protocols this week.',                'weekly', 100, (s) => s.protocolsEarned, 400),
+  numericContract('w_legendary_3',    'LEGEND CHASER',       'Draft 3 Legendary cards this week.',           'weekly', 90,  (s) => s.legendaryDrafts, 3),
+  numericContract('w_towers_8',       'ARSENAL MASTER',      'Deploy 8 different tower types this week.',    'weekly', 100, (s) => s.uniqueTowersDeployed.length, 8),
 
   // ── MONTHLY (reward 250–500) ─────────────────────────────────────────────
-  { id: 'm_wins_25',        name: 'CAMPAIGN GRINDER',    description: 'Win 25 runs this month.',                      frequency: 'monthly', reward: 300, check: (s) => s.wins >= 25 },
-  { id: 'm_kill_10k',       name: 'MASS EXTINCTION',     description: 'Eliminate 10,000 enemies this month.',         frequency: 'monthly', reward: 400, check: (s) => s.kills >= 10000 },
-  { id: 'm_boss_60',        name: 'BOSS CRUSHER',        description: 'Defeat 60 bosses this month.',                 frequency: 'monthly', reward: 350, check: (s) => s.bossKills >= 60 },
-  { id: 'm_towers_all',     name: 'FULL ARSENAL',        description: 'Deploy all 12 tower types this month.',        frequency: 'monthly', reward: 500, check: (s) => s.uniqueTowersDeployed.length >= 12 },
-  { id: 'm_waves_500',      name: 'WAVE LEGEND',         description: 'Clear 500 waves this month.',                  frequency: 'monthly', reward: 300, check: (s) => s.wavesCleared >= 500 },
+  numericContract('m_wins_25',        'CAMPAIGN GRINDER',    'Win 25 runs this month.',                      'monthly', 300, (s) => s.wins, 25),
+  numericContract('m_kill_10k',       'MASS EXTINCTION',     'Eliminate 10,000 enemies this month.',         'monthly', 400, (s) => s.kills, 10000),
+  numericContract('m_boss_60',        'BOSS CRUSHER',        'Defeat 60 bosses this month.',                 'monthly', 350, (s) => s.bossKills, 60),
+  numericContract('m_towers_all',     'FULL ARSENAL',        'Deploy all 12 tower types this month.',        'monthly', 500, (s) => s.uniqueTowersDeployed.length, 12),
+  numericContract('m_waves_500',      'WAVE LEGEND',         'Clear 500 waves this month.',                  'monthly', 300, (s) => s.wavesCleared, 500),
 ];
 
 export const CONTRACTS_BY_ID: Record<string, ContractDef> = Object.fromEntries(CONTRACTS.map((c) => [c.id, c]));

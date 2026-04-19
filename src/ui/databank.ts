@@ -1,9 +1,13 @@
-import type { SaveData, TowerId, EnemyId } from '@/types';
+import type { SaveData, TowerId, EnemyId, Difficulty } from '@/types';
 import { TOWERS } from '@/data/towers';
 import { ENEMIES } from '@/data/enemies';
-import { CARDS } from '@/data/cards';
+import { CARDS, CARDS_BY_ID } from '@/data/cards';
 import { ENEMY_PORT, TOWER_EXPLOITS } from '@/data/ports';
 import { CHROMAS, CHROMAS_BY_ID } from '@/data/chromas';
+import { MAPS, isSurvival } from '@/data/maps';
+import { RUNNERS, RUNNER_IDS } from '@/data/runners';
+import { ASCENSION_DESCRIPTIONS, ASCENSION_MAX } from '@/data/ascension';
+import { DIFFICULTY_PROFILE } from '@/game/waves';
 import { mount, type Screen } from './screens';
 import { audio } from '@/audio/sfx';
 
@@ -11,7 +15,7 @@ export function openDatabankScreen(save: SaveData, onBack: () => void): void {
   mount(databankScreen(save, onBack));
 }
 
-type Tab = 'arsenal' | 'cards' | 'intrusions';
+type Tab = 'arsenal' | 'cards' | 'intrusions' | 'progression';
 
 function databankScreen(save: SaveData, onBack: () => void): Screen {
   return (root) => {
@@ -195,6 +199,10 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
         }
       }
 
+      if (activeTab === 'progression') {
+        body += renderProgressionTab(save);
+      }
+
       const html = `
         <div class="screen screen-scroll databank-screen">
           <header class="topbar">
@@ -206,6 +214,7 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
             <button class="shop-tab${activeTab === 'arsenal' ? ' active' : ''}" data-tab="arsenal">ARSENAL <small>${towerUnlocked}/${towerTotal}</small></button>
             <button class="shop-tab${activeTab === 'intrusions' ? ' active' : ''}" data-tab="intrusions">INTRUSIONS <small>${enemySeen}/${enemyTotal}</small></button>
             <button class="shop-tab${activeTab === 'cards' ? ' active' : ''}" data-tab="cards">CARDS <small>${cardUnlocked}/${cardTotal}</small></button>
+            <button class="shop-tab${activeTab === 'progression' ? ' active' : ''}" data-tab="progression">PROGRESSION</button>
           </div>
           ${body}
         </div>
@@ -239,3 +248,156 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
     render();
   };
 }
+
+// ── PROGRESSION TAB ────────────────────────────────────────────────────────
+// Central reference for every unlock, progression system, and run-configuration
+// knob. The goal: a player should be able to answer "where do I get X / what
+// does Y do" without digging through menus.
+
+function renderProgressionTab(save: SaveData): string {
+  const campaign = MAPS.filter((m) => !isSurvival(m.id)).slice().sort((a, b) => a.order - b.order);
+  const ascensionMax = save.ascensionMax ?? 0;
+  const out: string[] = [];
+
+  out.push(`<div class="db-summary">PROGRESSION // how everything unlocks and scales</div>`);
+
+  // ── DIFFICULTY TIERS ────────────────────────────────────────────────
+  const diffs: Difficulty[] = ['easy', 'medium', 'hard'];
+  out.push(`<div class="progress-section"><div class="progress-head">DIFFICULTY TIERS</div>`);
+  out.push(`<div class="progress-sub">Picked per-map on the intrusion select screen. Waves, draft size, and enemy scaling shift per tier.</div>`);
+  out.push(`<table class="progress-table"><thead><tr>
+    <th></th>
+    <th class="t-easy">EASY</th>
+    <th class="t-med">MEDIUM</th>
+    <th class="t-hard">HARD</th>
+  </tr></thead><tbody>`);
+  const totalWaves = diffs.map((d) => {
+    const m = campaign[0].difficulties[d];
+    return m.waves;
+  });
+  out.push(`<tr><td>Wave count (map 1)</td><td>${totalWaves[0]}</td><td>${totalWaves[1]}</td><td>${totalWaves[2]}</td></tr>`);
+  out.push(`<tr><td>Enemy HP scaling / wave</td><td>+13%</td><td>+17%</td><td>+24%</td></tr>`);
+  out.push(`<tr><td>Enemy speed scaling / wave</td><td>+0.1%</td><td>+0.2%</td><td>+0.3%</td></tr>`);
+  out.push(`<tr><td>Draft card options</td><td>${DIFFICULTY_PROFILE.easy.draftSize}</td><td>${DIFFICULTY_PROFILE.medium.draftSize}</td><td>${DIFFICULTY_PROFILE.hard.draftSize}</td></tr>`);
+  out.push(`<tr><td>Starting draft rerolls</td><td>${DIFFICULTY_PROFILE.easy.startingRerolls}</td><td>${DIFFICULTY_PROFILE.medium.startingRerolls}</td><td>${DIFFICULTY_PROFILE.hard.startingRerolls}</td></tr>`);
+  out.push(`<tr><td>Random turret lock at run start</td><td>0</td><td>0</td><td>${DIFFICULTY_PROFILE.hard.turretLockCount}</td></tr>`);
+  out.push(`<tr><td>TROJAN unlock gate (wave)</td><td>${DIFFICULTY_PROFILE.easy.enemyGates.trojan}</td><td>${DIFFICULTY_PROFILE.medium.enemyGates.trojan}</td><td>${DIFFICULTY_PROFILE.hard.enemyGates.trojan}</td></tr>`);
+  out.push(`<tr><td>ROOTKIT unlock gate (wave)</td><td>${DIFFICULTY_PROFILE.easy.enemyGates.rootkit}</td><td>${DIFFICULTY_PROFILE.medium.enemyGates.rootkit}</td><td>${DIFFICULTY_PROFILE.hard.enemyGates.rootkit}</td></tr>`);
+  out.push(`<tr><td>PHANTOM unlock gate (wave)</td><td>${DIFFICULTY_PROFILE.easy.enemyGates.phantom}</td><td>${DIFFICULTY_PROFILE.medium.enemyGates.phantom}</td><td>${DIFFICULTY_PROFILE.hard.enemyGates.phantom}</td></tr>`);
+  out.push(`<tr><td>Clear protocol reward</td><td>20&#9670;</td><td>50&#9670;</td><td>100&#9670;</td></tr>`);
+  out.push(`</tbody></table></div>`);
+
+  // ── MAP UNLOCK WATERFALL ────────────────────────────────────────────
+  out.push(`<div class="progress-section"><div class="progress-head">TURRET + CARD UNLOCKS</div>`);
+  out.push(`<div class="progress-sub">Each map grants a different reward per difficulty cleared. Clear Easy first to unlock the next map. Cards unlock alongside their parent turret.</div>`);
+  out.push(`<table class="progress-table progress-table-compact"><thead><tr>
+    <th>MAP</th>
+    <th class="t-easy">EASY CLEAR</th>
+    <th class="t-med">MEDIUM CLEAR</th>
+    <th class="t-hard">HARD CLEAR</th>
+  </tr></thead><tbody>`);
+  for (const m of campaign) {
+    const r = m.rewards;
+    const cell = (reward: { type: string; id: string } | undefined) => {
+      if (!reward) return '<span class="db-dim">-</span>';
+      if (reward.type === 'unlock-tower') {
+        const tname = TOWERS[reward.id as TowerId]?.name ?? reward.id;
+        return `<span class="db-reward-tower">${tname}</span>`;
+      }
+      if (reward.type === 'unlock-card') {
+        const c = CARDS_BY_ID[reward.id];
+        return `<span class="db-reward-card">${c?.name ?? reward.id}</span>`;
+      }
+      if (reward.type === 'unlock-branch') {
+        const [tid, branchKey] = reward.id.split('.');
+        const tname = TOWERS[tid as TowerId]?.name ?? tid;
+        return `<span class="db-reward-branch">${tname} / ${branchKey.toUpperCase()}</span>`;
+      }
+      if (reward.type === 'protocols') {
+        return `<span class="db-reward-proto">+${reward.id}&#9670;</span>`;
+      }
+      return `<span class="db-dim">${reward.type}</span>`;
+    };
+    const orderLabel = String(m.order).padStart(2, '0');
+    out.push(`<tr>
+      <td><span class="db-map-id" style="color:${m.accentColor}">${orderLabel} ${m.name}</span></td>
+      <td>${cell(r.easyClear)}</td>
+      <td>${cell(r.mediumClear)}</td>
+      <td>${cell(r.hardClear)}</td>
+    </tr>`);
+  }
+  out.push(`</tbody></table></div>`);
+
+  // ── ASCENSION ──────────────────────────────────────────────────────
+  out.push(`<div class="progress-section"><div class="progress-head">ICE DEPTH / ASCENSION</div>`);
+  out.push(`<div class="progress-sub">Unlocked by winning any map on HARD. Each new level unlocks by winning at the current max. Apply from the RUNNER/DEPTH bar on the intrusion select screen.</div>`);
+  out.push(`<div class="progress-sub">Your max: <b class="db-accent">${ascensionMax}</b> / ${ASCENSION_MAX}</div>`);
+  out.push(`<table class="progress-table progress-table-compact"><thead><tr><th>LEVEL</th><th>EFFECTS</th></tr></thead><tbody>`);
+  for (let lvl = 1; lvl <= ASCENSION_MAX; lvl++) {
+    const effects = ASCENSION_DESCRIPTIONS[lvl] ?? [];
+    const unlocked = lvl <= ascensionMax;
+    out.push(`<tr class="${unlocked ? '' : 'db-row-locked'}">
+      <td class="db-asc-level">${lvl}${unlocked ? '' : ' &#128274;'}</td>
+      <td>${effects.join(' &middot; ')}</td>
+    </tr>`);
+  }
+  out.push(`</tbody></table></div>`);
+
+  // ── NG+ ────────────────────────────────────────────────────────────
+  out.push(`<div class="progress-section"><div class="progress-head">NG+</div>`);
+  out.push(`<div class="progress-sub">Per-map replay tier. First victory unlocks NG+1; each subsequent victory at the current tier bumps it by 1 (max 5). Each tier multiplies enemy HP and rewards.</div>`);
+  out.push(`<table class="progress-table progress-table-compact"><thead><tr><th>TIER</th><th>ENEMY HP</th><th>PROTOCOL REWARD</th></tr></thead><tbody>`);
+  for (let t = 0; t <= 5; t++) {
+    out.push(`<tr><td>${t}</td><td>+${t * 50}%</td><td>+${t * 25}%</td></tr>`);
+  }
+  out.push(`</tbody></table></div>`);
+
+  // ── RUNNERS ────────────────────────────────────────────────────────
+  out.push(`<div class="progress-section"><div class="progress-head">RUNNERS</div>`);
+  out.push(`<div class="progress-sub">Pick a persona on the intrusion select screen. Each has a passive buff and one banned turret.</div>`);
+  out.push(`<table class="progress-table progress-table-compact"><thead><tr><th>RUNNER</th><th>BUFFS</th><th>BAN</th></tr></thead><tbody>`);
+  for (const id of RUNNER_IDS) {
+    const r = RUNNERS[id];
+    const bits: string[] = [];
+    if (r.passiveDamagePct) bits.push(`+${Math.round(r.passiveDamagePct * 100)}% DMG`);
+    if (r.passiveRatePct) bits.push(`+${Math.round(r.passiveRatePct * 100)}% RATE`);
+    if (r.passiveCritPct) bits.push(`+${Math.round(r.passiveCritPct * 100)}% CRIT`);
+    if (r.bonusStartingHp) bits.push(`+${r.bonusStartingHp} HP`);
+    if (r.bonusHpRegenPerWave) bits.push(`+${r.bonusHpRegenPerWave} HP/wave`);
+    if (r.bonusStartingLevels) bits.push(`+${r.bonusStartingLevels} level`);
+    out.push(`<tr>
+      <td><span class="db-accent" style="color:${r.color}">${r.name}</span></td>
+      <td>${bits.join(' &middot; ')}</td>
+      <td>${TOWERS[r.bannedTower]?.name ?? r.bannedTower.toUpperCase()}</td>
+    </tr>`);
+  }
+  out.push(`</tbody></table></div>`);
+
+  // ── CHROMAS ────────────────────────────────────────────────────────
+  out.push(`<div class="progress-section"><div class="progress-head">CHROMA UNLOCKS</div>`);
+  out.push(`<div class="progress-sub">Cosmetic tower color overrides. Earned via lifetime milestones. Equip from the ARSENAL tab.</div>`);
+  out.push(`<table class="progress-table progress-table-compact"><thead><tr><th>CHROMA</th><th>TURRET</th><th>HOW TO UNLOCK</th></tr></thead><tbody>`);
+  for (const c of CHROMAS) {
+    const unlocked = save.unlockedChromas?.includes(c.id);
+    const tname = TOWERS[c.tower]?.name ?? c.tower;
+    out.push(`<tr class="${unlocked ? '' : 'db-row-locked'}">
+      <td><span style="color:${c.accent}">${c.name}${unlocked ? ' &check;' : ''}</span></td>
+      <td>${tname}</td>
+      <td>${c.unlockDescription}</td>
+    </tr>`);
+  }
+  out.push(`</tbody></table></div>`);
+
+  // ── DAILY CONTRACT ─────────────────────────────────────────────────
+  out.push(`<div class="progress-section"><div class="progress-head">DAILY CONTRACT</div>`);
+  out.push(`<div class="progress-sub">Seeded run — same (map, difficulty, mutator) for everyone on the same day. Unlocks after clearing 3 maps. Tracks best wave + clear time.</div>`);
+  out.push(`<div class="progress-sub">Mutators rotate daily: PACKET STORM (+40% burst spawns), ENCRYPTED PAYLOADS (+30% shield HP), GHOST PROTOCOL (25% cloaked — needs AOE/chain turret), REPLICATING VIRUS (15% worm offspring on kill), ROOTKIT SWEEP (jam every 4s near bosses).</div>`);
+  out.push(`</div>`);
+
+  return out.join('');
+}
+
+// Silence "unused import" warnings in case the CARDS constant is removed
+// from a future refactor; the reference below keeps the linter happy without
+// affecting bundle size.
+void CARDS;

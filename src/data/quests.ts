@@ -7,166 +7,52 @@ export interface QuestDef {
   reward: number;       // protocols awarded on claim
   category: 'combat' | 'progression' | 'mastery';
   check: (save: SaveData) => boolean;
+  // Numeric progress [current, target] for UI bars. Boolean-style quests (any
+  // map on medium, etc.) emit [0,1] or [1,1].
+  progress?: (save: SaveData) => [number, number];
+}
+
+function numericQuest(id: string, name: string, description: string, category: 'combat' | 'progression' | 'mastery', reward: number, extract: (s: SaveData) => number, target: number): QuestDef {
+  return {
+    id, name, description, category, reward,
+    check: (s) => extract(s) >= target,
+    progress: (s) => [Math.min(target, extract(s)), target],
+  };
+}
+
+function boolQuest(id: string, name: string, description: string, category: 'combat' | 'progression' | 'mastery', reward: number, check: (s: SaveData) => boolean): QuestDef {
+  return {
+    id, name, description, category, reward,
+    check,
+    progress: (s) => [check(s) ? 1 : 0, 1],
+  };
 }
 
 export const QUESTS: QuestDef[] = [
   // ── PROGRESSION ──────────────────────────────────────────────────────────
-  {
-    id: 'q_first_run',
-    name: 'FIRST CONTACT',
-    description: 'Complete your first run (win or lose).',
-    reward: 15,
-    category: 'progression',
-    check: (s) => s.stats.totalRuns >= 1,
-  },
-  {
-    id: 'q_first_win',
-    name: 'SYSTEM BREACH',
-    description: 'Win your first run on any map and difficulty.',
-    reward: 30,
-    category: 'progression',
-    check: (s) => s.stats.totalWins >= 1,
-  },
-  {
-    id: 'q_ten_wins',
-    name: 'VETERAN NETRUNNER',
-    description: 'Win 10 runs total.',
-    reward: 100,
-    category: 'progression',
-    check: (s) => s.stats.totalWins >= 10,
-  },
-  {
-    id: 'q_medium_win',
-    name: 'ESCALATION',
-    description: 'Win any run on Medium difficulty.',
-    reward: 40,
-    category: 'progression',
-    check: (s) => Object.values(s.completed).some((c) => c.medium),
-  },
-  {
-    id: 'q_hard_win',
-    name: 'MAXIMUM SECURITY',
-    description: 'Win any run on Hard difficulty.',
-    reward: 80,
-    category: 'progression',
-    check: (s) => Object.values(s.completed).some((c) => c.hard),
-  },
-  {
-    id: 'q_all_diff',
-    name: 'TRIPLE BREACH',
-    description: 'Complete all 3 difficulties on any single map.',
-    reward: 75,
-    category: 'progression',
-    check: (s) => Object.values(s.completed).some((c) => c.easy && c.medium && c.hard),
-  },
-  {
-    id: 'q_xp_5000',
-    name: 'DEEP LEARNING',
-    description: 'Earn 5,000 total XP across all runs.',
-    reward: 75,
-    category: 'progression',
-    check: (s) => (s.stats.totalXpEarned ?? 0) >= 5000,
-  },
-  {
-    id: 'q_protocols_500',
-    name: 'PROTOCOL MAGNATE',
-    description: 'Earn 500 total Protocols across all runs.',
-    reward: 60,
-    category: 'progression',
-    check: (s) => (s.stats.totalProtocolsEarned ?? 0) >= 500,
-  },
+  numericQuest('q_first_run',     'FIRST CONTACT',     'Complete your first run (win or lose).', 'progression', 15,  (s) => s.stats.totalRuns, 1),
+  numericQuest('q_first_win',     'SYSTEM BREACH',     'Win your first run on any map and difficulty.', 'progression', 30,  (s) => s.stats.totalWins, 1),
+  numericQuest('q_ten_wins',      'VETERAN NETRUNNER', 'Win 10 runs total.', 'progression', 100, (s) => s.stats.totalWins, 10),
+  boolQuest   ('q_medium_win',    'ESCALATION',        'Win any run on Medium difficulty.', 'progression', 40,  (s) => Object.values(s.completed).some((c) => c.medium)),
+  boolQuest   ('q_hard_win',      'MAXIMUM SECURITY',  'Win any run on Hard difficulty.', 'progression', 80,  (s) => Object.values(s.completed).some((c) => c.hard)),
+  boolQuest   ('q_all_diff',      'TRIPLE BREACH',     'Complete all 3 difficulties on any single map.', 'progression', 75,  (s) => Object.values(s.completed).some((c) => c.easy && c.medium && c.hard)),
+  numericQuest('q_xp_5000',       'DEEP LEARNING',     'Earn 5,000 total XP across all runs.', 'progression', 75,  (s) => s.stats.totalXpEarned ?? 0, 5000),
+  numericQuest('q_protocols_500', 'PROTOCOL MAGNATE',  'Earn 500 total Protocols across all runs.', 'progression', 60,  (s) => s.stats.totalProtocolsEarned ?? 0, 500),
 
   // ── COMBAT ───────────────────────────────────────────────────────────────
-  {
-    id: 'q_kill_100',
-    name: 'EXTERMINATOR',
-    description: 'Eliminate 100 enemies across all runs.',
-    reward: 20,
-    category: 'combat',
-    check: (s) => s.stats.totalKills >= 100,
-  },
-  {
-    id: 'q_kill_1k',
-    name: 'MASS DELETION',
-    description: 'Eliminate 1,000 enemies across all runs.',
-    reward: 75,
-    category: 'combat',
-    check: (s) => s.stats.totalKills >= 1000,
-  },
-  {
-    id: 'q_kill_10k',
-    name: 'DIGITAL APOCALYPSE',
-    description: 'Eliminate 10,000 enemies across all runs.',
-    reward: 250,
-    category: 'combat',
-    check: (s) => s.stats.totalKills >= 10000,
-  },
-  {
-    id: 'q_boss_5',
-    name: 'BOSS HUNTER',
-    description: 'Defeat 5 boss-class entities.',
-    reward: 50,
-    category: 'combat',
-    check: (s) => s.stats.bossKills >= 5,
-  },
-  {
-    id: 'q_boss_25',
-    name: 'APEX PREDATOR',
-    description: 'Defeat 25 boss-class entities.',
-    reward: 150,
-    category: 'combat',
-    check: (s) => s.stats.bossKills >= 25,
-  },
+  numericQuest('q_kill_100',      'EXTERMINATOR',        'Eliminate 100 enemies across all runs.', 'combat', 20,  (s) => s.stats.totalKills, 100),
+  numericQuest('q_kill_1k',       'MASS DELETION',       'Eliminate 1,000 enemies across all runs.', 'combat', 75,  (s) => s.stats.totalKills, 1000),
+  numericQuest('q_kill_10k',      'DIGITAL APOCALYPSE',  'Eliminate 10,000 enemies across all runs.', 'combat', 250, (s) => s.stats.totalKills, 10000),
+  numericQuest('q_boss_5',        'BOSS HUNTER',         'Defeat 5 boss-class entities.', 'combat', 50,  (s) => s.stats.bossKills, 5),
+  numericQuest('q_boss_25',       'APEX PREDATOR',       'Defeat 25 boss-class entities.', 'combat', 150, (s) => s.stats.bossKills, 25),
 
   // ── MASTERY ───────────────────────────────────────────────────────────────
-  {
-    id: 'q_tower_6',
-    name: 'DIVERSIFIED ARSENAL',
-    description: 'Deploy 6 different tower types across all your runs.',
-    reward: 60,
-    category: 'mastery',
-    check: (s) => (s.stats.towersEverDeployed?.length ?? 0) >= 6,
-  },
-  {
-    id: 'q_tower_all',
-    name: 'FULL LOADOUT',
-    description: 'Deploy all 12 tower types across any combination of runs.',
-    reward: 200,
-    category: 'mastery',
-    check: (s) => (s.stats.towersEverDeployed?.length ?? 0) >= 12,
-  },
-  {
-    id: 'q_legendary_1',
-    name: 'RARE ACQUISITION',
-    description: 'Draft a Legendary card.',
-    reward: 50,
-    category: 'mastery',
-    check: (s) => (s.stats.legendaryDrafts ?? 0) >= 1,
-  },
-  {
-    id: 'q_legendary_5',
-    name: 'LEGEND COLLECTOR',
-    description: 'Draft 5 Legendary cards total across all runs.',
-    reward: 150,
-    category: 'mastery',
-    check: (s) => (s.stats.legendaryDrafts ?? 0) >= 5,
-  },
-  {
-    id: 'q_survival_20',
-    name: 'ENDLESS NIGHT',
-    description: 'Survive to wave 20 in Survival mode.',
-    reward: 75,
-    category: 'mastery',
-    check: (s) => (s.stats.survivalBestWave ?? 0) >= 20,
-  },
-  {
-    id: 'q_survival_40',
-    name: 'ETERNAL BREACH',
-    description: 'Survive to wave 40 in Survival mode.',
-    reward: 175,
-    category: 'mastery',
-    check: (s) => (s.stats.survivalBestWave ?? 0) >= 40,
-  },
+  numericQuest('q_tower_6',       'DIVERSIFIED ARSENAL', 'Deploy 6 different tower types across all your runs.', 'mastery', 60,  (s) => s.stats.towersEverDeployed?.length ?? 0, 6),
+  numericQuest('q_tower_all',     'FULL LOADOUT',        'Deploy all 12 tower types across any combination of runs.', 'mastery', 200, (s) => s.stats.towersEverDeployed?.length ?? 0, 12),
+  numericQuest('q_legendary_1',   'RARE ACQUISITION',    'Draft a Legendary card.', 'mastery', 50,  (s) => s.stats.legendaryDrafts ?? 0, 1),
+  numericQuest('q_legendary_5',   'LEGEND COLLECTOR',    'Draft 5 Legendary cards total across all runs.', 'mastery', 150, (s) => s.stats.legendaryDrafts ?? 0, 5),
+  numericQuest('q_survival_20',   'ENDLESS NIGHT',       'Survive to wave 20 in Survival mode.', 'mastery', 75,  (s) => s.stats.survivalBestWave ?? 0, 20),
+  numericQuest('q_survival_40',   'ETERNAL BREACH',      'Survive to wave 40 in Survival mode.', 'mastery', 175, (s) => s.stats.survivalBestWave ?? 0, 40),
 ];
 
 export const QUESTS_BY_ID: Record<string, QuestDef> = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
