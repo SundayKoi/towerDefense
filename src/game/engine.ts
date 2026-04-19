@@ -596,6 +596,19 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     }
   }
 
+  // DATA MINER STUTTER — periodic aura-wide stun. Every 3s, pulse a 0.4s
+  // full-stop on all enemies inside the decrypt aura (slow-immune excepted).
+  // Timer fires once per interval; stutterFire is set for the enemy loop
+  // below to consume and cleared at end of frame.
+  let stutterFire = false;
+  if (hasEffect(s, 'data_miner', 'dataminer_mta_stutter')) {
+    (s as any).stutterTimer = ((s as any).stutterTimer ?? 3) - dtSec;
+    if ((s as any).stutterTimer <= 0) {
+      (s as any).stutterTimer = 3;
+      stutterFire = true;
+    }
+  }
+
   // Update enemies
   const map = getMap(s.mapId);
   for (const e of s.enemies) {
@@ -676,6 +689,11 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
         e.speedMult = Math.min(e.speedMult, 0.9);
         e.slowTimer = Math.max(e.slowTimer, 0.25);
       }
+      // STUTTER pulse — 0.4s full-stop on aura enemies every 3s.
+      if (stutterFire && !ENEMIES[e.def].slowImmune) {
+        e.speedMult = 0;
+        e.slowTimer = Math.max(e.slowTimer, 0.4);
+      }
       // EXPOSE reveal — strip invisibility.
       if (hasEffect(s, 'data_miner', 'dataminer_eco_reveal')) {
         if (e.invisTimer > 0) e.invisTimer = 0;
@@ -699,6 +717,38 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       for (let i = 0; i < Math.min(2, candidates.length); i++) {
         const tgt = candidates[i];
         tgt.hp = Math.min(tgt.maxHp, tgt.hp + 6 * dtSec);
+      }
+    }
+
+    // OVERWATCH (sniper) SPOTTER branch — per-frame reveal aura. When an
+    // enemy is cloaked (invisTimer > 0) and inside the sniper's reveal range,
+    // strip the cloak and optionally apply branch-specific follow-ons:
+    //   THERMAL SCOPE (`reveal`)          — strip the cloak (baseline keystone)
+    //   SPOTTER PROTOCOL (`spotter_mark`) — also mark 1.5s on reveal
+    //   TEAM CALLOUT    (`sniper_spt_team`) — reveal range extended by +50%
+    //   ECHO MARK       (`sniper_spt_caps`) — mark 3s (+30% dmg from all)
+    // Non-sniper towers respect the cleared invisTimer via their own target
+    // selection, so the whole roster benefits once sniper strips the cloak.
+    if (e.invisTimer > 0) {
+      const sniper = s.towers.find((tw) => tw.def === 'sniper');
+      if (sniper && hasEffect(s, 'sniper', 'reveal')) {
+        let revealRange = effectiveRange(s, sniper);
+        if (hasEffect(s, 'sniper', 'sniper_spt_team')) revealRange *= 1.5;
+        if (Math.hypot(e.pos.x - sniper.grid.x, e.pos.y - sniper.grid.y) <= revealRange) {
+          e.invisTimer = 0;
+          if (hasEffect(s, 'sniper', 'spotter_mark')) {
+            e.marked = Math.max(e.marked ?? 0, 1.5);
+          }
+          if (hasEffect(s, 'sniper', 'sniper_spt_caps')) {
+            e.marked = Math.max(e.marked ?? 0, 3.0);
+          }
+          s.floaters.push({
+            pos: { x: e.pos.x, y: e.pos.y - 0.4 },
+            text: 'SPOTTED',
+            vy: -22, life: 0.7, maxLife: 0.7,
+            color: '#00ff88', size: 12,
+          });
+        }
       }
     }
 
@@ -1304,6 +1354,29 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
     }
     heatMult = 1 + 0.10 * ((t.extras.heatStreak ?? 1) - 1);
   }
+  // FIREWALL FOCUSED FIRE — +15% extra damage when only one enemy is in range
+  // (stacks with the unconditional +15% from the same card's bumpDmg for a
+  // total of +30% promised by the description). Checked here so the range
+  // scan isn't duplicated; re-uses effectiveRange.
+  if (t.def === 'firewall' && hasEffect(s, 'firewall', 'firewall_siege_focus')) {
+    const range = effectiveRange(s, t);
+    let inRange = 0;
+    for (const e of s.enemies) {
+      if (!e.alive) continue;
+      if (Math.hypot(e.pos.x - t.grid.x, e.pos.y - t.grid.y) <= range) {
+        inRange++;
+        if (inRange > 1) break;
+      }
+    }
+    if (inRange === 1) heatMult *= 1.15;
+  }
+  // ANTIVIRUS EXPLOIT WINDOW — +25% damage vs enemies whose armor has been
+  // stripped below their base value (by SCRAMBLER / PULSE / signal-jam etc).
+  // Cleanly pairs antivirus with scrambler for a "strip + punish" combo.
+  if (t.def === 'antivirus' && hasEffect(s, 'antivirus', 'antivirus_pierce_exploit')) {
+    const baseArmor = ENEMIES[target.def].armor ?? 0;
+    if (target.armor < baseArmor) heatMult *= 1.25;
+  }
   // Port/Protocol exploit bonus — +25% dmg when the turret's exploit matches
   // the target's open port. Pops an EXPLOIT! floater so players can see the
   // pairing working in real time. Table lives in data/ports.ts.
@@ -1346,9 +1419,11 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
     }
   }
 
-  const projSpeed = (t.def === 'railgun' && hasEffect(s, 'railgun', 'hypersonic'))
-    ? def.projectileSpeed * 2
-    : def.projectileSpeed;
+  // Projectile speed — RAILGUN hypersonic doubles it; ANTIVIRUS ULTRASONIC
+  // SHOT multiplies by 1.6. Default otherwise.
+  let projSpeed = def.projectileSpeed;
+  if (t.def === 'railgun' && hasEffect(s, 'railgun', 'hypersonic')) projSpeed *= 2;
+  if (t.def === 'antivirus' && hasEffect(s, 'antivirus', 'antivirus_pierce_ultra')) projSpeed *= 1.6;
 
   const proj: Projectile = {
     id: nextId(),
@@ -1897,7 +1972,9 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     let dur = persistent ? 6.4 : 3.2;
     if (linger) dur *= 1.5;
     const rad = overflow ? 2.2 : 1.1;
-    const slowPct = hasEffect(s, 'honeypot', 'viscous') ? 0.55 : 0.4;
+    // Base 0.4; VISCOUS bumps to 0.55; SOLID GOO overrides to 0.7 (wins over viscous).
+    let slowPct = hasEffect(s, 'honeypot', 'viscous') ? 0.55 : 0.4;
+    if (hasEffect(s, 'honeypot', 'honeypot_con_solid')) slowPct = 0.7;
     // Napalm synergy: fire damage using firewall tower's damage
     let dps: number | undefined = acid ? 10 : undefined;
     let puddleColor: string | undefined;
@@ -2570,13 +2647,15 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
 
   // Honeypot detonation: death inside puddle explodes
   if (hasEffect(s, 'honeypot', 'detonation')) {
+    // OVERPRESSURE capstone multiplies detonation damage by 1.6x.
+    const detonationDmg = 80 * (hasEffect(s, 'honeypot', 'honeypot_vol_over') ? 1.6 : 1);
     for (const pu of s.puddles) {
       if (Math.hypot(e.pos.x - pu.pos.x, e.pos.y - pu.pos.y) <= pu.radius) {
         spawnExplosion(s, e.pos, '#ffd600', pu.radius);
         for (const other of s.enemies) {
           if (!other.alive) continue;
           if (Math.hypot(other.pos.x - e.pos.x, other.pos.y - e.pos.y) <= pu.radius * 1.5) {
-            damageEnemy(s, other, 80, false, 'aoe', false, 'honeypot');
+            damageEnemy(s, other, detonationDmg, false, 'aoe', false, 'honeypot');
           }
         }
         // Chain goo: leave a puddle at detonation point
