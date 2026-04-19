@@ -172,33 +172,19 @@ function wireGameScreen() {
   const vp = createViewport(h.canvas);
   const wrap = h.canvas.parentElement as HTMLElement;
   const doResize = () => {
-    // Primary: measure canvas-wrap directly
-    let w = wrap.getBoundingClientRect().width;
-    let hh = wrap.getBoundingClientRect().height;
-    // Fallback: game-screen is always sized (position:fixed derived). The math
-    // differs between portrait (column) and landscape (row) layouts — detect
-    // landscape via window aspect ratio and subtract the sidebar widths instead
-    // of the bar heights. Without this, landscape desktop hits the early-return
-    // and the canvas stays at default 300x150, showing bg-canvas behind.
+    // HUD, tokens, and action-bar are absolute overlays — they don't eat flow
+    // space — so the game canvas should always size to the full window. We
+    // measure window.innerWidth/Height directly rather than trust the wrap's
+    // bounding rect, which can race with layout during orientation flips and
+    // the overlay-chrome layout change.
+    let w = window.innerWidth;
+    let hh = window.innerHeight;
+    // Fallback: if window reports zero (very rare, some embedded contexts),
+    // ask the game-screen element directly.
     if (w < 4 || hh < 4) {
       const gs = wrap.closest('.game-screen') as HTMLElement | null;
-      const gsRect = gs?.getBoundingClientRect();
-      if (gsRect && gsRect.width > 4) {
-        const landscape = window.innerWidth >= window.innerHeight;
-        if (landscape) {
-          const hudW = (document.querySelector('.hud') as HTMLElement | null)?.offsetWidth ?? 0;
-          const tokW = (document.getElementById('hud-tokens') as HTMLElement | null)?.offsetWidth ?? 0;
-          const actW = (document.querySelector('.action-bar') as HTMLElement | null)?.offsetWidth ?? 0;
-          w = gsRect.width - hudW - tokW - actW;
-          hh = gsRect.height;
-        } else {
-          w = gsRect.width;
-          const hudH = (document.querySelector('.hud') as HTMLElement | null)?.offsetHeight ?? 0;
-          const tokH = (document.getElementById('hud-tokens') as HTMLElement | null)?.offsetHeight ?? 0;
-          const actH = (document.querySelector('.action-bar') as HTMLElement | null)?.offsetHeight ?? 0;
-          hh = gsRect.height - hudH - tokH - actH;
-        }
-      }
+      const r2 = gs?.getBoundingClientRect();
+      if (r2) { w = r2.width; hh = r2.height; }
     }
     if (w < 4 || hh < 4) return;
     resizeViewport(vp, getMap(r.mapId), w, hh);
