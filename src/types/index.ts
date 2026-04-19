@@ -534,7 +534,6 @@ export interface RunState {
   // Program deck: active abilities the player triggers with 1-4 hotkeys or by
   // clicking the program chip. Each entry pairs a program id with its current
   // cooldownLeft. Initialized in createRun with the starter deck.
-  programs?: { id: import('@/game/programs').ProgramId; cooldownLeft: number }[];
   runnerId?: import('@/data/runners').RunnerId;
   // Ascension multipliers, folded in at spawn time. 1.0 = no ascension.
   ascensionLevel?: number;

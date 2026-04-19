@@ -2,15 +2,14 @@ import '@/css/main.css';
 import { loadSave, writeSave, createRun, defaultSave } from '@/game/state';
 import { CARDS_BY_ID, drawDraft, STARTER_BRANCH, cardsInBranch } from '@/data/cards';
 import { TOWERS } from '@/data/towers';
-import { cycleTargetMode, placeTower, removeTower, startWave, triggerOverdrive, triggerProgram, tryCollectPacket, updateRun } from '@/game/engine';
-import { PROGRAMS, type ProgramId } from '@/game/programs';
+import { cycleTargetMode, placeTower, removeTower, startWave, triggerOverdrive, tryCollectPacket, updateRun } from '@/game/engine';
 import { DIFFICULTY_PROFILE } from '@/game/waves';
 import { applyBloom, applyPixelate, canPlaceAt, createViewport, renderRun, resizeViewport } from '@/render/canvas';
 import { preloadSprites } from '@/render/sprites';
 import { initBackground } from '@/render/background';
 import { startScreen } from '@/ui/start';
 import { mapSelectScreen } from '@/ui/mapSelect';
-import { gameScreen, refreshSelectedTowerLive, renderPalette, renderProgramDeck, renderSelectedTower, renderTokensBar, renderWavePreview, type GameScreenHandles } from '@/ui/game';
+import { gameScreen, refreshSelectedTowerLive, renderPalette, renderSelectedTower, renderTokensBar, renderWavePreview, type GameScreenHandles } from '@/ui/game';
 import { openBuildStats, openCardDraft, openEnemyIntel, openGameOver, openPauseMenu, openSettingsModal } from '@/ui/modals';
 import { openShopScreen } from '@/ui/shop';
 import { openDatabankScreen } from '@/ui/databank';
@@ -20,6 +19,7 @@ import { audio } from '@/audio/sfx';
 import { haptics } from '@/audio/haptics';
 import { addToAllPeriods, currentPeriodId, ensureDailyContract } from '@/data/contracts';
 import { refreshChromaUnlocks } from '@/data/chromas';
+import { RUNNERS } from '@/data/runners';
 import type { CardDef, Difficulty, EnemyId, RunState, SaveData, TowerId } from '@/types';
 import { ENEMIES } from '@/data/enemies';
 import { getMap, isSurvival, MAPS } from '@/data/maps';
@@ -452,16 +452,6 @@ function wireGameScreen() {
       }
     } else if (ev.code === 'Space') {
       if (run.phase === 'prep') { startWave(run); ev.preventDefault(); }
-    } else if (/^Digit[1-4]$/.test(ev.code)) {
-      const idx = parseInt(ev.code.slice(5), 10) - 1;
-      const prog = run.programs?.[idx];
-      if (prog) {
-        const def = PROGRAMS[prog.id as ProgramId];
-        if (def) {
-          triggerProgram(run, prog.id as ProgramId);
-          ev.preventDefault();
-        }
-      }
     }
   };
   window.addEventListener('keydown', onKey);
@@ -502,7 +492,6 @@ function updateHud() {
   }
   runHandles.startBtn.disabled = run.phase !== 'prep';
   renderWavePreview(runHandles, run);
-  renderProgramDeck(runHandles, run, (id) => { triggerProgram(run!, id); });
   // Refresh ONLY the live parts of the selected tower panel (overdrive countdown,
   // subnet readout). Full rebuild here would destroy the close button between a
   // user's pointerdown and pointerup, breaking the close action.
@@ -529,7 +518,9 @@ function startLoop() {
           if (!run) return;
           const protoBonus = save.metaBoosts.bonusProtocolsPerWave ?? 0;
           if (protoBonus > 0) run.protocolsEarned += protoBonus;
-          const hpRegen = save.metaBoosts.hpRegenPerWave ?? 0;
+          // Shop regen + runner (WARDEN) regen stack.
+          const runnerRegen = RUNNERS[run.runnerId ?? 'glitch'].bonusHpRegenPerWave;
+          const hpRegen = (save.metaBoosts.hpRegenPerWave ?? 0) + runnerRegen;
           if (hpRegen > 0) run.hp = Math.min(run.maxHp, run.hp + hpRegen);
           // Tutorial: explain XP / protocols / progression on first ever wave clear.
           showTutorialIfNew(save, () => writeSave(save), 'first_wave_clear');

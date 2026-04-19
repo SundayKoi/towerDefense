@@ -1,12 +1,15 @@
-import type { ProgramId } from '@/game/programs';
 import type { TowerId } from '@/types';
 
 // ─── RUNNERS ────────────────────────────────────────────────────────────────
 // A "runner" is the player's persona for a run. Each reshuffles the build in
-// broad strokes: passive damage/hp/econ buffs, one signature starting bonus,
+// broad strokes: passive damage/crit/hp/econ buffs, optional per-wave sustain,
 // and one banned tower to force composition diversity. Picking a runner is
 // the highest-leverage per-run identity knob — effectively a weapon/class
 // slot in a roguelike.
+//
+// v2: bonusStartingTokens removed — the singleton-per-run rule meant duplicate
+// tokens (run-default + runner bonus) were literally unusable. Runners now
+// express identity through passives only.
 
 export type RunnerId = 'glitch' | 'warden' | 'architect';
 
@@ -16,13 +19,13 @@ export interface RunnerDef {
   role: string;
   flavor: string;
   color: string;
-  passiveDamagePct: number;   // added to run.mods.globalDamagePct
-  passiveRatePct: number;     // added to run.mods.globalRatePct
-  bonusStartingHp: number;    // added to run.hp/maxHp
-  bonusStartingLevels: number;// queued pendingLevelUps on run start
-  bonusStartingTokens: Partial<Record<TowerId, number>>;
-  bonusProgramCooldownReady?: ProgramId[]; // these programs start OFF-CD (already usable on wave 1)
-  bannedTower: TowerId;       // added to lockedTurrets at run start
+  passiveDamagePct: number;      // added to run.mods.globalDamagePct
+  passiveRatePct: number;        // added to run.mods.globalRatePct
+  passiveCritPct: number;        // added to run.mods.globalCritChance
+  bonusStartingHp: number;       // added to run.hp/maxHp
+  bonusHpRegenPerWave: number;   // added to mods via hpRegenPerWave channel
+  bonusStartingLevels: number;   // queued pendingLevelUps on run start
+  bannedTower: TowerId;          // added to lockedTurrets at run start
   bannedDesc: string;
 }
 
@@ -35,9 +38,10 @@ export const RUNNERS: Record<RunnerId, RunnerDef> = {
     color: '#ff2d95',
     passiveDamagePct: 0.15,
     passiveRatePct: 0,
+    passiveCritPct: 0.08,
     bonusStartingHp: 0,
+    bonusHpRegenPerWave: 0,
     bonusStartingLevels: 0,
-    bonusStartingTokens: { firewall: 1 }, // extra firewall on top of default
     bannedTower: 'booster_node',
     bannedDesc: 'Runs raw DPS — no buff fields. BOOSTER NODE locked.',
   },
@@ -49,10 +53,10 @@ export const RUNNERS: Record<RunnerId, RunnerDef> = {
     color: '#00ff88',
     passiveDamagePct: 0,
     passiveRatePct: 0,
+    passiveCritPct: 0,
     bonusStartingHp: 25,
+    bonusHpRegenPerWave: 4,
     bonusStartingLevels: 0,
-    bonusStartingTokens: { honeypot: 1 },
-    bonusProgramCooldownReady: ['patch'],
     bannedTower: 'railgun',
     bannedDesc: 'Favors control over burst. RAILGUN locked.',
   },
@@ -64,9 +68,10 @@ export const RUNNERS: Record<RunnerId, RunnerDef> = {
     color: '#00fff0',
     passiveDamagePct: 0,
     passiveRatePct: 0.10,
+    passiveCritPct: 0,
     bonusStartingHp: 0,
+    bonusHpRegenPerWave: 0,
     bonusStartingLevels: 1,
-    bonusStartingTokens: {},
     bannedTower: 'sniper',
     bannedDesc: 'Precision loadout is off-limits. OVERWATCH locked.',
   },

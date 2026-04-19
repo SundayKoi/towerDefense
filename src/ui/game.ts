@@ -6,7 +6,6 @@ import { TOWERS } from '@/data/towers';
 import { ENEMIES } from '@/data/enemies';
 import { getMap } from '@/data/maps';
 import { getWavePreview } from '@/game/waves';
-import { PROGRAMS, type ProgramId } from '@/game/programs';
 import { audio } from '@/audio/sfx';
 import type { Screen } from './screens';
 import { getTowerDataUrl } from '@/render/sprites';
@@ -39,7 +38,6 @@ export interface GameScreenHandles {
   hudWave: HTMLElement;
   hudMap: HTMLElement;
   hudTokens: HTMLElement;
-  programDeck: HTMLElement;
   wavePreview: HTMLElement;
   startBtn: HTMLButtonElement;
   pauseBtn: HTMLButtonElement;
@@ -70,8 +68,6 @@ export function gameScreen(s: RunState, _save: SaveData): Screen & { handles: ()
         </header>
 
         <div class="tokens-bar" id="hud-tokens"></div>
-
-        <div class="program-deck" id="program-deck"></div>
 
         <div class="wave-preview" id="wave-preview"></div>
 
@@ -113,7 +109,6 @@ export function gameScreen(s: RunState, _save: SaveData): Screen & { handles: ()
       hudWave: root.querySelector('#hud-wave') as HTMLElement,
       hudMap: root.querySelector('#hud-map') as HTMLElement,
       hudTokens: root.querySelector('#hud-tokens') as HTMLElement,
-      programDeck: root.querySelector('#program-deck') as HTMLElement,
       wavePreview: root.querySelector('#wave-preview') as HTMLElement,
       startBtn: root.querySelector('#btn-start-wave') as HTMLButtonElement,
       pauseBtn: root.querySelector('#btn-pause') as HTMLButtonElement,
@@ -327,58 +322,6 @@ export function renderSelectedTower(
   (box.querySelector('#sel-remove') as HTMLButtonElement).onclick = () => { audio.play('ui_click'); onRemove(); };
   const odBtn = box.querySelector('#sel-overdrive') as HTMLButtonElement | null;
   if (odBtn) odBtn.onclick = () => { if (!odDisabled) onOverdrive(); };
-}
-
-// Program deck chips — active abilities the player can trigger with hotkeys
-// or taps. Cooldown is rendered as a decreasing numeric on the chip; clicking
-// a ready chip fires the program. Mirrors the research "active verbs" goal.
-export function renderProgramDeck(handles: GameScreenHandles, s: RunState, onTrigger: (id: ProgramId) => void): void {
-  const box = handles.programDeck;
-  if (!box) return;
-  if (!s.programs || s.programs.length === 0) { box.innerHTML = ''; return; }
-  const chips = s.programs.map((slot) => {
-    const def = PROGRAMS[slot.id];
-    if (!def) return '';
-    const ready = slot.cooldownLeft <= 0;
-    const pct = ready ? 0 : Math.min(100, Math.round((slot.cooldownLeft / def.cooldown) * 100));
-    return `
-      <button class="prog-chip${ready ? '' : ' prog-cooling'}" data-id="${slot.id}" style="--accent:${def.color}" title="${def.description}">
-        <span class="prog-hk">${def.hotkey}</span>
-        <span class="prog-body">
-          <span class="prog-name">${def.name}</span>
-          <span class="prog-cd">${ready ? 'READY' : `${slot.cooldownLeft.toFixed(0)}s`}</span>
-        </span>
-        <span class="prog-fill" style="transform:scaleY(${pct / 100})"></span>
-      </button>
-    `;
-  }).join('');
-  // innerHTML-ish update: only rebuild if chip count/id-set changed; otherwise
-  // update the cd text + fill attribute in place so the button never steals
-  // focus between a pointerdown and pointerup.
-  const wantIds = s.programs.map((p) => p.id).join(',');
-  if (box.getAttribute('data-ids') !== wantIds) {
-    box.innerHTML = chips;
-    box.setAttribute('data-ids', wantIds);
-    box.querySelectorAll<HTMLButtonElement>('.prog-chip').forEach((btn) => {
-      const id = btn.dataset.id as ProgramId;
-      btn.onpointerdown = (ev) => { ev.preventDefault(); audio.play('ui_click'); onTrigger(id); };
-    });
-  } else {
-    // Update live: cooldown label + fill %.
-    const btns = box.querySelectorAll<HTMLButtonElement>('.prog-chip');
-    for (let i = 0; i < btns.length; i++) {
-      const btn = btns[i];
-      const slot = s.programs[i];
-      const def = PROGRAMS[slot.id];
-      const ready = slot.cooldownLeft <= 0;
-      const pct = ready ? 0 : Math.min(100, Math.round((slot.cooldownLeft / def.cooldown) * 100));
-      btn.classList.toggle('prog-cooling', !ready);
-      const cd = btn.querySelector('.prog-cd') as HTMLElement | null;
-      if (cd) cd.textContent = ready ? 'READY' : `${slot.cooldownLeft.toFixed(0)}s`;
-      const fill = btn.querySelector('.prog-fill') as HTMLElement | null;
-      if (fill) fill.style.transform = `scaleY(${pct / 100})`;
-    }
-  }
 }
 
 // Pre-wave preview: shows the player what's incoming so they can retool.

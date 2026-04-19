@@ -48,15 +48,16 @@ function renderMapSelect(root: HTMLElement, save: SaveData, onPlay: (mapId: stri
       const buffBits: string[] = [];
       if (r.passiveDamagePct) buffBits.push(`+${Math.round(r.passiveDamagePct * 100)}% DMG`);
       if (r.passiveRatePct) buffBits.push(`+${Math.round(r.passiveRatePct * 100)}% RATE`);
+      if (r.passiveCritPct) buffBits.push(`+${Math.round(r.passiveCritPct * 100)}% CRIT`);
       if (r.bonusStartingHp) buffBits.push(`+${r.bonusStartingHp} HP`);
+      if (r.bonusHpRegenPerWave) buffBits.push(`+${r.bonusHpRegenPerWave} HP/WAVE`);
       if (r.bonusStartingLevels) buffBits.push(`+${r.bonusStartingLevels} LEVEL`);
-      const extraTokens = Object.entries(r.bonusStartingTokens).map(([k, v]) => `+${v} ${TOWERS[k as keyof typeof TOWERS]?.name ?? k}`).join(' / ');
       return `
         <button class="runner-card${active ? ' runner-active' : ''}" data-runner="${id}" style="--accent:${r.color}">
           <div class="runner-name">${r.name}</div>
           <div class="runner-role">${r.role}</div>
           <div class="runner-flavor">${r.flavor}</div>
-          <div class="runner-stats">${buffBits.join(' &middot; ')}${extraTokens ? ' &middot; ' + extraTokens : ''}</div>
+          <div class="runner-stats">${buffBits.join(' &middot; ')}</div>
           <div class="runner-ban">BANS: ${bannedName}</div>
         </button>
       `;

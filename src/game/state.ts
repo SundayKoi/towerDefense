@@ -222,17 +222,14 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData,
     }
   }
 
-  // Starting deploy tokens: always grant 1 Firewall minimum + any meta-boost starters.
-  // Skip tokens for locked turrets — the lockout must be consistent across all sources.
+  // Starting deploy tokens: always grant 1 Firewall minimum + any meta-boost
+  // starters. Capped to 1 per turret type — singleton rule makes extras dead
+  // weight. Runner bonus tokens were removed in v2 for the same reason.
   const tokens: Partial<Record<TowerId, number>> = { firewall: 1 };
   for (const [k, v] of Object.entries(save.metaBoosts.startingDeployTokens ?? {})) {
     if (lockedTurrets.includes(k as TowerId)) continue;
-    tokens[k as TowerId] = (tokens[k as TowerId] ?? 0) + (v as number);
-  }
-  // Runner bonus tokens — stacked on top of shop-granted starters.
-  for (const [k, v] of Object.entries(runner.bonusStartingTokens ?? {})) {
-    if (lockedTurrets.includes(k as TowerId)) continue;
-    tokens[k as TowerId] = (tokens[k as TowerId] ?? 0) + (v as number);
+    const current = tokens[k as TowerId] ?? 0;
+    tokens[k as TowerId] = Math.max(current, Math.min(1, current + (v as number)));
   }
 
   const startHp = d.startHp + (save.metaBoosts.bonusStartingHp ?? 0) + runner.bonusStartingHp;
@@ -262,7 +259,7 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData,
       globalDamagePct: (save.metaBoosts.globalDamagePct ?? 0) + 0.01 * (save.prestigeStars ?? 0) + runner.passiveDamagePct,
       globalRangePct: save.metaBoosts.globalRangePct ?? 0,
       globalRatePct: (save.metaBoosts.globalRatePct ?? 0) + runner.passiveRatePct,
-      globalCritChance: save.metaBoosts.globalCritChancePct ?? 0,
+      globalCritChance: (save.metaBoosts.globalCritChancePct ?? 0) + runner.passiveCritPct,
       enemySpeedMult: 1 - (save.metaBoosts.enemySpeedDebuff ?? 0),
       xpMult: 1 + (save.metaBoosts.xpBoostPct ?? 0),
       towerDmg: {},
@@ -317,15 +314,6 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData,
       }
       return out;
     })(),
-    // Grant the full starter deck for v1. Drafting new programs via cards is
-    // future work — for now players always have access to the four base verbs.
-    // Runner-specified "ready at start" programs override the default 0-CD.
-    programs: [
-      { id: 'emp_burst', cooldownLeft: runner.bonusProgramCooldownReady?.includes('emp_burst') ? 0 : 0 },
-      { id: 'patch', cooldownLeft: runner.bonusProgramCooldownReady?.includes('patch') ? 0 : 0 },
-      { id: 'kernel_panic', cooldownLeft: runner.bonusProgramCooldownReady?.includes('kernel_panic') ? 0 : 0 },
-      { id: 'trace', cooldownLeft: runner.bonusProgramCooldownReady?.includes('trace') ? 0 : 0 },
-    ],
     runnerId,
   };
 }

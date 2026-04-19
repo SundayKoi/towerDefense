@@ -11,7 +11,6 @@ import {
 import { audio } from '@/audio/sfx';
 import { haptics } from '@/audio/haptics';
 import { xpForLevel } from './state';
-import { tickPrograms, PROGRAMS, type ProgramId } from './programs';
 import { exploitBonus } from '@/data/ports';
 
 let entityIdSeq = 1;
@@ -567,7 +566,6 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
   s.elapsed += dtSec;
 
   if (s.shakeTime > 0) s.shakeTime = Math.max(0, s.shakeTime - dtSec);
-  tickPrograms(s, dtSec);
 
   // Hit-pause: freeze world sim but keep FX ticking so the player sees the
   // satisfying micro-freeze without losing the death particles/floaters.
@@ -1075,74 +1073,6 @@ export function canOverdrive(t: TowerInstance): boolean {
   return t.def !== 'booster_node' && t.def !== 'data_miner';
 }
 
-// Fire a program (active ability). No-op if the program is on cooldown or if
-// the effect short-circuits (patch on full HP). Returns whether the CD was
-// actually spent so callers can play a "fizzle" cue on failure.
-export function triggerProgram(s: RunState, id: ProgramId): boolean {
-  const slot = s.programs?.find((p) => p.id === id);
-  if (!slot) return false;
-  if (slot.cooldownLeft > 0) return false;
-  const def = PROGRAMS[id];
-  if (!def) return false;
-
-  let fired = false;
-  if (id === 'emp_burst') {
-    let hit = 0;
-    for (const e of s.enemies) {
-      if (!e.alive) continue;
-      damageEnemy(s, e, 80, false, 'energy', false);
-      hit++;
-    }
-    if (hit > 0) {
-      s.floaters.push({ pos: { x: s.enemies[0]?.pos.x ?? 8, y: s.enemies[0]?.pos.y ?? 4 }, text: 'EMP BURST', vy: -14, life: 1.4, maxLife: 1.4, color: '#ffd600', size: 22 });
-      s.shakeTime = Math.max(s.shakeTime, 0.3);
-      s.shakeAmp = Math.max(s.shakeAmp, 6);
-      audio.play('explode');
-      fired = true;
-    }
-  } else if (id === 'patch') {
-    if (s.hp < s.maxHp) {
-      s.hp = Math.min(s.maxHp, s.hp + 12);
-      s.floaters.push({ pos: { x: 4, y: 4 }, text: '+12 INTEGRITY', vy: -18, life: 1.4, maxLife: 1.4, color: '#00ff88', size: 20 });
-      audio.play('upgrade');
-      fired = true;
-    }
-  } else if (id === 'kernel_panic') {
-    let applied = 0;
-    for (const e of s.enemies) {
-      if (!e.alive) continue;
-      const def = ENEMIES[e.def];
-      if (def.slowImmune) {
-        damageEnemy(s, e, 30, false, 'energy', false);
-      } else {
-        e.slowTimer = Math.max(e.slowTimer, 2.5);
-        e.speedMult = 0.05;
-      }
-      applied++;
-    }
-    if (applied > 0) {
-      s.floaters.push({ pos: { x: 8, y: 4 }, text: 'KERNEL PANIC', vy: -14, life: 1.6, maxLife: 1.6, color: '#b847ff', size: 22 });
-      audio.play('boss_spawn');
-      fired = true;
-    }
-  } else if (id === 'trace') {
-    let applied = 0;
-    for (const e of s.enemies) {
-      if (!e.alive) continue;
-      e.invisTimer = 0;
-      e.marked = Math.max(e.marked ?? 0, 6);
-      applied++;
-    }
-    if (applied > 0) {
-      s.floaters.push({ pos: { x: 8, y: 4 }, text: 'TRACE ROUTE', vy: -14, life: 1.2, maxLife: 1.2, color: '#00fff0', size: 20 });
-      audio.play('ui_click');
-      fired = true;
-    }
-  }
-
-  if (fired) slot.cooldownLeft = def.cooldown;
-  return fired;
-}
 
 export function triggerOverdrive(s: RunState, t: TowerInstance): boolean {
   if (!canOverdrive(t)) return false;
