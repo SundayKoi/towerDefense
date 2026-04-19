@@ -1216,10 +1216,18 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
   }
 
   const range = effectiveRange(s, t);
+  // Cloak-detection: AOE and chain turrets see through the GHOST PROTOCOL
+  // runtime cloak and can target cloaked enemies; the hit also reveals them
+  // permanently (handled in damageEnemy). Non-detecting turrets skip cloaked
+  // enemies entirely. def.invisChance flicker (e.g. the GHOST enemy species)
+  // is a separate visual-only gimmick and doesn't block targeting.
+  const towerDef = TOWERS[t.def];
+  const canDetectCloak = towerDef.damageType === 'aoe' || towerDef.damageType === 'chain';
   let best: EnemyInstance | null = null;
   let bestScore = -Infinity;
   for (const e of s.enemies) {
     if (!e.alive) continue;
+    if (e.invisTimer > 0 && !canDetectCloak) continue;
     const dx = e.pos.x - t.grid.x;
     const dy = e.pos.y - t.grid.y;
     const dist = Math.hypot(dx, dy);
@@ -2306,6 +2314,18 @@ function applyResistanceAndArmor(e: EnemyInstance, raw: number, type: DamageType
 }
 
 export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: boolean, type: DamageType, silent = false, source?: TowerId): number {
+  // AOE / chain damage reveals cloaked enemies — permanent reveal once hit.
+  // Mirrors the GHOST enemy counterTip ("AOE reveals them") and is the primary
+  // counterplay to the GHOST PROTOCOL sector modifier and daily mutator.
+  if (e.invisTimer > 0 && (type === 'aoe' || type === 'chain')) {
+    e.invisTimer = 0;
+    s.floaters.push({
+      pos: { x: e.pos.x, y: e.pos.y - 0.4 },
+      text: 'REVEALED',
+      vy: -22, life: 0.8, maxLife: 0.8,
+      color: '#00fff0', size: 12,
+    });
+  }
   // Brittle coating: slowed/frozen enemies take +15% from all sources
   const brittleMult = (hasEffect(s, 'ice', 'brittle') && e.speedMult < 1) ? 1.15 : 1.0;
   // DECRYPT NODE aura — +% damage from all sources to enemies in range.
