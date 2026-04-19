@@ -38,3 +38,7 @@ ios/App/output/
 
 # Capacitor runtime artifacts
 .cap-cache/
+
+# itch.io upload artifact — regenerated on demand via `npm run itch`.
+# Large enough to bloat the repo if committed by accident.
+netrunner-itch.zip

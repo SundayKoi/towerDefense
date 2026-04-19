@@ -12,10 +12,13 @@
     "ios:add": "cap add ios",
     "ios:sync": "npm run build && cap sync ios",
     "ios:open": "cap open ios",
-    "ios:run": "npm run ios:sync && cap open ios"
+    "ios:run": "npm run ios:sync && cap open ios",
+    "itch": "node scripts/build-itch.mjs"
   },
   "devDependencies": {
+    "@types/archiver": "^7.0.0",
     "@types/node": "^25.6.0",
+    "archiver": "^7.0.1",
     "typescript": "^6.0.3",
     "vite": "^7.3.2",
     "vite-plugin-pwa": "^1.2.0"
