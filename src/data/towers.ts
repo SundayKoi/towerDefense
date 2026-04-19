@@ -33,7 +33,10 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   antivirus: {
     id: 'antivirus',
     name: 'ANTIVIRUS',
-    damage: 60,
+    // 60 was one-shotting 28-HP worms from wave 1. Rebalanced: ~3 shots per
+    // base worm, ~4 per trojan (pre-armor). Still the best starter DPS
+    // per-shot, still pierce-typed so it ignores most armor.
+    damage: 30,
     range: 3.8,
     fireRate: 0.55,
     projectileSpeed: 22,
@@ -62,7 +65,9 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   ice: {
     id: 'ice',
     name: 'ICE-BREAKER',
-    damage: 90,
+    // 90 AOE meant every hit cleared a cluster. Kept AOE radius + slow fire
+    // rate intact; damage down so swarms take 2 volleys not 1.
+    damage: 45,
     range: 2.8,
     fireRate: 0.4,
     projectileSpeed: 12,
@@ -77,7 +82,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   mine: {
     id: 'mine',
     name: 'ARTILLERY',
-    damage: 60,
+    damage: 35,
     range: 5.5,
     fireRate: 0.55,
     projectileSpeed: 7,
@@ -93,7 +98,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   chain: {
     id: 'chain',
     name: 'CHAIN LIGHTNING',
-    damage: 42,
+    damage: 22,
     range: 2.5,
     fireRate: 0.75,
     projectileSpeed: 30,
@@ -108,7 +113,10 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   railgun: {
     id: 'railgun',
     name: 'RAILGUN',
-    damage: 220,
+    // Still the heaviest pierce weapon; nerfed to 110 so it doesn't trivialize
+    // every line of enemies in one shot. Pairs with ANTIVIRUS for a full
+    // armor-shred loadout without being a solo "i-win" pick.
+    damage: 110,
     range: 5.0,
     fireRate: 0.25,
     projectileSpeed: 40,
@@ -123,7 +131,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   pulse: {
     id: 'pulse',
     name: 'EMP ARRAY',
-    damage: 55,
+    damage: 32,
     range: 2.2,
     fireRate: 0.4, // recharge: ~2.5s between bursts (cooldown used as burst timer)
     projectileSpeed: 0,
@@ -138,7 +146,9 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   sniper: {
     id: 'sniper',
     name: 'OVERWATCH',
-    damage: 380,
+    // 380 was 1-shotting every non-boss enemy deep into the campaign. 180
+    // keeps the "single heavy strike" feel without deleting whole waves.
+    damage: 180,
     range: 6.5,
     fireRate: 0.18,
     projectileSpeed: 55,
