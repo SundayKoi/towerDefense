@@ -5,7 +5,8 @@ import type { EnemyDef, EnemyId } from '@/types';
 export const ENEMIES: Record<EnemyId, EnemyDef> = {
   worm: {
     id: 'worm',
-    spriteAngleOffset: Math.PI / 2,
+    // Worm sprite on the sheet is drawn horizontally, head on the east side —
+    // native facing is EAST, so no rotation offset is needed.
     name: 'WORM',
     threat: 'LOW',
     // Base HP bumps across the roster so starter turrets take 2-4 shots per
@@ -194,7 +195,9 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
   leviathan: {
     id: 'leviathan',
-    spriteAngleOffset: Math.PI / 2,
+    // Leviathan whale sprite has its eye/head on the LEFT of its body — native
+    // facing is WEST, so we need a π offset to flip it when moving east.
+    spriteAngleOffset: Math.PI,
     name: 'LEVIATHAN',
     threat: 'MEGA',
     hp: 1800,
