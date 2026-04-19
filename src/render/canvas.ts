@@ -999,56 +999,49 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
       ctx.globalAlpha = prevAlpha;
     }
     ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
-    // BOMBER detonation windup — when HP drops below 30%, pulse red→white so
-    // the player knows to finish it fast. Visual-only telegraph; the "detonates
-    // on death" lore sells itself through the pulse.
+    // ── Tint overlays: re-draw the sprite with a CSS filter so the tint only
+    // touches the sprite's opaque pixels. The old source-atop approach clipped
+    // to the whole destination canvas (which is filled opaque with map bgColor),
+    // so each tint read as a full square bounded by the sprite transform. ──
+    //
+    // BOMBER detonation windup — pulse red/white so the player finishes it fast.
     if (e.def === 'bomber' && e.hp / e.maxHp < 0.3) {
-      const urgency = 1 - (e.hp / e.maxHp) / 0.3; // 0 → 1 as HP drops
+      const urgency = 1 - (e.hp / e.maxHp) / 0.3;
       const strobe = (Math.sin(t * (12 + urgency * 20)) + 1) / 2;
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.globalAlpha = 0.35 + strobe * 0.45 * urgency;
-      ctx.fillStyle = strobe > 0.5 ? '#ffffff' : '#ff3355';
-      ctx.fillRect(-size / 2, -size / 2, size, size);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.save();
+      ctx.globalAlpha = (0.5 + strobe * 0.4) * urgency;
+      ctx.filter = strobe > 0.5 ? 'brightness(0) invert(1)' : 'brightness(0.35) sepia(1) saturate(8) hue-rotate(330deg)';
+      ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+      ctx.filter = 'none';
+      ctx.restore();
     }
-    // Digital-entity motif: scanline corruption band slides vertically across
-    // the sprite of unstable/phased enemies. Applied to PHANTOM, WRAITH, GLITCH,
-    // CORRUPTOR. Sells "program running" without generic Matrix rain.
-    if (e.def === 'phantom' || e.def === 'wraith' || e.def === 'glitch' || e.def === 'corruptor') {
-      const bandCycle = (t * 0.55 + e.id * 0.17) % 1;
-      const bandY = -size / 2 + bandCycle * size;
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.globalAlpha = 0.45;
-      ctx.fillStyle = e.def === 'corruptor' ? '#ff2d95' : '#00fff0';
-      ctx.fillRect(-size / 2, bandY, size, 2);
-      // Second thinner trailing band for glitch feel.
-      ctx.globalAlpha = 0.25;
-      ctx.fillRect(-size / 2, bandY + 4, size, 1);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    // VOIDLORD body tint — soft fill in the active immunity color, applied via
-    // source-atop so only opaque sprite pixels are tinted. 35% alpha so the
-    // sprite detail still reads through.
+    // VOIDLORD body tint — hue-shift the sprite to the active immunity color.
     if (e.phaseShiftType && e.def === 'voidlord') {
-      const tint = PHASE_SHIFT_COLOR[e.phaseShiftType] ?? '#ffffff';
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.globalAlpha = 0.35;
-      ctx.fillStyle = tint;
-      ctx.fillRect(-size / 2, -size / 2, size, size);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
+      const hueMap: Record<string, string> = {
+        kinetic: 'hue-rotate(0deg) saturate(2.5) brightness(1.1)',       // red
+        energy:  'hue-rotate(180deg) saturate(2.5) brightness(1.1)',     // cyan
+        aoe:     'hue-rotate(30deg) saturate(2.5) brightness(1.1)',      // orange
+        chain:   'hue-rotate(270deg) saturate(2.5) brightness(1.1)',     // purple
+        pierce:  'hue-rotate(120deg) saturate(2.5) brightness(1.1)',     // green
+      };
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.filter = hueMap[e.phaseShiftType] ?? 'none';
+      ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+      ctx.filter = 'none';
+      ctx.restore();
     }
-    // White-tint hit flash — fills the sprite's opaque pixels with white during
-    // the first ~40ms after a hit. Source-atop clips the fill to the sprite
-    // silhouette so it never spills into background pixels. Fades out fast.
+    // Hit flash — bright white silhouette on top of the sprite for ~40ms.
+    // `brightness(0) invert(1)` turns the sprite into a pure-white silhouette
+    // that preserves the alpha channel, so the flash clips cleanly to the sprite.
     if (e.hitFlash > 0.12) {
       const flashAlpha = Math.min(1, (e.hitFlash - 0.12) * 12);
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha.toFixed(3)})`;
-      ctx.fillRect(-size / 2, -size / 2, size, size);
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.save();
+      ctx.globalAlpha = flashAlpha;
+      ctx.filter = 'brightness(0) invert(1)';
+      ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+      ctx.filter = 'none';
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -1353,24 +1346,29 @@ function drawPuddles(ctx: CanvasRenderingContext2D, vp: RenderViewport, s: RunSt
     const r = pu.radius * cs;
     const life = pu.timeLeft / pu.maxTime;
     const pulse = 0.5 + 0.15 * Math.sin(s.elapsed * 4);
-    ctx.globalAlpha = life * pulse;
     const c1 = pu.color ?? '#00ff88';
+    // Subtle fill — alpha maxes around 0.22 so the puddle reads as a ground
+    // wash, not an opaque splat. Gradient fades to transparent so the path
+    // and the enemies walking through it stay readable.
+    ctx.globalAlpha = life * pulse * 0.55;
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    grad.addColorStop(0, c1 + '55');
-    grad.addColorStop(0.6, c1 + '33');
+    grad.addColorStop(0, c1 + '3a');
+    grad.addColorStop(0.55, c1 + '1e');
     grad.addColorStop(1, '#00000000');
     ctx.fillStyle = grad;
-    ctx.strokeStyle = c1;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
-    // Rim
-    const rimColor = pu.color ?? '#00ff88';
-    ctx.globalAlpha = life * 0.6;
-    ctx.lineWidth = 1.5;
-    ctx.shadowColor = rimColor;
-    ctx.shadowBlur = 8;
+    // Thin dashed rim — reads as a "zone boundary" without the heavy shadow
+    // glow that previously dominated the playfield.
+    ctx.globalAlpha = life * 0.35;
+    ctx.strokeStyle = c1;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.setLineDash([]);
   }
   ctx.restore();
 }
