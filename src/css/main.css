@@ -2034,7 +2034,20 @@ html, body { overscroll-behavior: none; }
 .eib-threat { font-size: 9px; font-family: 'Orbitron', sans-serif; letter-spacing: 1px; margin-bottom: 4px; }
 .eib-name { font-size: 18px; font-weight: 900; font-family: 'Orbitron', sans-serif; margin-bottom: 4px; }
 .eib-desc { font-size: 11px; color: #ccc; margin-bottom: 4px; line-height: 1.4; }
-.eib-tip { font-size: 10px; color: #888; font-style: italic; }
+.eib-tip { font-size: 10px; color: #888; font-style: italic; margin-bottom: 8px; }
+.eib-dismiss {
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid currentColor;
+  color: currentColor;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.eib-dismiss:hover { background: rgba(255,255,255,0.08); }
 @keyframes eib-slide-in {
   from { transform: translateX(110%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }

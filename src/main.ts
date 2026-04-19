@@ -44,7 +44,21 @@ function letterReveal(text: string): string {
     .join('');
 }
 
+// Queue of pending enemy-intro banners so multiple new-enemy events in one
+// frame (e.g. a dense Act 7 wave seeding 3 unseen species at once) don't
+// overlap — each waits until the previous is dismissed.
+const enemyIntroQueue: EnemyId[] = [];
+let enemyIntroActive = false;
+
 function showEnemyIntroBanner(defId: EnemyId): void {
+  enemyIntroQueue.push(defId);
+  if (!enemyIntroActive) displayNextEnemyIntro();
+}
+
+function displayNextEnemyIntro(): void {
+  const defId = enemyIntroQueue.shift();
+  if (!defId) { enemyIntroActive = false; return; }
+  enemyIntroActive = true;
   const def = ENEMIES[defId];
   const threatColor: Record<string, string> = {
     LOW: '#00ff88', MEDIUM: '#ffd600', HIGH: '#ff9900', EXTREME: '#ff3355',
@@ -59,10 +73,14 @@ function showEnemyIntroBanner(defId: EnemyId): void {
     <div class="eib-name" style="color:${col}">${letterReveal(def.name)}</div>
     <div class="eib-desc">${def.description}</div>
     <div class="eib-tip">COUNTER: ${def.counterTip}</div>
+    <button class="eib-dismiss" style="border-color:${col};color:${col}">UNDERSTOOD</button>
   `;
   document.body.appendChild(el);
-  setTimeout(() => el.classList.add('eib-fade'), 3200);
-  setTimeout(() => el.remove(), 4000);
+  const dismiss = () => {
+    el.classList.add('eib-fade');
+    setTimeout(() => { el.remove(); displayNextEnemyIntro(); }, 250);
+  };
+  (el.querySelector('.eib-dismiss') as HTMLButtonElement).onclick = () => { audio.play('ui_click'); dismiss(); };
 }
 
 function showWaveBanner(r: RunState): void {
@@ -492,6 +510,12 @@ function updateHud() {
   }
   runHandles.startBtn.disabled = run.phase !== 'prep';
   renderWavePreview(runHandles, run);
+  // First-time packet-drop tutorial: fires the frame a packet first appears.
+  // Shown once ever via save.tutorial.seen['first_packet']. After that the
+  // packet is still tappable in the same frame — the tutorial is non-blocking.
+  if (run.packets.length > 0 && !save.tutorial.seen.includes('first_packet')) {
+    showTutorialIfNew(save, () => writeSave(save), 'first_packet');
+  }
   // Refresh ONLY the live parts of the selected tower panel (overdrive countdown,
   // subnet readout). Full rebuild here would destroy the close button between a
   // user's pointerdown and pointerup, breaking the close action.

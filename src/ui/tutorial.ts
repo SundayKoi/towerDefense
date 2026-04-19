@@ -37,6 +37,11 @@ export const TIPS: Record<string, TutorialTip> = {
     title: 'WAVE CLEARED',
     body: 'You earned XP and PROTOCOLS. XP fuels your card drafts; protocols are saved across runs and spent in the UPGRADE TERMINAL for permanent boosts.<br><br>Map clears unlock new turrets and cards. Aim for higher difficulties for bigger rewards.',
   },
+  first_packet: {
+    id: 'first_packet',
+    title: 'PACKET DROPPED',
+    body: 'Hostiles sometimes drop a glowing packet on death. TAP it within 5 seconds to claim a temporary buff:<br><br>&nbsp;&nbsp;<b>+D</b> &mdash; +50% turret damage (8s)<br>&nbsp;&nbsp;<b>+R</b> &mdash; +50% fire rate (8s)<br>&nbsp;&nbsp;<b>XP</b> &mdash; instant +15 XP<br>&nbsp;&nbsp;<b>+H</b> &mdash; restore 5 integrity<br><br>Packets fade if left uncollected. Bosses always drop one.',
+  },
 };
 
 export function showTutorialIfNew(save: SaveData, persist: () => void, tipId: keyof typeof TIPS): void {
@@ -136,6 +141,18 @@ function howToPlayScreen(onBack: () => void): Screen {
             <li>+12% damage per unique turret TYPE in the subnet</li>
             <li>Capped at +60% total — DIVERSITY matters more than size</li>
             <li>Glowing connection lines show active links: cyan = same type, magenta = diverse</li>
+          </ul>
+        </section>
+
+        <section class="htp-section">
+          <h2 class="htp-h2">// PACKET DROPS</h2>
+          <ul class="htp-list">
+            <li>8% of enemy kills drop a glowing PACKET on the path. Bosses always drop one.</li>
+            <li><b>TAP</b> the packet within 5 seconds to claim its buff. Missed packets fade.</li>
+            <li><b>+D</b> (pink) = +50% turret damage for 8 seconds.</li>
+            <li><b>+R</b> (cyan) = +50% fire rate for 8 seconds.</li>
+            <li><b>XP</b> (green) = instant +15 XP — stacks into your level bar.</li>
+            <li><b>+H</b> (yellow) = restore 5 integrity if damaged.</li>
           </ul>
         </section>
 
