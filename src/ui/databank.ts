@@ -14,7 +14,7 @@ export function openDatabankScreen(save: SaveData, onBack: () => void): void {
   mount(databankScreen(save, onBack));
 }
 
-type Tab = 'arsenal' | 'cards' | 'intrusions' | 'progression';
+type Tab = 'arsenal' | 'cards' | 'intrusions' | 'chromas' | 'progression';
 
 function databankScreen(save: SaveData, onBack: () => void): Screen {
   return (root) => {
@@ -198,6 +198,10 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
         }
       }
 
+      if (activeTab === 'chromas') {
+        body += renderChromasTab(save);
+      }
+
       if (activeTab === 'progression') {
         body += renderProgressionTab(save);
       }
@@ -213,6 +217,7 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
             <button class="shop-tab${activeTab === 'arsenal' ? ' active' : ''}" data-tab="arsenal">ARSENAL <small>${towerUnlocked}/${towerTotal}</small></button>
             <button class="shop-tab${activeTab === 'intrusions' ? ' active' : ''}" data-tab="intrusions">INTRUSIONS <small>${enemySeen}/${enemyTotal}</small></button>
             <button class="shop-tab${activeTab === 'cards' ? ' active' : ''}" data-tab="cards">CARDS <small>${cardUnlocked}/${cardTotal}</small></button>
+            <button class="shop-tab${activeTab === 'chromas' ? ' active' : ''}" data-tab="chromas">CHROMAS <small>${(save.unlockedChromas ?? []).length}/${CHROMAS.length}</small></button>
             <button class="shop-tab${activeTab === 'progression' ? ' active' : ''}" data-tab="progression">PROGRESSION</button>
           </div>
           ${body}
@@ -228,20 +233,21 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
           render();
         };
       });
-      root.querySelectorAll<HTMLButtonElement>('.db-chroma').forEach((btn) => {
+      const wireChromaToggle = (btn: HTMLButtonElement) => {
         btn.onclick = () => {
-          if (btn.classList.contains('db-chroma-locked')) { audio.play('sell'); return; }
+          if (btn.classList.contains('db-chroma-locked') || btn.disabled) { audio.play('sell'); return; }
           const chromaId = btn.dataset.chroma!;
           const tower = btn.dataset.tower! as TowerId;
           if (!save.equippedChromas) save.equippedChromas = {};
           const equipped = save.equippedChromas;
-          // Click-equipped → unequip; click-unequipped → equip.
           if (equipped[tower] === chromaId) { delete equipped[tower]; }
           else { equipped[tower] = CHROMAS_BY_ID[chromaId].id; }
           audio.play('ui_click');
           render();
         };
-      });
+      };
+      root.querySelectorAll<HTMLButtonElement>('.db-chroma').forEach(wireChromaToggle);
+      root.querySelectorAll<HTMLButtonElement>('.chroma-equip-btn').forEach(wireChromaToggle);
     };
 
     render();
@@ -252,6 +258,50 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
 // Central reference for every unlock, progression system, and run-configuration
 // knob. The goal: a player should be able to answer "where do I get X / what
 // does Y do" without digging through menus.
+
+// ── CHROMAS TAB ─────────────────────────────────────────────────────────────
+// Dedicated screen for every turret's cosmetic chroma: status, progress bar,
+// equip button. Single grid of cards — click any unlocked card to toggle
+// equip/unequip for that turret.
+
+function renderChromasTab(save: SaveData): string {
+  const unlockedIds = new Set(save.unlockedChromas ?? []);
+  const equippedTotal = Object.values(save.equippedChromas ?? {}).filter(Boolean).length;
+  const cards: string[] = [];
+  for (const c of CHROMAS) {
+    const unlocked = unlockedIds.has(c.id);
+    const [cur, tgt] = c.progress(save);
+    const pct = tgt > 0 ? Math.min(100, Math.round((cur / tgt) * 100)) : 0;
+    const tname = TOWERS[c.tower]?.name ?? c.tower;
+    const equippedHere = save.equippedChromas?.[c.tower] === c.id;
+    const fmt = (n: number) => n >= 1000 ? n.toLocaleString() : String(n);
+    const progRow = unlocked
+      ? `<div class="chroma-progress chroma-progress-done"><span>UNLOCKED</span></div>`
+      : `<div class="chroma-progress"><div class="chroma-fill" style="width:${pct}%"></div><span class="chroma-text">${fmt(cur)} / ${fmt(tgt)}</span></div>`;
+    const btn = unlocked
+      ? `<button class="btn ${equippedHere ? 'btn-primary' : 'btn-ghost'} chroma-equip-btn" data-chroma="${c.id}" data-tower="${c.tower}">${equippedHere ? 'EQUIPPED &check; (tap to remove)' : 'EQUIP'}</button>`
+      : `<button class="btn btn-ghost chroma-equip-btn" disabled>&#128274; LOCKED</button>`;
+    cards.push(`
+      <div class="chroma-card${unlocked ? '' : ' chroma-card-locked'}" style="--accent:${c.accent}">
+        <div class="chroma-card-head">
+          <div class="chroma-swatch"></div>
+          <div class="chroma-names">
+            <div class="chroma-card-name">${c.name}</div>
+            <div class="chroma-card-tower">${tname}</div>
+          </div>
+        </div>
+        <div class="chroma-card-criteria">${c.unlockDescription}</div>
+        ${progRow}
+        ${btn}
+      </div>
+    `);
+  }
+  return `
+    <div class="db-summary">CHROMAS // <b>${unlockedIds.size}</b> / ${CHROMAS.length} UNLOCKED &middot; ${equippedTotal} EQUIPPED</div>
+    <div class="db-summary" style="font-size:11px;color:var(--text-dim);letter-spacing:0.6px;">Cosmetic tower color overrides. Tap an unlocked card to equip; tap again to remove.</div>
+    <div class="chroma-grid">${cards.join('')}</div>
+  `;
+}
 
 function renderProgressionTab(save: SaveData): string {
   const campaign = MAPS.filter((m) => !isSurvival(m.id)).slice().sort((a, b) => a.order - b.order);

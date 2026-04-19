@@ -688,16 +688,15 @@ function finishRun(victory: boolean) {
   save.stats.totalKills = (save.stats.totalKills ?? 0) + run.killsThisRun;
   save.stats.bossKills = (save.stats.bossKills ?? 0) + run.bossKillsThisRun;
   save.stats.totalXpEarned = (save.stats.totalXpEarned ?? 0) + run.xpThisRun;
-  // Chroma unlock check — new entries auto-equip so the player sees them
-  // immediately. Floaters/toasts can be added later; for now the databank
-  // surface is how unlocks are discovered.
+  if (isSurvival(run.mapId) && run.wave > (save.stats.survivalBestWave ?? 0)) {
+    save.stats.survivalBestWave = run.wave;
+  }
+  // Chroma unlock check — runs AFTER stat updates so survival-wave and other
+  // current-run milestones are reflected. New entries auto-equip + show up on
+  // the game-over screen so the player sees the reward immediately.
   const newChromas = refreshChromaUnlocks(save);
   for (const c of newChromas) {
     haptics.fire('level_up');
-    console.log('[chroma] unlocked', c.id);
-  }
-  if (isSurvival(run.mapId) && run.wave > (save.stats.survivalBestWave ?? 0)) {
-    save.stats.survivalBestWave = run.wave;
   }
 
   // Challenge contract score tracking — daily/weekly/monthly. Each is locked
@@ -746,6 +745,13 @@ function finishRun(victory: boolean) {
     });
   }
   const unlocks: { kind: 'tower' | 'card'; id: string; name: string; rarity?: string }[] = [];
+  // Newly-unlocked chromas surface on the game-over card list so the player
+  // sees the reward. Fires on wins AND losses since chroma milestones (like
+  // "200 total kills") can finalize on a run that didn't clear.
+  for (const c of newChromas) {
+    const tname = TOWERS[c.tower]?.name ?? c.tower;
+    unlocks.push({ kind: 'card', id: c.id, name: `${tname} CHROMA: ${c.name}`, rarity: 'epic' });
+  }
   if (victory) {
     const c = (save.completed[run.mapId] ?? {});
     c[run.difficulty] = true;
