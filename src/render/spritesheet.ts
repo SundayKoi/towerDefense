@@ -8,8 +8,13 @@ export const SHEET_COLS = 8;
 export const SHEET_ROWS = 8;
 export const SHEET_WIDTH = 256;
 export const SHEET_HEIGHT = 256;
-// Vite serves /public at the site root, so the runtime URL is `/sprites.png`.
-export const SHEET_URL = '/sprites.png';
+// Relative path so the image resolves correctly no matter where the game is
+// hosted — Vite + PWA at site root, GitHub Pages under /project/, Capacitor
+// iOS at `capacitor://localhost`, and itch.io's sandboxed iframe at
+// `html.itch.zone/html/<id>/`. An absolute `/sprites.png` on itch would
+// hit html.itch.zone/sprites.png (doesn't exist) and silently fall back to
+// the old procedural SVG sprites — which is how this bug surfaced.
+export const SHEET_URL = './sprites.png';
 
 export interface SpriteFrame {
   readonly x: number;
