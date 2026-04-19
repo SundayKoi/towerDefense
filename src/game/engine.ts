@@ -120,7 +120,9 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
     hp *= bossHpMult(Math.max(10, s.wave));
   } else {
     if (s.wave === 1 && defId === 'worm') {
-      hp = 20;
+      // Wave-1 worms are a tutorial gimme — firewall (14 dmg) should one-shot
+      // them so the player's very first placement lands a clean kill.
+      hp = 12;
     } else {
       hp *= hpScale(s.wave, s.difficulty);
     }
