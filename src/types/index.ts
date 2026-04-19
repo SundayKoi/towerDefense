@@ -121,6 +121,11 @@ export interface EnemyDef {
   damage: number;
   armor?: number;
   slowImmune?: boolean;
+  // Soft slow resistance: 0 = no resistance (default), 0.5 = half-slow, 1.0 is
+  // functionally equivalent to slowImmune. Applied by the applySlow helper in
+  // engine.ts — lets an enemy take slows but feel sluggish rather than
+  // unaffected (e.g. wraith resists 50% of the applied slow).
+  slowResistPct?: number;
   invisChance?: number;
   bossScale?: boolean;
   color: string;

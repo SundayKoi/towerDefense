@@ -617,6 +617,15 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       e.slowTimer -= dtSec;
       if (e.slowTimer <= 0) e.speedMult = 1;
     }
+    // Soft slow resistance — per-frame floor on speedMult. An enemy with
+    // slowResistPct 0.5 can never have their speed cut below 50%, regardless
+    // of how many or how strong the incoming slows are. Lets wraith (and any
+    // future partial-resist enemies) take some slow without being shut down
+    // the way slow-immune bosses are.
+    const slowResist = ENEMIES[e.def].slowResistPct;
+    if (slowResist && slowResist > 0 && e.speedMult < slowResist) {
+      e.speedMult = slowResist;
+    }
     if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dtSec);
     if (e.marked !== undefined && e.marked > 0) {
       e.marked = Math.max(0, e.marked - dtSec);
@@ -2493,7 +2502,7 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
     e.bossTriggered = true;
     const path = getMap(s.mapId).paths[e.pathIndex] ?? getMap(s.mapId).paths[0];
     const totalLen = pathLength(path);
-    const jumpDist = 1.2;
+    const jumpDist = 0.6;
     const newProgress = Math.min(totalLen - 0.1, e.progress + jumpDist);
     e.progress = newProgress;
     const pos = posOnPath(path, newProgress);
