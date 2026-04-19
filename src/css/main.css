@@ -2713,4 +2713,149 @@ html, body { overflow-x: hidden; }
 .corner-bl { bottom: 6px; left: 6px;    border-bottom: 2px solid var(--cb); border-left:  2px solid var(--cb); }
 .corner-br { bottom: 6px; right: 6px;   border-bottom: 2px solid var(--cb); border-right: 2px solid var(--cb); }
 .canvas-wrap { position: relative; }
+
+/* ============ MOBILE LANDSCAPE TUNING ============
+ * Phones held sideways have ~375-430px viewport height. The desktop sizing
+ * of logos, modals, HUD chrome, and button paddings ate too much of that
+ * budget — start screen was clipping, draft cards were invisible below the
+ * fold, and in-game buttons looked comically oversized relative to the
+ * canvas. These rules compress chrome and allow overflow-scroll where
+ * content still can't compress further. Trigger: max-height: 500px catches
+ * every phone in landscape without touching tablets. */
+@media (max-height: 500px) {
+  .screen { padding: 8px; gap: 6px; }
+  /* Center screens get scroll-when-overflow so a tall logo can't clip. */
+  .screen-center {
+    overflow-y: auto;
+    justify-content: flex-start;
+    padding: 8px;
+  }
+
+  /* ── Start screen: ~50% vertical footprint ── */
+  .start-logo {
+    margin-bottom: 10px;
+    padding: 10px 20px 8px;
+  }
+  .logo-primary {
+    font-size: clamp(28px, 8vw, 48px);
+    letter-spacing: 4px;
+  }
+  .logo-sub { font-size: 14px; letter-spacing: 2px; margin-top: 2px; }
+  .logo-line { margin: 6px auto; }
+  .logo-flavor { font-size: 10px; }
+  .prestige-row { font-size: 11px; margin-top: 4px; }
+
+  .start-buttons {
+    gap: 6px;
+    width: min(300px, 70vw);
+    padding: 10px 12px;
+  }
+  .start-buttons .btn { font-size: 12px; padding: 7px 12px; letter-spacing: 1.2px; }
+  .btn-lg { font-size: 15px; padding: 10px 20px; letter-spacing: 1.5px; }
+
+  /* Daily / weekly / monthly contract cards stack without dominating */
+  .daily-contract-card {
+    width: min(300px, 70vw);
+    padding: 6px 10px;
+    margin-bottom: 8px;
+    gap: 3px;
+  }
+  .daily-contract-card .dc-head { font-size: 9px; }
+  .daily-contract-card .dc-mission { font-size: 11px; }
+  .daily-contract-card .dc-mut-name { font-size: 10px; }
+  .daily-contract-card .dc-mut-flavor { font-size: 9px; }
+  .daily-contract-card .dc-best { font-size: 9px; }
+  .daily-contract-card .btn { padding: 4px 8px; font-size: 10px; }
+
+  .build-tag { font-size: 9px; bottom: 6px; }
+
+  /* ── Modals: let the body scroll inside the viewport ── */
+  .modal-overlay { padding: 8px; }
+  .modal {
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .modal-title { font-size: 14px; margin-bottom: 8px; letter-spacing: 2px; }
+  .modal-actions { gap: 6px; }
+
+  /* ── Draft modal: shrink card + allow scroll. Keep 3-col layout since
+   *    wider phones (Pro Max) can still hold them side-by-side. ── */
+  .draft-modal { max-height: calc(100vh - 16px); overflow-y: auto; }
+  .draft-title { font-size: 14px; margin-bottom: 4px; letter-spacing: 2px; }
+  .draft-wave { font-size: 10px; margin-top: 2px; }
+  .draft-cards { gap: 6px; margin: 8px 0; }
+
+  /* ── Game HUD: slim the top bars ── */
+  .hud {
+    padding: 4px 8px;
+    gap: 2px;
+    top: 6px;
+    left: 6px;
+    min-width: 86px;
+  }
+  .hud-cell .label { font-size: 8px; letter-spacing: 1px; }
+  .hud-cell .value { font-size: 13px; }
+  .hud-cell.map .value { font-size: 10px; }
+  .hud-cell.level .value { font-size: 13px; }
+  .xp-bar { height: 3px; }
+  .xp-text { font-size: 8px; }
+
+  .action-bar {
+    top: 6px; right: 6px;
+    padding: 3px 4px;
+    gap: 4px;
+  }
+  .action-btn {
+    min-width: 34px;
+    padding: 5px 7px;
+    font-size: 13px;
+  }
+  #btn-start-wave {
+    font-size: 11px;
+    padding: 5px 10px;
+    letter-spacing: 1px;
+  }
+
+  .tokens-bar {
+    bottom: 6px;
+    padding: 3px 6px;
+    gap: 4px;
+  }
+  .token-chip { padding: 2px 6px 2px 2px; gap: 4px; }
+  .token-portrait { width: 22px; height: 22px; }
+  .token-name { font-size: 9px; }
+  .token-count { font-size: 10px; }
+
+  .corner-bracket { width: 10px; height: 10px; }
+  .corner-tl, .corner-tr { top: 4px; }
+  .corner-bl, .corner-br { bottom: 4px; }
+  .corner-tl, .corner-bl { left: 4px; }
+  .corner-tr, .corner-br { right: 4px; }
+
+  /* Wave preview: inline with the HUD, not stacked below it */
+  .wave-preview {
+    top: 56px;
+    padding: 4px 8px;
+    gap: 2px;
+    border-radius: 2px;
+  }
+  .wave-preview .wp-head { font-size: 9px; gap: 6px; }
+  .wave-preview .wp-wave { font-size: 9px; }
+  .wave-preview .wp-chip { font-size: 8px; padding: 0 4px; letter-spacing: 0.8px; }
+  .wave-preview .wp-mod { font-size: 8px; padding: 0 4px; }
+
+  /* Selected-tower sidebar can't exceed viewport */
+  .selected-tower { max-height: calc(100vh - 70px); overflow-y: auto; }
+}
+
+/* ============ NARROW PHONE WIDTH ============
+ * Applies regardless of orientation. Compresses modal bodies and the
+ * how-to-play reference so text wraps cleanly on <6" screens. */
+@media (max-width: 600px) {
+  .modal { padding: 14px; }
+  .htp-section h2 { font-size: 14px; }
+  .htp-section p,
+  .htp-list { font-size: 12px; }
+}
 .htp-list b { color: var(--cyan); letter-spacing: 1px; }
