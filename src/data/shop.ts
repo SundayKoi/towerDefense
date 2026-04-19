@@ -71,13 +71,13 @@ export const SHOP_UPGRADES: ShopUpgradeDef[] = [
   {
     id: 'hardened_core',
     name: 'HARDENED CORE',
-    description: '+5 starting HP per stack. Max 10 stacks (+50 HP).',
+    description: 'Start with +15 HP. Each extra stack adds +3 HP. Max 5 stacks (+27 HP).',
     icon: '♦',
-    baseCost: 60,
-    stackStep: 70,
-    maxStacks: 10,
+    baseCost: 70,
+    stackStep: 80,
+    maxStacks: 5,
     category: 'power',
-    effect: (save: SaveData, stacks: number) => { save.metaBoosts.bonusStartingHp = stacks * 5; },
+    effect: (save: SaveData, stacks: number) => { save.metaBoosts.bonusStartingHp = 12 + stacks * 3; },
   },
 
   // ── AUGMENTS (specialty — smaller caps, each stack matters more) ────────
