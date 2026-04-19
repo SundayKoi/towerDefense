@@ -428,7 +428,7 @@ const BRANCH_SPECS: BranchSpec[] = [];
         apply: (s) => { addEffect(s, T, 'quantum_super_key'); addEffect(s, T, 'double'); } },
       { shortName: 'UNSTABLE CORE', description: 'QUANTUM crit chance +8%.',
         apply: (s) => { addEffect(s, T, 'unstable'); } },
-      { shortName: 'RESONANCE', description: 'When first QUANTUM shot crits, double-shot also crits.', rarity: 'rare',
+      { shortName: 'RESONANCE', description: 'After a QUANTUM crit, next shot deals +50% damage. 5s cooldown between arms.', rarity: 'rare',
         apply: (s) => { addEffect(s, T, 'resonance'); } },
       { shortName: 'SUPERCHARGE', description: 'After a crit, next shot deals +100% damage.',
         apply: (s) => { addEffect(s, T, 'supercharge'); } },

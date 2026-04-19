@@ -1332,6 +1332,15 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
     superchargeMult = 2;
     t.extras.superchargeReady = 0;
   }
+  // Quantum resonance: +50% damage on the shot after a crit, then 5s cooldown
+  // before the trigger can re-arm (see hitEnemy for arming). Stacks with
+  // supercharge if both are picked (same SUPERPOSITION branch allows both).
+  let resonanceMult = 1;
+  if (t.def === 'quantum' && hasEffect(s, 'quantum', 'resonance') && (t.extras.resonanceArmed ?? 0) > 0) {
+    resonanceMult = 1.5;
+    t.extras.resonanceArmed = 0;
+    t.extras.resonanceReadyAt = s.elapsed + 5;
+  }
   if (critChance > 0 && Math.random() < critChance) isCrit = true;
   // Precision matrix: ANTIVIRUS marks cause quantum guaranteed crit
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'precision_matrix') && (target.marked ?? 0) > 0) isCrit = true;
@@ -1387,7 +1396,7 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   // the target's open port. Pops an EXPLOIT! floater so players can see the
   // pairing working in real time. Table lives in data/ports.ts.
   const portMult = exploitBonus(t.def, target.def);
-  const dmg = (isCrit ? baseDmg * critMult : baseDmg) * observerLensBonus * heatMult * portMult * superchargeMult;
+  const dmg = (isCrit ? baseDmg * critMult : baseDmg) * observerLensBonus * heatMult * portMult * superchargeMult * resonanceMult;
   if (portMult > 1 && Math.random() < 0.3) {
     s.floaters.push({
       pos: { x: target.pos.x, y: target.pos.y - 0.4 },
@@ -1523,8 +1532,7 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
     const shouldDouble = hasEffect(s, 'quantum', 'double') && Math.random() < 0.35;
     const quantumSightActive = hasEffect(s, 'quantum', 'quantum_sight') && (target.marked ?? 0) > 0;
     if (shouldDouble || quantumSightActive) {
-      const extraIsCrit = (hasEffect(s, 'quantum', 'resonance') && isCrit) ? true : isCrit;
-      s.projectiles.push({ ...proj, id: nextId(), pos: { x: t.grid.x, y: t.grid.y }, isCrit: extraIsCrit, trail: [] });
+      s.projectiles.push({ ...proj, id: nextId(), pos: { x: t.grid.x, y: t.grid.y }, isCrit, trail: [] });
     }
   }
 
@@ -2108,6 +2116,17 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
   if (p.fromTower === 'quantum' && p.isCrit && hasEffect(s, 'quantum', 'supercharge')) {
     const qmTower = s.towers.find((tw) => tw.def === 'quantum');
     if (qmTower) qmTower.extras.superchargeReady = 1;
+  }
+
+  // Quantum resonance: arm next-shot +50% damage bonus on crit. 5s cooldown
+  // between arms — resonanceReadyAt is an s.elapsed timestamp set when the
+  // bonus is CONSUMED (see fire), so re-arming is blocked until the game
+  // clock passes it.
+  if (p.fromTower === 'quantum' && p.isCrit && hasEffect(s, 'quantum', 'resonance')) {
+    const qmTower = s.towers.find((tw) => tw.def === 'quantum');
+    if (qmTower && s.elapsed >= (qmTower.extras.resonanceReadyAt ?? 0)) {
+      qmTower.extras.resonanceArmed = 1;
+    }
   }
 
   // Quantum antimatter: each crit permanently increases damage 2% (max +30%)
