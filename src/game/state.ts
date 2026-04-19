@@ -4,11 +4,7 @@ import { CARDS_BY_ID, STARTING_UNLOCKED_CARDS } from '@/data/cards';
 import { recomputeMetaBoosts } from '@/data/shop';
 import { emptyPeriodStats, DAILY_MUTATORS_BY_ID } from '@/data/contracts';
 import { RUNNERS } from '@/data/runners';
-import { computeAscensionMods } from '@/data/ascension';
 import { CHROMAS_BY_ID } from '@/data/chromas';
-
-export const NG_PLUS_MAX = 5;
-export function ngPlusHpMult(tier: number): number { return 1 + 0.5 * Math.max(0, Math.min(NG_PLUS_MAX, tier | 0)); }
 import { DIFFICULTY_PROFILE } from '@/game/waves';
 
 // v4 key rotation = hard reset. The 15-feature overhaul (program deck,
@@ -178,20 +174,17 @@ export function writeSave(s: SaveData): void {
   localStorage.setItem(SAVE_KEY, JSON.stringify(s));
 }
 
-export function createRun(mapId: string, difficulty: Difficulty, save: SaveData, options?: { dailyContract?: boolean; mutator?: NonNullable<import('@/types').SaveData['dailyContract']>['mutator'] }): RunState {
+export function createRun(mapId: string, difficulty: Difficulty, save: SaveData, options?: { dailyContract?: boolean; weeklyContract?: boolean; monthlyContract?: boolean; brutalMode?: boolean; mutator?: string }): RunState {
   const map = getMap(mapId);
   const d = map.difficulties[difficulty];
   const prof = DIFFICULTY_PROFILE[difficulty];
   const level = 1 + (save.metaBoosts.startingLevel ?? 0);
-  // Daily-contract runs override the player's runner with the default ('glitch')
-  // so today's challenge is the same for everyone — the leaderboard is only fair
-  // if the runner passive isn't a variable.
-  const runnerId = options?.dailyContract ? 'glitch' : (save.selectedRunner ?? 'glitch');
+  // Challenge runs (daily/weekly/monthly) force GLITCH so the seeded
+  // leaderboard stays on a single axis — same challenge, same passive.
+  const isChallenge = options?.dailyContract || options?.weeklyContract || options?.monthlyContract;
+  const runnerId = isChallenge ? 'glitch' : (save.selectedRunner ?? 'glitch');
   const runner = RUNNERS[runnerId];
-  // Ascension stacks on top of the difficulty curve. Dailies never ascend so the
-  // leaderboard stays on a single axis; campaign/survival use save.ascensionLevel.
-  const ascensionLevel = options?.dailyContract ? 0 : Math.max(0, Math.min(save.ascensionMax ?? 0, save.ascensionLevel ?? 0));
-  const asc = computeAscensionMods(ascensionLevel);
+  const brutal = options?.brutalMode ?? false;
 
   // Hard-mode turret lock: pick N random non-starter, non-FIREWALL unlocked turrets to lock
   // out this run. FIREWALL stays available because every run begins with a firewall token;
@@ -210,15 +203,22 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData,
   if (runner.bannedTower !== 'firewall' && !lockedTurrets.includes(runner.bannedTower)) {
     lockedTurrets.push(runner.bannedTower);
   }
-  // Ascension extra turret locks — pick more random non-FIREWALL towers, avoiding
-  // already-locked ones. Clamped to (unlocked - 2) so the player always has at
-  // least 2 viable towers even at max ascension.
-  if (asc.extraTurretLocks > 0 && lockable.length >= 4) {
+  // BRUTAL MODE: +2 random turret locks with two guardrails —
+  // (a) always keep at least 2 viable turrets total; (b) always keep at
+  // least one AOE or CHAIN turret unlocked so cloaked-spawn modifiers
+  // stay counterable.
+  if (brutal && lockable.length >= 5) {
+    const aoeChainIds = ['ice', 'mine', 'chain'] as const;
     const remaining = lockable.filter((t) => !lockedTurrets.includes(t));
     const shuffled = remaining.slice().sort(() => Math.random() - 0.5);
-    const maxAdditional = Math.min(asc.extraTurretLocks, Math.max(0, lockable.length - 2 - lockedTurrets.length));
-    for (let i = 0; i < maxAdditional && i < shuffled.length; i++) {
-      lockedTurrets.push(shuffled[i]);
+    const maxAdditional = Math.min(2, Math.max(0, lockable.length - 2 - lockedTurrets.length));
+    for (const candidate of shuffled) {
+      if (lockedTurrets.length - (prof.turretLockCount + (runner.bannedTower !== 'firewall' ? 1 : 0)) >= maxAdditional) break;
+      // Guard: would this lock remove the last AOE/chain turret?
+      const unlockedAoeChain = lockable.filter((t) =>
+        (aoeChainIds as readonly TowerId[]).includes(t) && !lockedTurrets.includes(t) && t !== candidate);
+      if ((aoeChainIds as readonly TowerId[]).includes(candidate) && unlockedAoeChain.length === 0) continue;
+      lockedTurrets.push(candidate);
     }
   }
 
@@ -255,8 +255,7 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData,
     spawnQueue: [],
     spawnElapsed: 0,
     mods: {
-      // Each prestige star = permanent +1% global damage. Stacks with shop adaptive_weapons.
-      globalDamagePct: (save.metaBoosts.globalDamagePct ?? 0) + 0.01 * (save.prestigeStars ?? 0) + runner.passiveDamagePct,
+      globalDamagePct: (save.metaBoosts.globalDamagePct ?? 0) + runner.passiveDamagePct,
       globalRangePct: save.metaBoosts.globalRangePct ?? 0,
       globalRatePct: (save.metaBoosts.globalRatePct ?? 0) + runner.passiveRatePct,
       globalCritChance: (save.metaBoosts.globalCritChancePct ?? 0) + runner.passiveCritPct,
@@ -298,12 +297,27 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData,
     xpThisRun: 0,
     legendariesThisRun: 0,
     isDailyContract: options?.dailyContract ?? false,
-    contractMutators: options?.mutator ? DAILY_MUTATORS_BY_ID[options.mutator]?.modifier : undefined,
+    isWeeklyContract: options?.weeklyContract ?? false,
+    isMonthlyContract: options?.monthlyContract ?? false,
+    // Mutator sources stack multiplicatively on the map's base modifiers via
+    // getEffectiveModifiers. Brutal layers all 5 at 60% strength; a challenge
+    // run's single mutator uses its own full modifier.
+    contractMutators: (() => {
+      if (brutal) {
+        return {
+          packetBursts: 0.4 * 0.6,
+          encrypted:    0.3 * 0.6,
+          stealthChance:0.25 * 0.6,
+          replication:  0.15 * 0.6,
+          rootkit:      4.0 / 0.6,  // interval — smaller is stronger; divide to ease
+        };
+      }
+      return options?.mutator ? DAILY_MUTATORS_BY_ID[options.mutator]?.modifier : undefined;
+    })(),
     runStartMs: typeof performance !== 'undefined' ? performance.now() : 0,
-    ascensionLevel,
-    ascensionHpMult: asc.hpMult * ngPlusHpMult(save.mapNgPlus?.[mapId]?.current ?? 0),
-    ascensionSpeedMult: asc.speedMult,
-    ngPlusTier: options?.dailyContract ? 0 : (save.mapNgPlus?.[mapId]?.current ?? 0),
+    brutalMode: brutal,
+    brutalHpMult: brutal ? 2.0 : 1.0,
+    brutalSpeedMult: brutal ? 1.25 : 1.0,
     chromaColors: (() => {
       const out: Partial<Record<TowerId, { accent: string; projectile: string; trail: string }>> = {};
       for (const [towerId, chromaId] of Object.entries(save.equippedChromas ?? {})) {

@@ -405,19 +405,34 @@ export interface SaveData {
   // Selected runner persona for regular runs. Each runner applies a distinct
   // passive + banned tower at run start. Default 'glitch' for returning saves.
   selectedRunner?: import('@/data/runners').RunnerId;
-  // Ascension — post-campaign stacked difficulty. Each level ratchets enemy HP
-  // + speed + turret locks + draft reduction. `ascensionLevel` is what the next
-  // run will use; `ascensionMax` is the highest unlocked. Unlock next level by
-  // hard-clearing at the current level.
-  ascensionLevel?: number;
-  ascensionMax?: number;
+  // BRUTAL MODE toggle — persists across runs once unlocked (all 7 sectors
+  // hard-cleared). Applied to every regular-map run when true.
+  brutalMode?: boolean;
   // Cosmetic chromas — unlocked via lifetime milestones, equipped per-tower.
   unlockedChromas?: string[];
   equippedChromas?: Partial<Record<TowerId, string>>;
-  // NG+ per-map state. Unlocks after any-difficulty clear (max=1), bumps by
-  // 1 each victory at the current tier, capped at NG_PLUS_MAX in state.ts.
-  // current = tier the next run will use. Enemies +50% HP per tier.
-  mapNgPlus?: Record<string, { current: number; max: number }>;
+  // Seeded weekly + monthly challenge runs. Same shape as dailyContract.
+  // Gated behind "beat campaign or unlock all base turrets" (see start.ts).
+  weeklyContract?: {
+    period: string;
+    mapId: string;
+    difficulty: Difficulty;
+    mutator: string;
+    attempts: number;
+    bestWave: number;
+    bestTimeSec: number;
+    completed: boolean;
+  };
+  monthlyContract?: {
+    period: string;
+    mapId: string;
+    difficulty: Difficulty;
+    mutator: string;
+    attempts: number;
+    bestWave: number;
+    bestTimeSec: number;
+    completed: boolean;
+  };
   stats: {
     totalRuns: number;
     totalWins: number;
@@ -529,19 +544,24 @@ export interface RunState {
   // the map's base modifiers at read time via getEffectiveModifiers(). Also
   // signals to the run-end hook to write bestWave/bestTime back to save.
   isDailyContract?: boolean;
+  isWeeklyContract?: boolean;
+  isMonthlyContract?: boolean;
   contractMutators?: MapDef['modifiers'];
   runStartMs?: number;   // performance.now() at run start, for daily best-time
   // Program deck: active abilities the player triggers with 1-4 hotkeys or by
   // clicking the program chip. Each entry pairs a program id with its current
   // cooldownLeft. Initialized in createRun with the starter deck.
   runnerId?: import('@/data/runners').RunnerId;
-  // Ascension multipliers, folded in at spawn time. 1.0 = no ascension.
-  ascensionLevel?: number;
-  ascensionHpMult?: number;
-  ascensionSpeedMult?: number;
+  // Brutal-mode enemy multipliers, folded in at spawn time. 1.0 = off.
+  brutalHpMult?: number;
+  brutalSpeedMult?: number;
   // Per-tower chroma color overrides (accent/projectile/trail) — read by the
   // renderer to tint turrets the player has cosmetically customized. Keyed on
   // TowerId; missing entry means vanilla colors.
   chromaColors?: Partial<Record<TowerId, { accent: string; projectile: string; trail: string }>>;
-  ngPlusTier?: number; // 0 = base run, each tier multiplies enemy HP by (1 + 0.5 * tier)
+  // BRUTAL MODE: stacked late-game difficulty replacing NG+/Ascension.
+  // Applies +100% enemy HP, +25% speed, 2 extra random turret locks (with a
+  // guardrail that keeps at least one AOE/chain turret available), draft
+  // size floor of 2, and all sector modifiers at 60% strength.
+  brutalMode?: boolean;
 }

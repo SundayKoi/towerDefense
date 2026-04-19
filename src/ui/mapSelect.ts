@@ -4,7 +4,6 @@ import { MAPS, isSurvival } from '@/data/maps';
 import { ENEMIES } from '@/data/enemies';
 import { TOWERS } from '@/data/towers';
 import { RUNNERS, RUNNER_IDS, type RunnerId } from '@/data/runners';
-import { ASCENSION_MAX, ASCENSION_DESCRIPTIONS } from '@/data/ascension';
 import { audio } from '@/audio/sfx';
 
 const THREAT_COLOR: Record<string, string> = {
@@ -62,20 +61,19 @@ function renderMapSelect(root: HTMLElement, save: SaveData, onPlay: (mapId: stri
         </button>
       `;
     }).join('');
-    const ascMax = save.ascensionMax ?? 0;
-    const ascLevel = Math.max(0, Math.min(ascMax, save.ascensionLevel ?? 0));
-    const ascMods = ascLevel > 0 ? ASCENSION_DESCRIPTIONS[ascLevel].join(' &middot; ') : 'None — clear any HARD map to unlock ICE DEPTH 1.';
-    const ascBar = ascMax > 0 ? `
-      <div class="asc-bar">
-        <div class="asc-head">
-          <span class="asc-lbl">ICE DEPTH</span>
-          <span class="asc-value">${ascLevel}<span class="asc-cap">/${Math.min(ascMax, ASCENSION_MAX)}</span></span>
+    // BRUTAL MODE toggle — unlocks once the player has cleared every act
+    // on hard (all 7 sectorClears). Adds +100% enemy HP, +25% speed, 2
+    // extra random turret locks (AOE/chain guaranteed), draft floor 2,
+    // all sector modifiers at 60% strength. Clears reward +50% protocols.
+    const brutalUnlocked = [1,2,3,4,5,6,7].every((n) => save.sectorClears?.[n]);
+    const brutalOn = !!save.brutalMode;
+    const brutalBar = brutalUnlocked ? `
+      <div class="brutal-bar ${brutalOn ? 'brutal-on' : ''}">
+        <div class="brutal-head">
+          <span class="brutal-lbl">BRUTAL MODE</span>
+          <button class="btn btn-ghost btn-sm" id="brutal-toggle">${brutalOn ? 'ENABLED &check;' : 'DISABLED'}</button>
         </div>
-        <div class="asc-mods">${ascMods}</div>
-        <div class="asc-controls">
-          <button class="btn btn-ghost btn-sm" id="asc-down" ${ascLevel <= 0 ? 'disabled' : ''}>&minus;</button>
-          <button class="btn btn-ghost btn-sm" id="asc-up" ${ascLevel >= ascMax ? 'disabled' : ''}>+</button>
-        </div>
+        <div class="brutal-desc">+100% enemy HP &middot; +25% speed &middot; +2 turret locks &middot; all sector modifiers at 60% &middot; +50% protocols on clear</div>
       </div>
     ` : '';
     wrap.innerHTML = `
@@ -88,7 +86,7 @@ function renderMapSelect(root: HTMLElement, save: SaveData, onPlay: (mapId: stri
         <div class="runner-bar-head">RUNNER</div>
         <div class="runner-bar-grid">${runnerCards}</div>
       </div>
-      ${ascBar}
+      ${brutalBar}
       <div class="map-list" id="map-list"></div>
     `;
     root.appendChild(wrap);
@@ -100,10 +98,8 @@ function renderMapSelect(root: HTMLElement, save: SaveData, onPlay: (mapId: stri
         rerender();
       };
     });
-    const ascUp = root.querySelector('#asc-up') as HTMLButtonElement | null;
-    const ascDn = root.querySelector('#asc-down') as HTMLButtonElement | null;
-    if (ascUp) ascUp.onclick = () => { audio.play('ui_click'); save.ascensionLevel = Math.min(save.ascensionMax ?? 0, (save.ascensionLevel ?? 0) + 1); rerender(); };
-    if (ascDn) ascDn.onclick = () => { audio.play('ui_click'); save.ascensionLevel = Math.max(0, (save.ascensionLevel ?? 0) - 1); rerender(); };
+    const brutalBtn = root.querySelector('#brutal-toggle') as HTMLButtonElement | null;
+    if (brutalBtn) brutalBtn.onclick = () => { audio.play('ui_click'); save.brutalMode = !save.brutalMode; rerender(); };
 
     const list = root.querySelector('#map-list') as HTMLElement;
 
@@ -177,22 +173,6 @@ function renderMapSelect(root: HTMLElement, save: SaveData, onPlay: (mapId: stri
             </button>`;
           }).join('')}
         </div>
-        ${(() => {
-          const ng = save.mapNgPlus?.[m.id];
-          if (!ng || ng.max === 0) return '';
-          const cur = Math.min(ng.current, ng.max);
-          const hpPct = Math.round((1 + 0.5 * cur - 1) * 100);
-          const rewardPct = Math.round(0.25 * cur * 100);
-          return `
-            <div class="ng-row" data-map="${m.id}">
-              <span class="ng-lbl">NG+</span>
-              <button class="ng-step" data-act="down" data-map="${m.id}" ${cur <= 0 ? 'disabled' : ''}>&minus;</button>
-              <span class="ng-value">${cur}<span class="ng-max">/${ng.max}</span></span>
-              <button class="ng-step" data-act="up" data-map="${m.id}" ${cur >= ng.max ? 'disabled' : ''}>+</button>
-              <span class="ng-desc">${cur === 0 ? 'Standard run' : `+${hpPct}% enemy HP &middot; +${rewardPct}% protocols`}</span>
-            </div>
-          `;
-        })()}
       `;
       list.appendChild(row);
     };
@@ -225,18 +205,6 @@ function renderMapSelect(root: HTMLElement, save: SaveData, onPlay: (mapId: stri
         onPlay(map, diff);
       });
       btn.addEventListener('mouseenter', () => audio.play('ui_hover'));
-    });
-    list.querySelectorAll<HTMLButtonElement>('.ng-step').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const mapId = btn.dataset.map!;
-        const dir = btn.dataset.act === 'up' ? 1 : -1;
-        if (!save.mapNgPlus) save.mapNgPlus = {};
-        const entry = save.mapNgPlus[mapId] ?? { current: 0, max: 0 };
-        entry.current = Math.max(0, Math.min(entry.max, entry.current + dir));
-        save.mapNgPlus[mapId] = entry;
-        audio.play('ui_click');
-        rerender();
-      });
     });
   }
 }

@@ -6,7 +6,6 @@ import { ENEMY_PORT, TOWER_EXPLOITS } from '@/data/ports';
 import { CHROMAS, CHROMAS_BY_ID } from '@/data/chromas';
 import { MAPS, isSurvival } from '@/data/maps';
 import { RUNNERS, RUNNER_IDS } from '@/data/runners';
-import { ASCENSION_DESCRIPTIONS, ASCENSION_MAX } from '@/data/ascension';
 import { DIFFICULTY_PROFILE } from '@/game/waves';
 import { mount, type Screen } from './screens';
 import { audio } from '@/audio/sfx';
@@ -256,7 +255,6 @@ function databankScreen(save: SaveData, onBack: () => void): Screen {
 
 function renderProgressionTab(save: SaveData): string {
   const campaign = MAPS.filter((m) => !isSurvival(m.id)).slice().sort((a, b) => a.order - b.order);
-  const ascensionMax = save.ascensionMax ?? 0;
   const out: string[] = [];
 
   out.push(`<div class="db-summary">PROGRESSION // how everything unlocks and scales</div>`);
@@ -328,28 +326,17 @@ function renderProgressionTab(save: SaveData): string {
   }
   out.push(`</tbody></table></div>`);
 
-  // ── ASCENSION ──────────────────────────────────────────────────────
-  out.push(`<div class="progress-section"><div class="progress-head">ICE DEPTH / ASCENSION</div>`);
-  out.push(`<div class="progress-sub">Unlocked by winning any map on HARD. Each new level unlocks by winning at the current max. Apply from the RUNNER/DEPTH bar on the intrusion select screen.</div>`);
-  out.push(`<div class="progress-sub">Your max: <b class="db-accent">${ascensionMax}</b> / ${ASCENSION_MAX}</div>`);
-  out.push(`<table class="progress-table progress-table-compact"><thead><tr><th>LEVEL</th><th>EFFECTS</th></tr></thead><tbody>`);
-  for (let lvl = 1; lvl <= ASCENSION_MAX; lvl++) {
-    const effects = ASCENSION_DESCRIPTIONS[lvl] ?? [];
-    const unlocked = lvl <= ascensionMax;
-    out.push(`<tr class="${unlocked ? '' : 'db-row-locked'}">
-      <td class="db-asc-level">${lvl}${unlocked ? '' : ' &#128274;'}</td>
-      <td>${effects.join(' &middot; ')}</td>
-    </tr>`);
-  }
-  out.push(`</tbody></table></div>`);
-
-  // ── NG+ ────────────────────────────────────────────────────────────
-  out.push(`<div class="progress-section"><div class="progress-head">NG+</div>`);
-  out.push(`<div class="progress-sub">Per-map replay tier. First victory unlocks NG+1; each subsequent victory at the current tier bumps it by 1 (max 5). Each tier multiplies enemy HP and rewards.</div>`);
-  out.push(`<table class="progress-table progress-table-compact"><thead><tr><th>TIER</th><th>ENEMY HP</th><th>PROTOCOL REWARD</th></tr></thead><tbody>`);
-  for (let t = 0; t <= 5; t++) {
-    out.push(`<tr><td>${t}</td><td>+${t * 50}%</td><td>+${t * 25}%</td></tr>`);
-  }
+  // ── BRUTAL MODE ────────────────────────────────────────────────────
+  const brutalUnlocked = [1,2,3,4,5,6,7].every((n) => save.sectorClears?.[n]);
+  out.push(`<div class="progress-section"><div class="progress-head">BRUTAL MODE</div>`);
+  out.push(`<div class="progress-sub">Unlocked after clearing all 7 acts on HARD (your status: <b class="db-accent">${brutalUnlocked ? 'UNLOCKED' : 'LOCKED'}</b>). Single toggle on the intrusion select screen that re-layers the campaign:</div>`);
+  out.push(`<table class="progress-table progress-table-compact"><thead><tr><th>EFFECT</th><th>VALUE</th></tr></thead><tbody>`);
+  out.push(`<tr><td>Enemy HP</td><td>+100%</td></tr>`);
+  out.push(`<tr><td>Enemy speed</td><td>+25%</td></tr>`);
+  out.push(`<tr><td>Extra random turret locks</td><td>+2 (AOE/chain guaranteed unlocked)</td></tr>`);
+  out.push(`<tr><td>Draft floor</td><td>2 options (never below)</td></tr>`);
+  out.push(`<tr><td>Sector modifiers</td><td>all 5 active at 60% strength</td></tr>`);
+  out.push(`<tr><td>Clear reward</td><td>+50% protocols</td></tr>`);
   out.push(`</tbody></table></div>`);
 
   // ── RUNNERS ────────────────────────────────────────────────────────

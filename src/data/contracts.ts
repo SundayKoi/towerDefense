@@ -235,3 +235,56 @@ export function ensureDailyContract(save: SaveData): boolean {
   }
   return false;
 }
+
+// Weekly and monthly seeded challenges use the same roll pipeline but with a
+// different period + seed prefix, so all players share the same (map,
+// difficulty, mutator) triple for the whole week / month. Weeklies favor
+// hard / epic mutators; monthlies force all-HARD as a "signature long run".
+export function rollWeeklyContract(save: SaveData, period: string): NonNullable<SaveData['weeklyContract']> {
+  const campaignMaps = MAPS.filter((m) => !isSurvival(m.id));
+  const unlocked = campaignMaps.filter((m) => save.completed[m.id]?.easy || save.completed[m.id]?.medium || save.completed[m.id]?.hard);
+  const pool = unlocked.length > 0 ? unlocked : campaignMaps.slice(0, 3);
+  let seed = hashString('weekly:' + period);
+  const rng = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0x100000000; };
+  const map = pool[Math.floor(rng() * pool.length)];
+  // Weekly bias: medium + hard weighted.
+  const diffPool: Difficulty[] = ['medium', 'hard', 'hard'];
+  const difficulty = diffPool[Math.floor(rng() * diffPool.length)];
+  const mutatorPool = DAILY_MUTATORS.filter((m) => !m.availableFor || m.availableFor(save));
+  const pickPool = mutatorPool.length > 0 ? mutatorPool : [DAILY_MUTATORS[0]];
+  const mutator = pickPool[Math.floor(rng() * pickPool.length)];
+  return { period, mapId: map.id, difficulty, mutator: mutator.id, attempts: 0, bestWave: 0, bestTimeSec: 0, completed: false };
+}
+
+export function rollMonthlyContract(save: SaveData, period: string): NonNullable<SaveData['monthlyContract']> {
+  const campaignMaps = MAPS.filter((m) => !isSurvival(m.id));
+  const unlocked = campaignMaps.filter((m) => save.completed[m.id]?.hard || save.completed[m.id]?.medium || save.completed[m.id]?.easy);
+  const pool = unlocked.length > 0 ? unlocked : campaignMaps.slice(0, 3);
+  let seed = hashString('monthly:' + period);
+  const rng = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0x100000000; };
+  const map = pool[Math.floor(rng() * pool.length)];
+  // Monthly is always HARD — the signature long-form challenge.
+  const difficulty: Difficulty = 'hard';
+  const mutatorPool = DAILY_MUTATORS.filter((m) => !m.availableFor || m.availableFor(save));
+  const pickPool = mutatorPool.length > 0 ? mutatorPool : [DAILY_MUTATORS[0]];
+  const mutator = pickPool[Math.floor(rng() * pickPool.length)];
+  return { period, mapId: map.id, difficulty, mutator: mutator.id, attempts: 0, bestWave: 0, bestTimeSec: 0, completed: false };
+}
+
+export function ensureWeeklyContract(save: SaveData): boolean {
+  const period = currentPeriodId('weekly');
+  if (!save.weeklyContract || save.weeklyContract.period !== period) {
+    save.weeklyContract = rollWeeklyContract(save, period);
+    return true;
+  }
+  return false;
+}
+
+export function ensureMonthlyContract(save: SaveData): boolean {
+  const period = currentPeriodId('monthly');
+  if (!save.monthlyContract || save.monthlyContract.period !== period) {
+    save.monthlyContract = rollMonthlyContract(save, period);
+    return true;
+  }
+  return false;
+}

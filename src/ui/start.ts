@@ -1,49 +1,70 @@
 import type { Screen } from './screens';
 import type { SaveData } from '@/types';
 import { audio } from '@/audio/sfx';
-import { ensureDailyContract, DAILY_MUTATORS_BY_ID } from '@/data/contracts';
-import { getMap } from '@/data/maps';
+import {
+  ensureDailyContract, ensureWeeklyContract, ensureMonthlyContract,
+  DAILY_MUTATORS_BY_ID,
+} from '@/data/contracts';
+import { getMap, isSurvival, MAPS } from '@/data/maps';
+import { TOWERS } from '@/data/towers';
 
-// Daily contract unlocks after the player has cleared 3 maps. Brand-new
-// players with only 3 starter turrets can't reasonably handle the rotated
-// mutators (GHOST PROTOCOL, ROOTKIT SWEEP, etc.), so we gate the card until
-// they have a few unlocks under their belt.
-const DAILY_CONTRACT_CLEAR_GATE = 3;
-
-function dailyContractUnlocked(save: SaveData): boolean {
-  const cleared = Object.values(save.completed ?? {}).filter((c) => c && (c.easy || c.medium || c.hard)).length;
-  return cleared >= DAILY_CONTRACT_CLEAR_GATE;
+// Challenge runs unlock once the player has either fully beaten the campaign
+// (every non-survival map cleared on hard) OR unlocked every base turret.
+// Either condition signals "endgame ready" which is when seeded rotating
+// challenges become meaningful. Before then the player needs the core
+// progression loop and doesn't benefit from mutator-laden dailies.
+function challengesUnlocked(save: SaveData): boolean {
+  const campaign = MAPS.filter((m) => !isSurvival(m.id));
+  const allCampaignHardCleared = campaign.every((m) => !!save.completed[m.id]?.hard);
+  const allTurretsUnlocked = (Object.keys(TOWERS) as Array<keyof typeof TOWERS>).every((id) => save.unlockedTowers.includes(id));
+  return allCampaignHardCleared || allTurretsUnlocked;
 }
 
-export function startScreen(save: SaveData, onJackIn: () => void, onSettings: () => void, onShop: () => void, onDatabank: () => void, onHowToPlay: () => void, onDailyContract: () => void): Screen {
+export type ChallengeKind = 'daily' | 'weekly' | 'monthly';
+
+export function startScreen(
+  save: SaveData,
+  onJackIn: () => void,
+  onSettings: () => void,
+  onShop: () => void,
+  onDatabank: () => void,
+  onHowToPlay: () => void,
+  onChallenge: (kind: ChallengeKind) => void,
+): Screen {
   return (root) => {
-    const stars = save.prestigeStars ?? 0;
-    const prestigeMarkup = stars > 0 ? `&#9733; \u00D7 ${stars}` : '';
-    const dcUnlocked = dailyContractUnlocked(save);
-    let dcBlock = '';
-    if (dcUnlocked) {
+    const unlocked = challengesUnlocked(save);
+    let challengeBlock = '';
+    if (unlocked) {
       ensureDailyContract(save);
-      const dc = save.dailyContract!;
-      const dcMap = getMap(dc.mapId);
-      const dcMut = DAILY_MUTATORS_BY_ID[dc.mutator];
-      const dcBest = dc.bestWave > 0 ? `BEST WAVE ${dc.bestWave}${dc.completed ? ' &#9733;' : ''}` : 'NO ATTEMPTS YET';
-      dcBlock = `
-        <div class="daily-contract-card" id="daily-contract">
-          <div class="dc-head">
-            <span class="dc-lbl">TODAY'S CONTRACT</span>
-            <span class="dc-period">${dc.period}</span>
+      ensureWeeklyContract(save);
+      ensureMonthlyContract(save);
+      const card = (kind: ChallengeKind, label: string, dc: NonNullable<SaveData['dailyContract']>) => {
+        const dcMap = getMap(dc.mapId);
+        const dcMut = DAILY_MUTATORS_BY_ID[dc.mutator];
+        const dcBest = dc.bestWave > 0 ? `BEST WAVE ${dc.bestWave}${dc.completed ? ' &#9733;' : ''}` : 'NO ATTEMPTS YET';
+        return `
+          <div class="daily-contract-card">
+            <div class="dc-head">
+              <span class="dc-lbl">${label}</span>
+              <span class="dc-period">${dc.period}</span>
+            </div>
+            <div class="dc-mission">
+              <span class="dc-map" style="color:${dcMap.accentColor}">${dcMap.name}</span>
+              <span class="dc-diff dc-diff-${dc.difficulty}">${dc.difficulty.toUpperCase()}</span>
+            </div>
+            <div class="dc-mutator">
+              <span class="dc-mut-name">${dcMut?.name ?? dc.mutator}</span>
+              <span class="dc-mut-flavor">${dcMut?.flavor ?? ''}</span>
+            </div>
+            <div class="dc-best">${dcBest}</div>
+            <button class="btn btn-ghost" data-challenge="${kind}">&#x25B6; ATTEMPT</button>
           </div>
-          <div class="dc-mission">
-            <span class="dc-map" style="color:${dcMap.accentColor}">${dcMap.name}</span>
-            <span class="dc-diff dc-diff-${dc.difficulty}">${dc.difficulty.toUpperCase()}</span>
-          </div>
-          <div class="dc-mutator">
-            <span class="dc-mut-name">${dcMut?.name ?? dc.mutator}</span>
-            <span class="dc-mut-flavor">${dcMut?.flavor ?? ''}</span>
-          </div>
-          <div class="dc-best">${dcBest}</div>
-          <button class="btn btn-ghost" id="btn-daily-run">&#x25B6; ATTEMPT</button>
-        </div>
+        `;
+      };
+      challengeBlock = `
+        ${card('daily',   "TODAY'S CONTRACT",   save.dailyContract!)}
+        ${card('weekly',  "WEEKLY CHALLENGE",   save.weeklyContract!)}
+        ${card('monthly', "MONTHLY CHALLENGE",  save.monthlyContract!)}
       `;
     }
     root.innerHTML = `
@@ -55,9 +76,8 @@ export function startScreen(save: SaveData, onJackIn: () => void, onSettings: ()
           <div class="logo-sub">// INTRUSION DEFENSE</div>
           <div class="logo-line"></div>
           <div class="logo-flavor">A cyberpunk roguelike tower defense</div>
-          <div class="prestige-row" id="prestige-row"${stars === 0 ? ' style="display:none"' : ''}>${prestigeMarkup}</div>
         </div>
-        ${dcBlock}
+        ${challengeBlock}
         <div class="start-buttons">
           <button class="btn btn-primary btn-lg" id="btn-jack-in">
             <span class="glitch" data-text="JACK IN">JACK IN</span>
@@ -80,9 +100,8 @@ export function startScreen(save: SaveData, onJackIn: () => void, onSettings: ()
     sh.onclick = () => { audio.play('ui_click'); onShop(); };
     db.onclick = () => { audio.play('ui_click'); onDatabank(); };
     ht.onclick = () => { audio.play('ui_click'); onHowToPlay(); };
-    if (dcUnlocked) {
-      const dcBtn = root.querySelector('#btn-daily-run') as HTMLButtonElement;
-      dcBtn.onclick = () => { audio.play('ui_click'); onDailyContract(); };
-    }
+    root.querySelectorAll<HTMLButtonElement>('[data-challenge]').forEach((btn) => {
+      btn.onclick = () => { audio.play('ui_click'); onChallenge(btn.dataset.challenge as ChallengeKind); };
+    });
   };
 }

@@ -145,8 +145,8 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
   }
   // Ascension stacks on top of base scaling — cleanly multiplicative so the
   // player sees "8% more HP per level" directly in their run feel.
-  if (s.ascensionHpMult && s.ascensionHpMult > 1) hp *= s.ascensionHpMult;
-  const speed = def.speed * (s.mods.enemySpeedMult) * (1 + Math.min(0.3, (s.wave - 1) * 0.01)) * (s.ascensionSpeedMult ?? 1);
+  if (s.brutalHpMult && s.brutalHpMult > 1) hp *= s.brutalHpMult;
+  const speed = def.speed * (s.mods.enemySpeedMult) * (1 + Math.min(0.3, (s.wave - 1) * 0.01)) * (s.brutalSpeedMult ?? 1);
   const path = map.paths[pathIndex] ?? map.paths[0];
   const start = path.points[0];
 

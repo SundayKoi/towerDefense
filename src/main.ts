@@ -17,7 +17,7 @@ import { openHowToPlayScreen, showTutorialIfNew, showActBriefingIfNew } from '@/
 import { mount } from '@/ui/screens';
 import { audio } from '@/audio/sfx';
 import { haptics } from '@/audio/haptics';
-import { addToAllPeriods, currentPeriodId, ensureDailyContract } from '@/data/contracts';
+import { addToAllPeriods, currentPeriodId, ensureDailyContract, ensureWeeklyContract, ensureMonthlyContract } from '@/data/contracts';
 import { refreshChromaUnlocks } from '@/data/chromas';
 import { RUNNERS } from '@/data/runners';
 import type { CardDef, Difficulty, EnemyId, RunState, SaveData, TowerId } from '@/types';
@@ -126,7 +126,6 @@ const startAudio = () => {
 window.addEventListener('pointerdown', startAudio, { once: true });
 
 function showStart() {
-  ensureDailyContract(save);
   mount(startScreen(
     save,
     () => showMapSelect(),
@@ -134,18 +133,28 @@ function showStart() {
     () => openShopScreen(save, () => writeSave(save), showStart),
     () => openDatabankScreen(save, showStart),
     () => openHowToPlayScreen(showStart),
-    () => startDailyContract(),
+    (kind) => startChallengeRun(kind),
   ));
 }
 
-function startDailyContract() {
-  ensureDailyContract(save);
-  const dc = save.dailyContract!;
-  startRun(dc.mapId, dc.difficulty, { dailyContract: true, mutator: dc.mutator });
+function startChallengeRun(kind: 'daily' | 'weekly' | 'monthly') {
+  if (kind === 'daily') {
+    ensureDailyContract(save);
+    const dc = save.dailyContract!;
+    startRun(dc.mapId, dc.difficulty, { dailyContract: true, mutator: dc.mutator });
+  } else if (kind === 'weekly') {
+    ensureWeeklyContract(save);
+    const dc = save.weeklyContract!;
+    startRun(dc.mapId, dc.difficulty, { weeklyContract: true, mutator: dc.mutator });
+  } else {
+    ensureMonthlyContract(save);
+    const dc = save.monthlyContract!;
+    startRun(dc.mapId, dc.difficulty, { monthlyContract: true, mutator: dc.mutator });
+  }
 }
 
 function showMapSelect() {
-  mount(mapSelectScreen(save, (mapId, diff) => startRun(mapId, diff), showStart));
+  mount(mapSelectScreen(save, (mapId, diff) => startRun(mapId, diff, { brutalMode: !!save.brutalMode }), showStart));
 }
 
 // ---------- Run lifecycle ----------
@@ -166,7 +175,7 @@ function runRunCleanups() {
   runCleanups = [];
 }
 
-function startRun(mapId: string, difficulty: Difficulty, contractOpts?: { dailyContract?: boolean; mutator?: string }) {
+function startRun(mapId: string, difficulty: Difficulty, contractOpts?: { dailyContract?: boolean; weeklyContract?: boolean; monthlyContract?: boolean; brutalMode?: boolean; mutator?: string }) {
   save.stats.totalRuns += 1;
   writeSave(save);
   run = createRun(mapId, difficulty, save, contractOpts);
@@ -586,10 +595,11 @@ function pauseRun() {
     () => {
       if (!run) return;
       const mid = run.mapId, d = run.difficulty;
+      const wasBrutal = !!run.brutalMode;
       cancelAnimationFrame(rafId);
       runRunCleanups();
       run = null; runHandles = null;
-      startRun(mid, d);
+      startRun(mid, d, { brutalMode: wasBrutal });
     },
     () => {
       cancelAnimationFrame(rafId);
@@ -623,7 +633,9 @@ function openLevelUpDraft() {
   // Tutorial: explain card drafts on the player's first ever level-up.
   showTutorialIfNew(save, () => writeSave(save), 'first_levelup');
   const unlocked = new Set(save.unlockedCards);
-  const cardCount = Math.max(1, DIFFICULTY_PROFILE[r.difficulty].draftSize + (save.metaBoosts.extraDraftCards ?? 0) - Math.floor((r.ascensionLevel ?? 0) / 3));
+  // Brutal mode keeps the difficulty's own draft size (with minimum 2 as a
+  // guardrail). No ascension-based reduction anymore.
+  const cardCount = Math.max(2, DIFFICULTY_PROFILE[r.difficulty].draftSize + (save.metaBoosts.extraDraftCards ?? 0));
   const ctx = buildDraftContext(r);
   r.draftOptions = drawDraft(r.level, unlocked, ctx, cardCount, r.cardsPicked);
   r.draftSource = 'level';
@@ -688,19 +700,28 @@ function finishRun(victory: boolean) {
     save.stats.survivalBestWave = run.wave;
   }
 
-  // Daily contract score tracking. Records bestWave (always) and bestTimeSec
-  // (only on victory). Locked to the current period so a run started yesterday
-  // doesn't retroactively post to today's contract.
-  if (run.isDailyContract && save.dailyContract && save.dailyContract.period === currentPeriodId('daily')) {
-    const dc = save.dailyContract;
-    dc.attempts += 1;
-    if (run.wave > dc.bestWave) dc.bestWave = run.wave;
+  // Challenge contract score tracking — daily/weekly/monthly. Each is locked
+  // to its current period so a run started in a prior period can't retroactively
+  // post. bestTimeSec only updates on victory.
+  const recordChallenge = (
+    active: boolean | undefined,
+    contract: NonNullable<SaveData['dailyContract']> | undefined,
+    freq: 'daily' | 'weekly' | 'monthly',
+  ) => {
+    if (!active || !contract || contract.period !== currentPeriodId(freq)) return;
+    contract.attempts += 1;
+    if (run!.wave > contract.bestWave) contract.bestWave = run!.wave;
     if (victory) {
-      const elapsedSec = run.runStartMs ? Math.round((performance.now() - run.runStartMs) / 1000) : 0;
-      if (!dc.completed || elapsedSec < dc.bestTimeSec || dc.bestTimeSec === 0) dc.bestTimeSec = elapsedSec;
-      dc.completed = true;
+      const elapsedSec = run!.runStartMs ? Math.round((performance.now() - run!.runStartMs) / 1000) : 0;
+      if (!contract.completed || elapsedSec < contract.bestTimeSec || contract.bestTimeSec === 0) {
+        contract.bestTimeSec = elapsedSec;
+      }
+      contract.completed = true;
     }
-  }
+  };
+  recordChallenge(run.isDailyContract,   save.dailyContract,   'daily');
+  recordChallenge(run.isWeeklyContract,  save.weeklyContract,  'weekly');
+  recordChallenge(run.isMonthlyContract, save.monthlyContract, 'monthly');
 
   // Update per-period contract stats for daily/weekly/monthly
   {
@@ -729,28 +750,10 @@ function finishRun(victory: boolean) {
     const c = (save.completed[run.mapId] ?? {});
     c[run.difficulty] = true;
     save.completed[run.mapId] = c;
-    // Ascension unlock: hard-win at the current max bumps it by one, up to
-    // ASCENSION_MAX. Non-hard or non-max wins don't advance the ladder.
-    if (run.difficulty === 'hard' && !run.isDailyContract) {
-      const curLevel = run.ascensionLevel ?? 0;
-      const max = save.ascensionMax ?? 0;
-      if (curLevel >= max && max < 10) {
-        save.ascensionMax = max + 1;
-      }
-    }
-    // NG+ unlock / bump. Any-difficulty victory unlocks NG+1 for this map; if
-    // the run was already at the current max NG+ tier, bump max to current+1.
-    // Dailies don't advance NG+ (the leaderboard stays on a single tier).
-    if (!run.isDailyContract) {
-      if (!save.mapNgPlus) save.mapNgPlus = {};
-      const entry = save.mapNgPlus[run.mapId] ?? { current: 0, max: 0 };
-      const ran = run.ngPlusTier ?? 0;
-      if (ran >= entry.max && entry.max < 5) entry.max = entry.max + 1;
-      save.mapNgPlus[run.mapId] = entry;
-    }
-    // Clear bonus protocols — NG+ tiers multiply the reward by (1 + 0.25 * tier).
+    // Clear bonus protocols. Brutal mode gets a +50% reward bump to offset
+    // the extra difficulty.
     const baseClearBonus = run.difficulty === 'hard' ? 100 : run.difficulty === 'medium' ? 50 : 20;
-    const clearBonus = Math.round(baseClearBonus * (1 + 0.25 * (run.ngPlusTier ?? 0)));
+    const clearBonus = Math.round(baseClearBonus * (run.brutalMode ? 1.5 : 1));
     save.protocols += clearBonus;
     save.stats.totalProtocolsEarned += clearBonus;
     run.protocolsEarned += clearBonus;
@@ -803,7 +806,10 @@ function finishRun(victory: boolean) {
         unlocks.push({ kind: 'card', id: 'protocols_bonus', name: `+${amount} PROTOCOLS`, rarity: 'rare' });
       }
     }
-    // Prestige star check: did this hard clear complete every map in the act?
+    // Sector-clear tracking: when every map in the act is hard-cleared, mark
+    // the sector complete. Used as the unlock gate for BRUTAL MODE (all 7
+    // sectors cleared). Prestige-star damage bonus + display removed — the
+    // act-clear payout now lives as a flat protocol reward only.
     if (run.difficulty === 'hard') {
       const map = getMap(run.mapId);
       if (map.sector !== undefined && !save.sectorClears[map.sector]) {
@@ -811,15 +817,10 @@ function finishRun(victory: boolean) {
         const allCleared = sectorMaps.every((m) => save.completed[m.id]?.hard);
         if (allCleared) {
           save.sectorClears[map.sector] = true;
-          save.prestigeStars = (save.prestigeStars ?? 0) + 1;
-          // Meaningful one-time reward per prestige star so the system feels like
-          // real progression, not just a cosmetic +1% damage tick. Scales with
-          // sector — later acts require more mastery and should pay out more.
-          const prestigeBonus = 250 + map.sector * 100; // Act 1 = 350, Act 7 = 950
-          save.protocols += prestigeBonus;
-          save.stats.totalProtocolsEarned += prestigeBonus;
-          unlocks.push({ kind: 'card', id: 'prestige_star', name: `\u2605 ACT ${map.sector} PRESTIGE STAR  +${prestigeBonus}P`, rarity: 'legendary' });
-          haptics.fire('prestige_earned');
+          const actBonus = 250 + map.sector * 100; // Act 1 = 350, Act 7 = 950
+          save.protocols += actBonus;
+          save.stats.totalProtocolsEarned += actBonus;
+          unlocks.push({ kind: 'card', id: 'act_clear', name: `ACT ${map.sector} CLEARED  +${actBonus}\u25c7`, rarity: 'legendary' });
         }
       }
     }
@@ -827,10 +828,11 @@ function finishRun(victory: boolean) {
   writeSave(save);
   openGameOver(run, victory, unlocks, () => {
     const mid = run!.mapId, d = run!.difficulty;
+    const wasBrutal = !!run!.brutalMode;
     cancelAnimationFrame(rafId);
     runRunCleanups();
     run = null; runHandles = null; hoverCell = null;
-    startRun(mid, d);
+    startRun(mid, d, { brutalMode: wasBrutal });
   }, () => {
     cancelAnimationFrame(rafId);
     runRunCleanups();

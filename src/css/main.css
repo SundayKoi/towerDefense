@@ -416,55 +416,30 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
   margin-top: 2px;
 }
 
-.asc-bar {
+.brutal-bar {
   margin: 0 0 20px;
   padding: 10px 12px;
-  background: rgba(8, 2, 16, 0.72);
-  border: 1px solid rgba(255, 45, 149, 0.35);
+  background: rgba(16, 0, 0, 0.72);
+  border: 1px solid rgba(255, 51, 85, 0.4);
   border-radius: 4px;
   font-family: 'Orbitron', sans-serif;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.asc-bar .asc-head {
+.brutal-bar.brutal-on {
+  background: rgba(28, 0, 0, 0.85);
+  border-color: var(--red);
+  box-shadow: 0 0 18px rgba(255, 51, 85, 0.35);
+}
+.brutal-bar .brutal-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
 }
-.asc-bar .asc-lbl { font-size: 11px; letter-spacing: 2.5px; color: var(--magenta); font-weight: 700; }
-.asc-bar .asc-value { font-size: 18px; font-weight: 700; color: var(--magenta); }
-.asc-bar .asc-cap { font-size: 11px; color: var(--text-dim); font-weight: 400; }
-.asc-bar .asc-mods { font-size: 10.5px; letter-spacing: 1px; color: var(--text); opacity: 0.85; }
-.asc-bar .asc-controls { display: flex; gap: 6px; align-self: flex-start; }
-.asc-bar .btn-sm { padding: 2px 12px; font-size: 14px; line-height: 1; }
-
-.ng-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  margin-top: 8px;
-  background: rgba(0, 4, 14, 0.55);
-  border: 1px solid rgba(0, 255, 240, 0.25);
-  font-family: 'Orbitron', sans-serif;
-  font-size: 10px;
-  letter-spacing: 1.5px;
-}
-.ng-row .ng-lbl { color: var(--cyan); font-weight: 700; letter-spacing: 2px; }
-.ng-row .ng-step {
-  padding: 0 8px;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--cyan);
-  background: transparent;
-  border: 1px solid var(--cyan);
-  cursor: pointer;
-}
-.ng-row .ng-step[disabled] { opacity: 0.3; cursor: not-allowed; }
-.ng-row .ng-value { color: var(--yellow); font-size: 14px; font-weight: 700; }
-.ng-row .ng-max { color: var(--text-dim); font-size: 10px; font-weight: 400; }
-.ng-row .ng-desc { color: var(--text-dim); font-size: 9.5px; margin-left: auto; }
+.brutal-bar .brutal-lbl { font-size: 12px; letter-spacing: 3px; color: var(--red); font-weight: 700; }
+.brutal-bar .brutal-desc { font-size: 10px; letter-spacing: 0.8px; color: var(--text); opacity: 0.85; }
+.brutal-bar .btn-sm { padding: 3px 12px; font-size: 11px; line-height: 1; color: var(--red); border-color: var(--red); }
 
 .map-list {
   display: flex;
