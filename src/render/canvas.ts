@@ -1012,11 +1012,20 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
     ctx.fill();
     ctx.restore();
   }
-  // Invisibility fade (stealth)
+  // Invisibility fade.
+  // - def.invisChance: static per-enemy "phasing" flicker (GHOST-type enemies).
+  // - e.invisTimer > 0: runtime permanent-cloak flag set by the GHOST PROTOCOL
+  //   sector modifier / daily mutator. Renders at a low alpha so the player
+  //   can see that cloaked spawns are arriving, not just that things feel off.
   let alpha = 1;
   if (def.invisChance) {
     const flicker = (Math.sin(t * 3 + e.id) + 1) / 2;
     alpha = flicker < def.invisChance ? 0.25 : 1;
+  }
+  if (e.invisTimer > 0) {
+    // Animated shimmer so cloaked enemies pulse rather than sit at flat alpha.
+    const shimmer = 0.15 + 0.1 * ((Math.sin(t * 2.4 + e.id * 0.7) + 1) / 2);
+    alpha = Math.min(alpha, shimmer);
   }
   ctx.globalAlpha = alpha;
 
