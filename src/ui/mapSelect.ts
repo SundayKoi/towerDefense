@@ -128,6 +128,17 @@ function renderMapSelect(root: HTMLElement, save: SaveData, onPlay: (mapId: stri
       }
     }
 
+    // Zone-based difficulty unlocks: clear every map in a sector on EASY to
+    // unlock MEDIUM for that whole sector; clear every map on MEDIUM to unlock
+    // HARD. Replaces the old per-map sequential gating. Computed once up-front
+    // so every map row reads the same flag.
+    const sectorMediumUnlocked: Record<number, boolean> = {};
+    const sectorHardUnlocked: Record<number, boolean> = {};
+    for (const [sectorNum, sectorMaps] of sectors) {
+      sectorMediumUnlocked[sectorNum] = sectorMaps.every((mm) => save.completed[mm.id]?.easy);
+      sectorHardUnlocked[sectorNum] = sectorMaps.every((mm) => save.completed[mm.id]?.medium);
+    }
+
     const renderMapRow = (m: MapDef) => {
       const unlocked = unlockStatus[m.id];
       const survival = isSurvival(m.id);
@@ -163,7 +174,15 @@ function renderMapSelect(root: HTMLElement, save: SaveData, onPlay: (mapId: stri
         <div class="diff-row">
           ${['easy','medium','hard'].map((d) => {
             const done = (compl as any)[d];
-            const locked = !unlocked || (!survival && d !== 'easy' && !(compl as any)[prevDiff(d as Difficulty)]);
+            // Zone-based gating: medium unlocks when every map in the sector is
+            // easy-cleared; hard unlocks when every map in the sector is medium-
+            // cleared. Survival skips all gates.
+            const sec = m.sector;
+            let locked = !unlocked;
+            if (!locked && !survival && sec !== undefined) {
+              if (d === 'medium' && !sectorMediumUnlocked[sec]) locked = true;
+              if (d === 'hard' && !sectorHardUnlocked[sec]) locked = true;
+            }
             const waveLabel = survival ? '\u221e WAVES' : m.difficulties[d as Difficulty].waves + ' WAVES';
             return `<button class="diff-btn diff-${d}${locked ? ' locked' : ''}${done ? ' done' : ''}" data-map="${m.id}" data-diff="${d}" ${locked ? 'disabled' : ''}>
               <div class="diff-label">${d.toUpperCase()}</div>
@@ -207,9 +226,4 @@ function renderMapSelect(root: HTMLElement, save: SaveData, onPlay: (mapId: stri
       btn.addEventListener('mouseenter', () => audio.play('ui_hover'));
     });
   }
-}
-
-function prevDiff(d: Difficulty): Difficulty {
-  if (d === 'medium') return 'easy';
-  return 'medium';
 }
