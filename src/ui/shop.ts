@@ -83,7 +83,11 @@ function shopScreen(save: SaveData, persist: () => void, onBack: () => void): Sc
           if (items.length === 0) continue;
           html += `<div class="shop-section-title">${catLabels[cat]}</div><div class="shop-grid">`;
           for (const u of items) {
-            const stacks = save.shopPurchased[u.id] ?? 0;
+            // Display clamps to maxStacks so old saves that purchased past a
+            // since-lowered cap don't show "20 / 10". The raw count stays in
+            // save for forward compat if we raise caps again.
+            const rawStacks = save.shopPurchased[u.id] ?? 0;
+            const stacks = Math.min(rawStacks, u.maxStacks);
             const maxed = stacks >= u.maxStacks;
             const nextCost = maxed ? 0 : shopCost(u, stacks + 1);
             const afford = !maxed && save.protocols >= nextCost;

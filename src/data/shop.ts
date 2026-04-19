@@ -3,26 +3,34 @@ import type { ShopUpgradeDef, SaveData } from '@/types';
 // Meta-progression purchases. Protocols earned persist across runs.
 // Effects write to save.metaBoosts which createRun reads when seeding a new RunState.
 
+// REBALANCE (v2): shop stacks were too decisive — max adaptive-weapons alone
+// gave +40% damage and CRITICAL MATRIX pushed crit chance so high that
+// quantum was crit-on-every-shot. New philosophy: shop upgrades are a gentle
+// "new game" lean, not a power spike. Per-stack effects are small,
+// generic boosts cap at 10 stacks, and costs ramp hard so committing to
+// the full cap takes real play time. Specialty upgrades (NEURAL BOOSTER,
+// CARD BANDWIDTH, REVIVE, ARMOR CRACK, etc.) keep smaller stack caps
+// because their per-stack impact is too strong to scale to 10.
 export const SHOP_UPGRADES: ShopUpgradeDef[] = [
-  // ── COMBAT ───────────────────────────────────────────────────────────────
+  // ── COMBAT (generic stat boosts — +1%/stack, cap 10) ────────────────────
   {
     id: 'adaptive_weapons',
     name: 'ADAPTIVE WEAPONS',
-    description: 'Every run begins with +2% global damage. Stacks up to 20x.',
+    description: '+1% global damage per stack. Max 10 stacks (+10%).',
     icon: '▲',
-    baseCost: 30,
-    stackStep: 20,
-    maxStacks: 20,
+    baseCost: 50,
+    stackStep: 60,
+    maxStacks: 10,
     category: 'power',
-    effect: (save: SaveData, stacks: number) => { save.metaBoosts.globalDamagePct = stacks * 0.02; },
+    effect: (save: SaveData, stacks: number) => { save.metaBoosts.globalDamagePct = stacks * 0.01; },
   },
   {
     id: 'neural_booster',
     name: 'NEURAL BOOSTER',
-    description: 'Start each run at level +1 with a free draft. Max 2 stacks — skipping further past early drafts warps the branch commitment curve.',
+    description: 'Start each run at level +1 with a free draft. Max 2 stacks — further skips past early drafts warp branch commitment.',
     icon: '∆',
-    baseCost: 120,
-    stackStep: 180,
+    baseCost: 250,
+    stackStep: 400,
     maxStacks: 2,
     category: 'power',
     effect: (save: SaveData, stacks: number) => { save.metaBoosts.startingLevel = stacks; },
@@ -30,55 +38,55 @@ export const SHOP_UPGRADES: ShopUpgradeDef[] = [
   {
     id: 'critical_matrix',
     name: 'CRITICAL MATRIX',
-    description: 'All towers gain +2% crit chance per run. Stacks up to 15x.',
+    description: '+0.5% crit chance per stack. Max 10 stacks (+5%).',
     icon: '◈',
-    baseCost: 40,
-    stackStep: 30,
-    maxStacks: 15,
+    baseCost: 60,
+    stackStep: 70,
+    maxStacks: 10,
     category: 'power',
-    effect: (save: SaveData, stacks: number) => { save.metaBoosts.globalCritChancePct = stacks * 0.02; },
+    effect: (save: SaveData, stacks: number) => { save.metaBoosts.globalCritChancePct = stacks * 0.005; },
   },
   {
     id: 'overclocked',
     name: 'OVERCLOCKED CORE',
-    description: 'All towers fire +3% faster per run. Stacks up to 10x.',
+    description: '+1% fire rate per stack. Max 10 stacks (+10%).',
     icon: '⚡',
-    baseCost: 50,
-    stackStep: 40,
+    baseCost: 60,
+    stackStep: 70,
     maxStacks: 10,
     category: 'power',
-    effect: (save: SaveData, stacks: number) => { save.metaBoosts.globalRatePct = stacks * 0.03; },
+    effect: (save: SaveData, stacks: number) => { save.metaBoosts.globalRatePct = stacks * 0.01; },
   },
   {
     id: 'extended_sensors',
     name: 'EXTENDED SENSORS',
-    description: 'All towers gain +2% range per run. Stacks up to 10x.',
+    description: '+1% turret range per stack. Max 10 stacks (+10%).',
     icon: '◎',
-    baseCost: 45,
-    stackStep: 35,
+    baseCost: 50,
+    stackStep: 60,
     maxStacks: 10,
     category: 'power',
-    effect: (save: SaveData, stacks: number) => { save.metaBoosts.globalRangePct = stacks * 0.02; },
+    effect: (save: SaveData, stacks: number) => { save.metaBoosts.globalRangePct = stacks * 0.01; },
   },
   {
     id: 'hardened_core',
     name: 'HARDENED CORE',
-    description: 'Start each run with +15 bonus HP. Stacks up to 5x.',
+    description: '+5 starting HP per stack. Max 10 stacks (+50 HP).',
     icon: '♦',
     baseCost: 60,
-    stackStep: 80,
-    maxStacks: 5,
+    stackStep: 70,
+    maxStacks: 10,
     category: 'power',
-    effect: (save: SaveData, stacks: number) => { save.metaBoosts.bonusStartingHp = stacks * 15; },
+    effect: (save: SaveData, stacks: number) => { save.metaBoosts.bonusStartingHp = stacks * 5; },
   },
 
-  // ── AUGMENTS ──────────────────────────────────────────────────────────────
+  // ── AUGMENTS (specialty — smaller caps, each stack matters more) ────────
   {
     id: 'revive_module',
     name: 'REVIVE MODULE',
     description: 'Once per run, survive a lethal hit at 1 HP instead of dying.',
     icon: '↺',
-    baseCost: 300,
+    baseCost: 500,
     stackStep: 0,
     maxStacks: 1,
     category: 'loadout',
@@ -87,32 +95,32 @@ export const SHOP_UPGRADES: ShopUpgradeDef[] = [
   {
     id: 'suppression_field',
     name: 'SUPPRESSION FIELD',
-    description: 'All enemies move 3% slower per run. Stacks up to 5x.',
+    description: '-1% enemy speed per stack. Max 10 stacks (-10%).',
     icon: '⇓',
-    baseCost: 50,
-    stackStep: 50,
-    maxStacks: 5,
+    baseCost: 70,
+    stackStep: 80,
+    maxStacks: 10,
     category: 'loadout',
-    effect: (save: SaveData, stacks: number) => { save.metaBoosts.enemySpeedDebuff = stacks * 0.03; },
+    effect: (save: SaveData, stacks: number) => { save.metaBoosts.enemySpeedDebuff = stacks * 0.01; },
   },
   {
     id: 'repair_protocol',
     name: 'REPAIR PROTOCOL',
-    description: 'Recover +2 HP each wave cleared. Stacks up to 4x.',
+    description: '+1 HP/wave per stack. Max 10 stacks (+10 HP/wave).',
     icon: '♥',
-    baseCost: 70,
-    stackStep: 60,
-    maxStacks: 4,
+    baseCost: 80,
+    stackStep: 90,
+    maxStacks: 10,
     category: 'loadout',
-    effect: (save: SaveData, stacks: number) => { save.metaBoosts.hpRegenPerWave = stacks * 2; },
+    effect: (save: SaveData, stacks: number) => { save.metaBoosts.hpRegenPerWave = stacks * 1; },
   },
   {
     id: 'armor_crack',
     name: 'ARMOR CRACK',
-    description: 'All enemies spawn with -1 armor per run. Stacks up to 3x.',
+    description: '-1 enemy armor per stack. Max 3 stacks — a full -3 already shifts mid-game weighting.',
     icon: '⚔',
-    baseCost: 60,
-    stackStep: 50,
+    baseCost: 120,
+    stackStep: 160,
     maxStacks: 3,
     category: 'loadout',
     effect: (save: SaveData, stacks: number) => { save.metaBoosts.globalArmorReduction = stacks; },
@@ -120,25 +128,23 @@ export const SHOP_UPGRADES: ShopUpgradeDef[] = [
   {
     id: 'bounty_chip',
     name: 'BOUNTY CHIP',
-    description: 'Earn +1 extra Protocol per boss kill. Stacks up to 5x.',
+    description: '+1 protocol per boss kill per stack. Max 5 stacks.',
     icon: '◈',
-    baseCost: 80,
-    stackStep: 60,
+    baseCost: 120,
+    stackStep: 130,
     maxStacks: 5,
     category: 'loadout',
     effect: (save: SaveData, stacks: number) => { save.metaBoosts.bossProtocolBonus = stacks; },
   },
 
   // ── ECONOMY ───────────────────────────────────────────────────────────────
-  // PROTOCOL AUDIT removed — stacking XP boost past wave 20 blew past the
-  // draft pool even after nerfing the rate.
   {
     id: 'data_harvest',
     name: 'DATA HARVEST',
-    description: 'Earn +1 bonus Protocol each wave cleared. Max 3 stacks.',
+    description: '+1 bonus Protocol per wave cleared per stack. Max 3 stacks.',
     icon: '◆',
-    baseCost: 80,
-    stackStep: 90,
+    baseCost: 150,
+    stackStep: 200,
     maxStacks: 3,
     category: 'economy',
     effect: (save: SaveData, stacks: number) => { save.metaBoosts.bonusProtocolsPerWave = stacks; },
@@ -148,10 +154,10 @@ export const SHOP_UPGRADES: ShopUpgradeDef[] = [
   {
     id: 'card_bandwidth',
     name: 'CARD BANDWIDTH',
-    description: 'Draw +1 card option per draft. Stacks up to 2x.',
+    description: '+1 card option per draft. Max 2 stacks — each extra pick heavily weights RNG.',
     icon: '●●',
-    baseCost: 200,
-    stackStep: 400,
+    baseCost: 400,
+    stackStep: 700,
     maxStacks: 2,
     category: 'utility',
     effect: (save: SaveData, stacks: number) => { save.metaBoosts.extraDraftCards = stacks; },
@@ -159,11 +165,11 @@ export const SHOP_UPGRADES: ShopUpgradeDef[] = [
   {
     id: 'reroll_cache',
     name: 'REROLL CACHE',
-    description: 'Start each draft with +1 reroll available. Stacks up to 4x.',
+    description: '+1 starting draft reroll per stack. Max 5 stacks.',
     icon: '↻',
-    baseCost: 60,
-    stackStep: 70,
-    maxStacks: 4,
+    baseCost: 90,
+    stackStep: 100,
+    maxStacks: 5,
     category: 'utility',
     effect: (save: SaveData, stacks: number) => { save.metaBoosts.extraRerolls = stacks; },
   },
@@ -197,7 +203,12 @@ export function recomputeMetaBoosts(save: SaveData): void {
     bossProtocolBonus: 0,
   };
   for (const u of SHOP_UPGRADES) {
-    const stacks = save.shopPurchased[u.id] ?? 0;
+    // Clamp to maxStacks so old saves that bought past a now-lower cap don't
+    // over-apply the effect. Excess shopPurchased counts are preserved so a
+    // future cap raise still honors the purchase; they just don't stack past
+    // the current ceiling.
+    const raw = save.shopPurchased[u.id] ?? 0;
+    const stacks = Math.min(raw, u.maxStacks);
     if (stacks > 0) u.effect(save, stacks);
   }
 }
