@@ -982,7 +982,9 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
     const splitAmt = isCritFlash ? 2 : 0;
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(e.angle + (def.spriteAngleOffset ?? 0));
+    // DIAGNOSTIC: rotation disabled to expose the sheet's native sprite facing.
+    // Reinstate once we know which way the sprites face in sprites.png.
+    // ctx.rotate(e.angle + (def.spriteAngleOffset ?? 0));
     ctx.scale(scaleX, scaleY);
     if (splitAmt > 0) {
       // RGB chromatic split for crit hits — brief 1-2 frames.
