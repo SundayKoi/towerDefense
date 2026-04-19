@@ -135,9 +135,16 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
 
 /* ------------- Start Screen ------------- */
 
+/* Backdrop behind start-screen content so the retrowave bg-canvas (sun +
+   perspective grid) doesn't bleed through title/buttons and kill legibility.
+   The screen-center layout already centers; we just darken a column behind
+   the logo + button stack. */
 .start-logo {
   text-align: center;
-  margin-bottom: 60px;
+  margin-bottom: 40px;
+  padding: 32px 40px 24px;
+  background: radial-gradient(ellipse at center, rgba(5, 8, 14, 0.88) 0%, rgba(5, 8, 14, 0.7) 70%, transparent 100%);
+  border-radius: 4px;
 }
 .logo-row { position: relative; line-height: 1; }
 .logo-primary {
@@ -193,7 +200,25 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: min(320px, 80vw);
+  width: min(340px, 82vw);
+  padding: 18px 16px;
+  background: rgba(5, 8, 14, 0.78);
+  border: 1px solid rgba(0, 255, 240, 0.2);
+  border-radius: 4px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.4);
+}
+/* Start-screen buttons get an opaque dark base so their neon borders read
+   against the sun+grid bg. The cyan/magenta tints stay on top as a faint wash. */
+.start-buttons .btn {
+  background:
+    linear-gradient(180deg, rgba(0, 255, 240, 0.1), rgba(0, 255, 240, 0.02)),
+    rgba(8, 12, 20, 0.85);
+}
+.start-buttons .btn-primary {
+  background:
+    linear-gradient(180deg, rgba(255, 45, 149, 0.2), rgba(255, 45, 149, 0.04)),
+    rgba(8, 12, 20, 0.88);
 }
 
 .build-tag {
