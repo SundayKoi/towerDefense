@@ -1,212 +1,656 @@
 ═══════════════════════════════════════════════════════════════════════════════
-NETRUNNER — TURRET + MONSTER ROSTER
+NETRUNNER — COMPLETE ROSTER
+(turrets, branch upgrades, enemies, and special mechanics)
 ═══════════════════════════════════════════════════════════════════════════════
 
-╔═══════════════════════════════════════════════════════════════════════════╗
-║  TURRETS  (14 total — 3 starters + 11 unlocked across acts 1–4)           ║
-╚═══════════════════════════════════════════════════════════════════════════╝
+Notation
+  DMG  damage per shot        RATE  shots/second         TYPE  damage channel
+  RNG  range in grid cells    HP    hit points           SPD   path speed
+  [*]  rare-rarity card       [C]   capstone (last card in a branch)
 
-─── DPS / FRONTLINE ──────────────────────────────────────────────────────────
+Singleton rule: only 1 of each turret type per run. Branch keystones are
+mutually exclusive — picking one locks out the other two for that turret.
 
-[FIREWALL]                          starter
-  damage: 14   range: 2.4   rate: 1.3/s   type: KINETIC
-  Kinetic rounds. Reliable frontline, cheap to field.
-  → Every run starts with a FIREWALL deploy token.
+═══════════════════════════════════════════════════════════════════════════════
+RUNNERS  (pick one per run — swaps the starting passive + bans one turret)
+═══════════════════════════════════════════════════════════════════════════════
 
-[ANTIVIRUS]                         starter
-  damage: 60   range: 3.8   rate: 0.55/s   type: PIERCE
-  Long-range pierce sniper. Cracks armor with precision.
+[GLITCH]                 OFFENSE
+  +15% global damage · +8% global crit chance
+  BANS: BOOSTER NODE
+  "Pushes turrets past spec. Nothing survives the uptime."
 
-[QUANTUM]                           unlock: Act 1 Map 2 (NEXUS HUB) — easy
-  damage: 24   range: 2.8   rate: 1.4/s   type: ENERGY
-  35% crit chance, 3.5× crit damage. Crits ignore phase resistance.
+[WARDEN]                 DEFENSE
+  +5 starting HP · +1 HP/wave regen
+  BANS: RAILGUN
+  "Trades glass cannons for rock-solid sustain."
 
-[CHAIN LIGHTNING]                   unlock: Act 1 Map 3 (MAINFRAME) — easy
-  damage: 42   range: 2.5   rate: 0.75/s   type: CHAIN
-  Arcs through 3 nearby enemies, 0.8 falloff per jump.
-  ⚠ Useless against CORRUPTOR (chain-immune).
+[ARCHITECT]              ECONOMY
+  +10% global fire rate · +1 starting level (free draft)
+  BANS: OVERWATCH (sniper)
+  "Cards in hand, eddies in bank. Wins through tempo."
 
-[ICE-BREAKER]                       unlock: Act 1 Map 4 (DATA LAKE) — easy
-  damage: 90   range: 2.8   rate: 0.4/s   type: AOE
-  AoE shredder, 0.95 explosion radius. Reveals stealth, shreds swarms.
 
-[ARTILLERY]                         unlock: Act 2 Map 8 (INFERNET) — medium
-  damage: 60   range: 5.5   rate: 0.55/s   type: AOE
-  Heavy artillery — slow firing, massive 1.6 AoE radius.
-  Lobs high-arc shells. Best against dense groups.
+═══════════════════════════════════════════════════════════════════════════════
+TURRETS  (14 total)
+═══════════════════════════════════════════════════════════════════════════════
 
-[OVERWATCH] (sniper)                unlock: Act 3 Map 9 (HARDLOCK) — easy
-  damage: 380   range: 6.5   rate: 0.18/s   type: PIERCE
-  Extreme range, massive damage, 40% crit at 4×. Single-target precision.
+───────────────────────────────────────────────────────────────────────────────
+[FIREWALL]                                                       starter
+  DMG 14   RNG 2.4   RATE 1.3/s   TYPE KINETIC
+  Kinetic rounds. HEAT BUILDUP: +10% damage per consecutive shot on same
+  target, max +50% at streak 6. Streak resets on target change.
+  EXPLOIT: SMB (+25% vs worm/spider/glitch/daemon/swarm)
 
-[RAILGUN]                           unlock: Act 3 Map 11 (BASTION) — easy
-  damage: 220   range: 5.0   rate: 0.25/s   type: PIERCE
-  Pierces every enemy in a line. Ignores most armor.
+  Branch: SUPPRESSION (starter — slow/CC identity)
+    SUPPRESSION PROTOCOL    shots slow enemies 20% for 1.2s
+    TRACER ROUNDS            shots mark targets — marked take +30% for 2s
+ [*] HUNTER INSTINCT         tracer marks last 4s (was 2s), grant +45%
+    INCENDIARY.EXE           leaves small fire zone burning nearby enemies
+ [*] CHILL CASCADE           slow strengthened to 35%, applies to ricochets
+ [C] TOTAL LOCKDOWN          +25% crit chance. Crits fully stop enemies 0.4s
 
-─── SUPPORT / CONTROL ────────────────────────────────────────────────────────
+  Branch: BURST (unlock: sector-4 map 1, hard clear)
+    BURST PROTOCOL           every 4th shot fires triple spread
+    FRAG ROUNDS              spread shots detonate in 0.5-cell AoE
+ [*] RICOCHET                 shots ricochet to a 2nd enemy for 55% damage
+    BLAZE PROTOCOL           3 kills in 5s → 2s of +25% fire rate
+ [*] OVERDRIVE                kills shorten next cooldown by 0.4s (crits 0.8s)
+ [C] PENTA BURST              every 4th shot is a 5-way burst spread
 
-[HONEYPOT]                          starter
-  damage: 4   range: 2.0   rate: 1.8/s   type: ENERGY
-  Slows 45% for 1.8s. Low damage, critical for crowd control.
-  Drops sticky goo puddles on hit.
+  Branch: SIEGE (unlock: sector-6 map 1, easy clear)
+    SIEGE LOADOUT            +25% damage, +0.4 range
+    HOLLOW POINT             shots ignore 5 armor per hit
+ [*] SIEGE CALIBRATION        +20% crit chance
+    FOCUSED FIRE             +30% damage when one enemy in range (15 + 15 cond)
+ [*] ARMOR CRUSHER            double damage to enemies above 75% HP
+ [C] OBLITERATE               2× HP% damage to targets above 75% HP
 
-[EMP ARRAY] (pulse)                 unlock: Act 2 Map 7 (ORBITAL) — easy
-  damage: 55   range: 2.2   rate: 1 burst/2.5s   type: ENERGY
+───────────────────────────────────────────────────────────────────────────────
+[HONEYPOT]                                                       starter
+  DMG 4   RNG 2.0   RATE 1.8/s   TYPE ENERGY
+  Slows 45% for 1.8s. Low damage, critical for crowd control. Drops goo
+  puddles at impact that slow anything inside.
+  EXPLOIT: DNS (+25% vs leech/parasite)
+
+  Branch: VENOM (starter)
+    ACID BATH                puddles burn enemies for 10 dps
+    PERSISTENT PAYLOAD       puddles last twice as long
+ [*] VISCOUS PAYLOAD          puddles slow enemies 55% (was 40%)
+    SLOW DRAIN               puddles last 50% longer (stacks with PERSISTENT)
+ [*] TOXIC BLOOM              acid kills leave 3s micro-puddles (8 dps)
+ [C] CORROSION CASCADE        acid DPS doubled (20), acid stacks on enemies
+
+  Branch: CONTAINMENT (unlock: sector-4 map 2, hard clear)
+    CONTAINMENT FIELD        puddles double in radius
+    VIRAL COATING            slowed enemies spread 50% slow on contact
+ [*] EXPANDED CACHE           +30% range. Drops puddles farther afield
+    SOLID GOO                slow inside puddles raised to 70% (overrides viscous)
+ [*] NET OF LIES              puddles last +75% longer when stacked
+ [C] TARPIT                   enemies inside puddles can't leave for 2s
+
+  Branch: VOLATILE (unlock: sector-6 map 1, hard clear)
+    GOO DETONATION           deaths in puddle detonate for 80 AoE
+    VOLATILE MIXTURE         puddles explode on expire (30 AoE)
+ [*] CHAIN GOO                detonations leave 1.5s goo at blast point
+    PRESSURE BUILD           +20% damage, +0.2 range
+ [*] OVERPRESSURE             detonation damage +60% (80 → 128)
+ [C] CHAIN DETONATION         deaths ignite all adjacent puddles
+
+───────────────────────────────────────────────────────────────────────────────
+[ANTIVIRUS]                                                      starter
+  DMG 30   RNG 3.8   RATE 0.55/s   TYPE PIERCE
+  Long-range pierce sniper. Cracks armor with precision. Fires 2 projectiles
+  per shot (base); scales to 5 with PENTA VOLLEY.
+  EXPLOIT: SSH (+25% vs trojan/rootkit/juggernaut/leviathan)
+
+  Branch: MARK (starter)
+    LOCKDOWN                 marks targets — marked take +30% for 2s
+    QUARANTINE               hits apply 30% slow for 1.2s
+ [*] VIRAL MARK               marked-enemy deaths spread mark to 2 nearby
+    FOCUS FIRE               consecutive hits on same enemy +10% (cap +30%)
+ [*] ADAPTIVE TARGETING       +15% vs armor-stripped enemies
+ [C] SURGICAL DOMINANCE       marked take +75% from all (was +30%)
+
+  Branch: VOLLEY (unlock: sector-6 map 2, easy clear)
+    TRIPLE SCAN              fires 3 projectiles per shot
+    BURST MODE               fires 4th shot instantly after burst
+ [*] PRECISION TARGETING      secondary shots always crit
+    PRECISION BURST          precision crits deal +50% bonus damage
+ [*] OVERDRIVE SCAN           every 3rd kill triggers a free instant-crit shot
+ [C] PENTA VOLLEY             fires 5 shots per volley
+
+  Branch: PIERCE (unlock: sector-4 map 3, hard clear)
+    DEEP SCAN                shots ignore 6 armor on hit
+    ARMOR MELT               hits permanently strip 1 armor per shot
+ [*] BLAST CALIBRATION        +20% damage
+    EXPLOIT WINDOW           armor-stripped take +25% from ANTIVIRUS shots
+ [*] ULTRASONIC SHOT          projectiles +60% speed, +0.4 range
+ [C] ARMOR ANNIHILATION       each hit cracks 5 armor permanently
+
+───────────────────────────────────────────────────────────────────────────────
+[QUANTUM]                              unlock: Act 1 map 2 (NEXUS HUB) · easy
+  DMG 24   RNG 2.8   RATE 1.4/s   TYPE ENERGY
+  35% crit chance, 3.5× crit mult. Crits ignore phase resistance (PHANTOM,
+  VOID LORD). Synergizes hard with SUPERPOSITION for double-fire chains.
+  EXPLOIT: HTTP (+25% vs phantom/wraith/stealth/voidlord)
+
+  Branch: SUPERPOSITION (starter)
+    SUPERPOSITION            35% chance to fire twice per shot
+    UNSTABLE CORE            +8% crit chance
+ [*] RESONANCE                if first shot crits, double-shot also crits
+    SUPERCHARGE              post-crit: next shot +50% dmg (5s CD)
+ [*] CRITICAL TUNE            +12% crit chance, +10% damage
+ [C] DECOHERENCE OVERLOAD     +50% crit chance (flat)
+
+  Branch: COLLAPSE (unlock: Act 4 map 4, easy clear)
+    WAVE COLLAPSE            hits reduce target armor 50% for 1.5s
+    PHASE SHIFT              shots ignore ALL enemy armor
+ [*] ANTIMATTER               each crit permanently +2% damage (max +30%)
+    UNCERTAINTY              entanglement arcs reduce target armor 25% for 2s
+ [*] ENTANGLEMENT             crits arc to nearest enemy for 60% damage
+ [C] PERMANENT COLLAPSE       COLLAPSE armor reduction is permanent
+
+  Branch: OBSERVER (unlock: Act 6 map 2, hard clear)
+    OBSERVER EFFECT          0.5s idle → next crit +0.5 mult (max +3.0)
+    PATIENT GAZE             observer charges 50% faster
+ [*] SCRY                     +0.6 range, +20% damage
+    RESEARCHER               observer charge cap +50% (extra +1.5 mult)
+ [*] ANTIMATTER LENS          observer-charged shots ignore all armor
+ [C] ABSOLUTE OBSERVER        observer max +5.0 mult (~×8 crit total)
+
+───────────────────────────────────────────────────────────────────────────────
+[CHAIN LIGHTNING]                     unlock: Act 1 map 3 (MAINFRAME) · easy
+  DMG 22   RNG 2.5   RATE 0.75/s   TYPE CHAIN
+  Arcs through 3 nearby enemies, 0.8 falloff per jump. AOE/chain towers
+  detect cloaked enemies and reveal them on hit.
+  EXPLOIT: ICMP (+25% vs bomber/corruptor/kernel)
+  WARNING: Useless against CORRUPTOR (chain-immune) and dampened vs
+  LEVIATHAN (40%) and WRAITH (35%).
+
+  Branch: STORM (starter)
+    STORM SURGE              +2 extra arc targets
+    ARC NOVA                 arc reach doubles
+ [*] MEGAVOLT                 every 6th shot has no arc limit
+    TESLA COIL               megavolt shots leave electric puddles (15 dps)
+ [*] STORM RANGE              +0.6 range
+ [C] TWELVE-FOLD              base jump count raised to 12
+
+  Branch: VOLTAGE (unlock: Act 4 map 4, hard clear)
+    FULL DISCHARGE           arcs deal full damage — no falloff
+    OVERCHARGE               arcs deal +20% per jump
+ [*] CONDUCTOR                +35% damage to slowed enemies
+    PERSISTENT ARC           arcs leave 0.6s burn (10 dps) at each hit
+ [*] VOLTAGE TUNING           +30% damage
+ [C] MEGAVOLT GENERATOR       no falloff + +50% base damage
+
+  Branch: GROUND FAULT (unlock: Act 7 map 1, easy clear)
+    GROUND FAULT             each hit stuns 0.35s
+    FEEDBACK LOOP            stunned → marked (+30% from all)
+ [*] GROUNDING SPIKE          stun duration +0.25s
+    FAULT STRESS             stunned take +25% damage from CHAIN
+ [*] EARTHED                  +20% damage, stun applies to 1st arc also
+ [C] TOTAL GROUND             every arc applies 0.8s stun
+
+───────────────────────────────────────────────────────────────────────────────
+[ICE-BREAKER]                         unlock: Act 1 map 4 (DATA LAKE) · easy
+  DMG 45   RNG 2.8   RATE 0.4/s   TYPE AOE
+  AoE shredder. Reveals stealth on hit. 0.95 radius. Great for swarms.
+  EXPLOIT: SMB (+25% vs worm/spider/glitch/daemon/swarm)
+
+  Branch: BLIZZARD (starter)
+    BLIZZARD FIELD           explosion radius +70%
+    GLACIAL FIELD            explosions leave 3s slow field (25%)
+ [*] ICE LANCE                radius +20% more (stacks)
+    BRITTLE COATING          slowed enemies take +15% from ALL sources
+ [*] PERMAFROST               hits leave 3s cryo field slowing 20%
+ [C] GLACIAL CHAIN            explosions chain to nearby enemy (60% dmg)
+
+  Branch: DEEP FREEZE (unlock: Act 4 map 4, medium clear)
+    ABSOLUTE ZERO            full-stop for 0.6s instead of slowing
+    DEEP FREEZE              freeze duration 1.0s (was 0.6s)
+ [*] AVALANCHE                hits on stopped enemies 2× damage, wider
+    CRYO RECYCLE             +20% fire rate
+ [*] FROST CORE               +25% damage to slowed enemies
+ [C] BOSS FREEZE              slow-immune bosses can be frozen 0.6s
+
+  Branch: CRYO SHARD (unlock: Act 6 map 3, medium clear)
+    SHARD STORM              blasts spawn 6 slow fields in a ring
+    CRYO NOVA                shard fields deal 8 dps
+ [*] SHARP SHARDS             shard DPS doubled (16)
+    FROST KINETICS           +0.5 range, +15% damage
+ [*] SHARD ECHO               shard fields last 50% longer
+ [C] OCTAGONAL SHARDS         every shot → 8 shard fields
+
+───────────────────────────────────────────────────────────────────────────────
+[ARTILLERY]                                   unlock: Act 2 map 4 · medium
+  DMG 35   RNG 5.5   RATE 0.55/s   TYPE AOE   RADIUS 1.6
+  Heavy artillery. Slow-firing, massive AoE. Lobs high-arc shells.
+  EXPLOIT: ICMP (+25% vs bomber/corruptor/kernel)
+
+  Branch: BARRAGE (starter)
+    CLUSTER MUNITIONS        +2 additional shells nearby
+    FRAGMENTATION ROUNDS     each shell scatters 3 mini-blasts (40%)
+ [*] CHAIN DETONATION         cluster shells deal full damage (was 70%)
+    AUTO-LOADER              +25% fire rate
+ [*] ADVANCED TARGETING       +0.4 range
+ [C] TRIPLE BARRAGE           every shot is a 3-shell volley
+
+  Branch: DEMOLITION (unlock: Act 5 map 1, easy clear)
+    HEAVY SHELLS             explosion radius doubles
+    DEMOLITION WARHEAD       wide-radius shells +35% damage
+ [*] SHOCKWAVE SHELLS         explosions stun all in blast 1.2s
+    PENETRATOR SHELLS        strip 10 armor in blast for 4s
+ [*] WARHEAD TUNING           +25% damage
+ [C] EARTH-SHAKER             +80% damage, -20% fire rate
+
+  Branch: SCORCH (unlock: Act 6 map 4, easy clear)
+    NANOBOT PAYLOAD          35% chance impact leaves acid (3s, 12 dps)
+    PHOSPHORUS LOAD          nanobot DPS doubled (24)
+ [*] EXTENDED BURN            nanobot duration doubled (6s)
+    INCENDIARY TARGETING     nanobot proc chance → 100%
+ [*] WIDE BURN                nanobot radius +50%
+ [C] INFERNO ZONE             every impact → 5s, 30 dps burn zone
+
+───────────────────────────────────────────────────────────────────────────────
+[DISRUPTOR] (scrambler)                             unlock: Act 2 map 1 · easy
+  DMG 10   RNG 2.4   RATE 2.8/s   TYPE ENERGY
+  Rapid bolts strip 3 armor per hit for 3s. Enables combos — ANTIVIRUS +25%
+  vs armor-stripped, SIGNAL BREAK slows them further.
+  EXPLOIT: HTTP (+25% vs phantom/wraith/stealth/voidlord)
+
+  Branch: DECRYPT (starter)
+    DEEP SCAN                strips 6 armor per hit (was 3)
+    DEEP HACK                +2 additional armor strip per hit
+ [*] BROADCAST                pulses apply armor strip to ALL in range
+    NULL FIELD               BROADCAST also slows 20% for 1.5s
+ [*] DECRYPT TUNE             +0.4 range, +20% fire rate
+ [C] TOTAL DECRYPT            strips 12 armor per hit
+
+  Branch: SABOTAGE (unlock: Act 5 map 3, hard clear)
+    CRIPPLE                  debuffed enemies move 30% slower
+    SIGNAL FEEDBACK          +0.5 fire rate per debuffed enemy in range
+ [*] EXPLOIT CHAIN            consecutive hits +8% dmg (max +40%)
+    SIGNAL BREAK             armor-stripped get 20% slow for 1.5s
+ [*] SABOTAGE TUNE            +20% damage
+ [C] TOTAL SABOTAGE           debuffed take 2× damage from all sources
+
+  Branch: CRASH (unlock: Act 7 map 3, easy clear)
+    OVERWRITE                20% chance hit nullifies armor 2.5s
+    SYSTEM CRASH             nullified enemies marked for +40% from all
+ [*] OVERWRITE BOOST          proc chance raised to 35%
+    CRASH RANGE              +0.6 range
+ [*] CASCADE FAILURE          nullified enemies emit a small EMP burst
+ [C] KERNEL PANIC             every 5th hit fully nullifies (0 armor, 50% slow, 3s)
+
+───────────────────────────────────────────────────────────────────────────────
+[EMP ARRAY] (pulse)                                unlock: Act 2 map 3 · easy
+  DMG 32   RNG 2.2   RATE 0.4/s   TYPE ENERGY   RADIUS 2.2 (matches range)
   Radial EM burst every 2.5s. Hits every enemy in range simultaneously.
+  EXPLOIT: DNS (+25% vs leech/parasite)
 
-[DISRUPTOR] (scrambler)             unlock: Act 2 Map 5 (NEON DISTRICT) — easy
-  damage: 10   range: 2.4   rate: 2.8/s   type: ENERGY
-  Rapid bolts strip 3 armor per hit for 3s.
-  Enables lethal combos with other turrets.
+  Branch: FREQUENCY (starter)
+    HIGH FREQUENCY           recharge reduced by 0.7s
+    RAPID RESONANCE          recharge reduced by additional 0.4s
+ [*] AMPLIFIER                range +0.6 cells
+    CONCUSSIVE PULSE         pushes enemies 0.12 cells back toward start
+ [*] CASCADE                  pushes enemies 0.15 cells back toward start
+ [C] STROBE BURST             fires every 0.8s
 
-[SENTINEL NODE]                     unlock: Act 3 Map 12 (KEEPSAKE) — medium
-  damage: 12/sec   range: 2.8   passive field   type: ENERGY
-  Passive field — 12 dmg/s and 20% slow to all enemies in range.
-  No projectiles.
+  Branch: OVERLOAD (unlock: Act 5 map 2, medium clear)
+    OVERLOAD PULSE           every 4th burst = 3× damage
+    OVERLOAD SHOCK           overloads also slow 40% for 1.5s
+ [*] POWER CAPACITOR          +15% damage
+    STUN BURST               bursts stun every enemy hit 0.5s
+ [*] OVERLOAD AMP             +20% damage
+ [C] ETERNAL OVERLOAD         every burst is an overload (3× damage)
 
-─── PASSIVE / AURA ───────────────────────────────────────────────────────────
+  Branch: IONIC (unlock: Act 7 map 2, easy clear)
+    IONIC CHARGE             burst damage ignores all armor
+    STUN COIL                bursts stun every enemy 0.5s
+ [*] IONIC TUNE               +25% damage
+    STATIC FIELD             +0.4 range, pierces shielded enemies
+ [*] CHARGED IONS             bursts strip 2 armor on hit
+ [C] PERMANENT STRIP          bursts strip 4 armor permanently
 
-[BOOSTER NODE]                      unlock: Act 1 Map 1 (GRID.01) — easy
-  damage: 0   range: 1.5   passive support
-  Adjacent turrets gain +25% damage and +15% fire rate. No attack.
+───────────────────────────────────────────────────────────────────────────────
+[OVERWATCH] (sniper)                               unlock: Act 3 map 1 · easy
+  DMG 180   RNG 6.5   RATE 0.18/s   TYPE PIERCE
+  Extreme range, massive damage. 40% crit @ 4× mult. Single-target precision.
+  EXPLOIT: SSH (+25% vs trojan/rootkit/juggernaut/leviathan)
 
-[DECRYPT NODE] (data_miner)         unlock: Act 4 Map 13 (GLITCHWIRE) — easy
-  damage: 0   range: 2.0   passive aura
-  Enemies inside aura take +15% damage from ALL sources. No combat.
+  Branch: MARKSMAN (starter)
+    CALLOUT                  marks targets — marked +30% for 3s
+    INCENDIARY ROUND         shots burn marked targets (12 dps for 2s)
+ [*] MARKSMAN TUNE            +20% damage
+    GHOST ROUND              shots ignore 5 armor
+ [*] PERSISTENT MARK          marks last 50% longer
+ [C] BRAND OF DEATH           marks last the rest of the run
+
+  Branch: EXECUTIONER (unlock: Act 5 map 3, easy clear)
+    EXECUTE                  3× damage to enemies below 25% HP
+    DEADEYE                  execute threshold raises to 35% HP
+ [*] ONE SHOT                 crits vs marked kill non-bosses below 40% HP
+    APEX PREDATOR            ONE SHOT threshold raises to 50% HP
+ [*] RAPID SCAN               each kill reduces next shot CD by 0.8s
+ [C] EXECUTIONER'S MARK       execute threshold raises to 50% HP
+
+  Branch: SPOTTER (unlock: Act 7 map 2, medium clear)
+    THERMAL SCOPE            reveals cloaked enemies in full range
+    SPOTTER PROTOCOL         reveals + marks stealth 1.5s
+ [*] WIDE SCOPE               +0.8 range
+    TEAM CALLOUT             reveal range extended 1.5×
+ [*] TACTICAL SCAN            +15% damage (reveals refresh every 5s)
+ [C] ECHO MARK                revealed enemies marked 3s (+30% from all)
+
+───────────────────────────────────────────────────────────────────────────────
+[RAILGUN]                                          unlock: Act 3 map 3 · easy
+  DMG 110   RNG 5.0   RATE 0.25/s   TYPE PIERCE
+  Pierces every enemy in a line. Ignores most armor. Heavy long-CD hitter.
+  EXPLOIT: SSH (+25% vs trojan/rootkit/juggernaut/leviathan)
+
+  Branch: SABOT (starter)
+    SABOT ROUND              small explosion at each pierced enemy
+    SPLINTER ROUND           sabot explosions +50% damage
+ [*] PENETRATOR               pierce angle widens — finds more in path
+    SHOCKWAVE                pierced enemies slowed 70% for 1.5s
+ [*] SABOT TUNING             +20% damage
+ [C] WIDE SABOT               sabot explosion radius → 1.5 cells
+
+  Branch: HYPERSONIC (unlock: Act 5 map 1, hard clear)
+    HYPERSONIC               projectile speed doubled
+    KILL FEEDBACK            each kill reduces next shot CD 0.6s
+ [*] KILL CHAIN               kills reduce CD by 0.3s (stacks)
+    ARMOR PIERCER            shots ignore 6 armor (stacks with pierce)
+ [*] OVERCLOCK BARREL         +20% fire rate
+ [C] CHAIN-FIRE               each kill refunds 1.5s cooldown
+
+  Branch: CAPACITOR (unlock: Act 7 map 1, medium clear)
+ [*] CAPACITOR                 charges 8s → auto-fires 5× damage mega shot
+    CHARGED BURST            mega shot stuns all pierced targets 1s
+ [*] CHARGE COILS             charges 25% faster (8s → 6s)
+    MEGA RANGE               +0.6 range
+ [*] OVERCAP                  mega damage +50% (×7.5 instead of ×5)
+ [C] RAPID CAPACITOR          mega shots every 4s instead of 8s
+
+───────────────────────────────────────────────────────────────────────────────
+[SENTINEL NODE]                              unlock: Act 3 map 4 · medium
+  DMG 12 DPS   RNG 2.8   TYPE ENERGY
+  Passive field: 12 dmg/s and 20% slow to all enemies in range. No projectiles.
+  EXPLOIT: HTTP (+25% vs phantom/wraith/stealth/voidlord)
+
+  Branch: FIELD (starter)
+    REINFORCED FIELD         damage +8 (20 dps)
+    EXPANDED GRID            range +0.8
+ [*] OVERCLOCKED FIELD        damage +8 dps (28 total)
+    NODE BROADCAST           range +0.5 more
+ [*] TRAUMA PROTOCOL          enemies in field +20% from all sources
+ [C] INCANDESCENT FIELD       damage to 40 dps base
+
+  Branch: THORNS (unlock: Act 5 map 4, medium clear)
+    THORN PROTOCOL           enemies attacking towers take 2× retaliation
+    ANCHOR FIELD             slow to 45%, slow-immune affected at 20%
+ [*] TOTAL SUPPRESSION        slow-immune affected at 35%
+    SHIELD WALL              +0.4 range, trauma marks last 0.5s longer
+ [*] BARBED FIELD             +6 dps, reflects 10% damage automatically
+ [C] RETALIATION FIELD        enemies in field reflect 30% damage back
+
+  Branch: PULSE SURGE (unlock: Act 7 map 3, medium clear)
+    PULSE LINK               every 5s: marks all in range for 2s
+    SURGE EVENT              every 5s: field surges to 5× for 0.5s
+ [*] CHARGED PULSE            PULSE LINK every 3s instead of 5s
+    WIDE PULSE               +0.5 range
+ [*] PULSE STORM              marks last 4s instead of 2s
+ [C] MEGA SURGE               surge events 10× instead of 5×, every 4s
+
+───────────────────────────────────────────────────────────────────────────────
+[BOOSTER NODE]                                 unlock: Act 1 map 1 · easy
+  Passive support. No attack. Adjacent turrets: +25% dmg / +15% rate.
+  NOTE: GLITCH runner cannot use this turret (banned).
+
+  Branch: AMPLIFIER (starter)
+    AMPLIFIER                aura range +0.5
+    OVERCHARGE               buffs: +35% dmg / +25% rate
+ [*] FOCUS BEAM               aura targets ALL turrets regardless of distance
+    AMPLIFIER TUNE           all towers +5% global damage
+ [*] WIDE BAND                aura range +0.8 more
+ [C] GLOBAL AURA              aura covers the whole map
+
+  Branch: RESONATOR (unlock: Act 7 map 4, easy clear)
+    RESONANCE                booster counts as 2 unique types for subnet
+    DUAL WAVE                buffed turrets +10% crit
+ [*] SUBNET HARMONICS         subnet bonuses 25% stronger
+    AURA RESONANCE           aura range +0.4
+ [*] CHANNELED ENERGY         all towers +8% global damage
+ [C] NETLINK MASTER           all subnet-pair synergies without adjacency
+
+  Branch: CRITICAL (unlock: Act 7 map 4, medium clear)
+    CRITICAL AURA            adjacent +5% crit
+    CRIT AMPLIFIER           all towers +5% crit
+ [*] PRECISION FIELD          all towers +6% damage
+    BURST AURA               all towers +6% fire rate
+ [*] EAGLE EYE                all towers +5% range
+ [C] CRITICAL OVERLOAD        +20% crit applied globally
+
+───────────────────────────────────────────────────────────────────────────────
+[DECRYPT NODE] (data_miner)                   unlock: Act 4 map 1 · easy
+  Passive damage aura. Enemies inside take +15% damage from all sources.
+  No combat. Small range, high-value support.
+
+  Branch: BREACH (starter — raw amplification)
+    BREACH PROTOCOL          aura amp +5% (20% total)
+    EXTENDED FIELD           aura range +0.5
+ [*] DEEP DECRYPT             aura amp +10% (30% total)
+    SUSTAINED BREACH         amp holds 2s after leaving range
+ [*] SIGNAL AMP               aura amp +5% more (35% with DEEP DECRYPT)
+ [C] GLOBAL BREACH            aura covers entire map
+
+  Branch: EXPOSE (unlock: Act 7 map 1, hard clear)
+    EXPOSE PROTOCOL          enemies in aura MARKED (+30% from all)
+    WIDE SCAN                aura range +0.5
+ [*] REVEAL                   strips all stealth/invis in aura
+    ARMOR SCAN               aura enemies −3 effective armor
+ [*] DEEP SCAN                MARK bonus raises to +45%
+ [C] FULL EXPOSURE            all enemies on map marked while boss alive
+
+  Branch: CORRUPT (unlock: Act 7 map 2, hard clear)
+    CORRUPT PROTOCOL         aura deals 4 dps corruption damage
+    SYSTEM SLOW              aura applies 10% slow to non-immune
+ [*] HEAVY CORRUPTION         DPS doubles to 8
+    SYNC FIELD               aura enemies can't regen (shield/HP)
+ [*] STUTTER                  every 3s, all aura enemies stunned 0.4s
+ [C] TOTAL CORRUPTION         bosses take DOUBLE aura damage
 
 
-╔═══════════════════════════════════════════════════════════════════════════╗
-║  ENEMIES  (18 total — 12 standard + 6 bosses)                             ║
-╚═══════════════════════════════════════════════════════════════════════════╝
+═══════════════════════════════════════════════════════════════════════════════
+ENEMIES  (18 total)
+═══════════════════════════════════════════════════════════════════════════════
 
-─── LOW THREAT (cannon fodder) ───────────────────────────────────────────────
+Resistances: 1.0 = normal, <1 = resistant, 0 = immune, >1 = weak.
+  kinetic  pierce  energy  aoe  chain
+Ports: open port → 25% bonus damage from matching turret exploit.
 
-[WORM]
-  hp: 28   speed: 1.5   damage: 1   no armor
-  Basic self-replicating probe. Common swarm unit.
-  Counter: anything kills worms. Economy matters more than tower choice.
+─── STANDARD ─────────────────────────────────────────────────────────────────
 
-[CRAWLER] (spider)
-  hp: 16   speed: 2.8 (FAST)   damage: 1   no armor
-  Fast scuttling crawler. Low HP, may slip past sniper turrets.
-  Counter: fast-firing FIREWALL or AOE handles swarms; ANTIVIRUS struggles.
+[WORM]                   LOW threat        port: SMB
+  HP 42   SPD 1.5   DMG 1   XP 6
+  Basic self-replicating probe. No resistances. Anything kills them.
 
-─── MEDIUM THREAT ────────────────────────────────────────────────────────────
+[CRAWLER] (spider)       LOW               port: SMB
+  HP 24   SPD 2.8   DMG 1   XP 5
+  Fast scuttling swarm unit. Low HP but may slip past slow-firing snipers.
+  Counter: FIREWALL / HONEYPOT / ICE-BREAKER.
 
-[TROJAN]
-  hp: 70   speed: 1.1   damage: 2   armor: 2
-  resist: kinetic 0.65×   weak: pierce 1.3×
+[TROJAN]                 MEDIUM            port: SSH
+  HP 105   SPD 1.1   DMG 2   armor 2   XP 16
+  Resist kinetic 0.65 · Weak pierce 1.3
   Armored payload carrier. Slow but durable.
-  Counter: PIERCE weapons bypass armor. Kinetic struggles.
+  Counter: PIERCE weapons bypass armor; KINETIC struggles.
 
-[LEECH]                              ★ priority kill
-  hp: 40   speed: 1.4   damage: 1   no armor
-  resist: energy 0.8×
-  Heals enemies behind it continuously. Renderer marks with magenta ring + tether.
-  Counter: priority kill. HONEYPOT slows them for easy pickoff.
-
-[GLITCH]
-  hp: 55   speed: 1.6   damage: 2
-  weak: aoe 1.3×
-  Corrupted packet. Splits into 2 worms on death — kill with AoE before the split.
-  Counter: ICE-BREAKER or PULSE kills it before split. Single-target wastes a shot.
-
-─── HIGH THREAT ──────────────────────────────────────────────────────────────
-
-[ROOTKIT]
-  hp: 180   speed: 0.85   damage: 3   armor: 5
-  resist: kinetic 0.45×, aoe 0.75×   weak: pierce 1.5×
+[ROOTKIT]                HIGH              port: SSH
+  HP 260   SPD 0.85   DMG 3   armor 5   XP 32
+  Resist kinetic 0.45 · Weak pierce 1.5 · Resist aoe 0.75
   Root-level intrusion. Extremely armored.
-  Counter: RAILGUN/ANTIVIRUS pierce shreds them. Kinetic wastes DPS.
+  Counter: RAILGUN/ANTIVIRUS pierce shreds them.
+  NOTE: Removed from grid01 pool — too punishing with 3-turret starter.
 
-[PHANTOM]
-  hp: 45   speed: 2.0   damage: 2
-  resist: kinetic 0.5×, pierce 0.6×   weak: energy 1.3×
-  CRIT IGNORES RESIST. Phases out of reality. Kinetic half-misses.
-  Counter: QUANTUM crits ignore resistance. ENERGY is strong.
+[PHANTOM]                HIGH              port: HTTP
+  HP 65   SPD 2.0   DMG 2   XP 20
+  Resist kinetic 0.5 · Resist pierce 0.6 · Weak energy 1.3
+  critIgnoresResist: true (crits bypass phase resistance)
+  Phases out of reality. Kinetic half-misses.
+  Counter: QUANTUM crits ignore resistance. ENERGY preferred.
+  SPECIAL: On death — EMP burst jams 2 closest towers for 1.5s.
 
-[BOMBER]                             ⚠ low-HP red pulse telegraph
-  hp: 60   speed: 1.3   damage: 5   no armor
-  resist: aoe 0.5×
-  Detonates on death. Devastates mainframe if it reaches core.
-  Sprite pulses red→white when HP < 30%.
-  Counter: AOE resisted (they're bombs); PIERCE or KINETIC works best.
-
-[GHOST] (stealth)
-  hp: 50   speed: 1.8   damage: 2   50% invisChance
-  resist: pierce 0.55×   weak: aoe 1.5×
-  Phases in and out of detection.
-  Counter: AOE reveals them (+50% dmg). Sniper wastes shots.
-
-[JUGGERNAUT]
-  hp: 280   speed: 0.6   damage: 4   armor: 14 (highest non-boss)
-  resist: kinetic 0.15×, aoe 0.6×, pierce 0.7×   weak: energy 1.4×
-  Heavily armored breach unit. Kinetic rounds barely scratch it. Energy melts it.
-  Counter: ENERGY towers (QUANTUM, SCRAMBLER, PULSE, SENTINEL) deal full damage.
-
-[PARASITE]                           ★ priority kill (renderer flags it)
-  hp: 35   speed: 2.2 (FAST)   damage: 0
-  resist: energy 0.6×   weak: aoe 1.2×
-  Sacrifices itself to infect the nearest tower, halving its damage for 6s.
-  Counter: kill before it reaches a tower. AOE and CHAIN can catch it mid-rush.
-
-─── EXTREME THREAT ───────────────────────────────────────────────────────────
-
-[WRAITH]
-  hp: 100   speed: 1.6   damage: 4   slow-immune
-  resist: chain 0.35×, energy 0.8×
+[WRAITH]                 EXTREME           port: HTTP
+  HP 145   SPD 1.6   DMG 4   XP 38   slow-immune
+  Resist chain 0.35 · Resist energy 0.8
   Slow-immune. Shreds through chain attacks.
-  Counter: burst damage (ICE / RAILGUN) beats DPS. Chain is weak.
+  Counter: Burst damage (ICE / RAILGUN) beats DPS. Chain is weak.
+  SPECIAL: At 60% HP — PHASE JUMP 1.2 tiles forward along path (one-shot).
 
-─── BOSSES ───────────────────────────────────────────────────────────────────
+[LEECH]                  MEDIUM            port: DNS
+  HP 58   SPD 1.4   DMG 1   XP 12
+  Resist energy 0.8
+  Heals 2 most-damaged non-boss allies within 1.4 tiles for 6 HP/s.
+  Counter: Priority kill. HONEYPOT slows them for easy pickoff.
 
-[KERNEL]                             threat: BOSS
-  hp: 900   speed: 0.75   damage: 5   armor: 4   bossScale: yes
-  resist: kinetic 0.7×, aoe 0.85×   weak: pierce 1.15×
-  Core system boss. Massive HP pool.
-  Counter: raw sustained DPS. PIERCE skips armor.
+[BOMBER]                 HIGH              port: ICMP
+  HP 85   SPD 1.3   DMG 5   XP 24
+  Resist aoe 0.5
+  Detonates on arrival at the mainframe. Devastates the core if it gets there.
+  Counter: AOE resisted — PIERCE or KINETIC works best.
 
-[DAEMON]                             threat: BOSS
-  hp: 650   speed: 1.2   damage: 4   armor: 2   bossScale: yes
-  resist: chain 0.7×   weak: energy 1.2×
-  Spawns worms at 50% HP. Resists chain attacks.
-  Counter: burst through 50% HP. ENERGY or KINETIC preferred.
+[GHOST] (stealth)        HIGH              port: HTTP
+  HP 72   SPD 1.8   DMG 2   XP 26   50% flicker-invis
+  Weak aoe 1.5 · Resist pierce 0.55
+  Phases in and out of detection. Flicker-visual only (not cloak-gated).
+  Counter: AOE reveals them with +50% damage. SNIPER wastes shots.
 
-[LEVIATHAN]                          threat: MEGA
-  hp: 1800   speed: 0.6   damage: 8   armor: 6   slow-immune   bossScale: yes
-  resist: aoe 0.6×, chain 0.4×   weak: pierce 1.2×
-  Slow-immune. Regenerates. AOE and chain damped.
-  Counter: single-target heavy hitters. RAILGUN + QUANTUM.
+[GLITCH]                 MEDIUM            port: SMB
+  HP 80   SPD 1.6   DMG 2   XP 18
+  Weak aoe 1.3
+  Corrupted packet. Splits into 2 WORMS on death.
+  Counter: ICE-BREAKER or PULSE kills it before the split.
 
-[SWARM QUEEN]                        threat: MEGA
-  hp: 1200   speed: 0.9   damage: 6   bossScale: yes
-  weak: aoe 1.4×, chain 1.2×
-  Spawns a crawler every 1.5s. Weak to AOE.
+[JUGGERNAUT]             HIGH              port: SSH
+  HP 400   SPD 0.6   DMG 4   armor 14   XP 42
+  Resist kinetic 0.15 · Resist aoe 0.6 · Weak energy 1.4 · Resist pierce 0.7
+  Heavily armored breach unit. Kinetic barely scratches.
+  Counter: ENERGY towers deal full damage. Avoid KINETIC.
+
+[PARASITE]               HIGH              port: DNS
+  HP 50   SPD 2.2   DMG 0   XP 28
+  Resist energy 0.6 · Weak aoe 1.2
+  Sacrifices itself to INFECT the nearest tower — halves its damage for 6s.
+  Intercept BEFORE reaching a tower.
+  Counter: AoE and CHAIN can catch it mid-rush.
+
+─── BOSS / MEGA ──────────────────────────────────────────────────────────────
+
+[KERNEL]                 BOSS              port: ICMP
+  HP 900   SPD 0.75   DMG 5   armor 4   XP 140   boss-scaled
+  Resist kinetic 0.7 · Resist aoe 0.85 · Weak pierce 1.15
+  Core system boss. TWO-PHASE:
+    66% HP → KERNEL PANIC: spawns 3 worms + jams closest 2 towers 3s
+    33% HP → CORE DUMP:    enraged (+35% speed), spawns 3 more worms,
+                           jams closest 3 towers 2s
+  Counter: Burst THROUGH phase gates so jams don't stall mid-kill.
+
+[DAEMON]                 BOSS              port: SMB
+  HP 650   SPD 1.2   DMG 4   armor 2   XP 115   boss-scaled
+  Resist chain 0.7 · Weak energy 1.2
+  Spawns 3 WORMS at 50% HP (one-shot).
+  Counter: Burst through 50% HP. ENERGY or KINETIC preferred.
+
+[LEVIATHAN]              MEGA              port: SSH
+  HP 1800   SPD 0.6   DMG 8   armor 6   XP 280   slow-immune boss-scaled
+  Resist aoe 0.6 · Resist chain 0.4 · Weak pierce 1.2
+  Slow-immune. Regenerates 1.5% maxHP/s if undamaged for >1s.
+  AOE and chain damped.
+  Counter: Single-target heavy hitters. RAILGUN + QUANTUM.
+
+[SWARM QUEEN]            MEGA              port: SMB
+  HP 1200   SPD 0.9   DMG 6   XP 220   boss-scaled
+  Weak aoe 1.4 · Weak chain 1.2
+  Spawns a CRAWLER every 1.5s while alive.
   Counter: ICE-BREAKER + CHAIN shreds her and her brood.
 
-[CORRUPTOR]                          threat: MEGA
-  hp: 2200   speed: 0.7   damage: 10   armor: 8   bossScale: yes
-  resist: chain 0× (IMMUNE), kinetic 0.85×, energy 0.9×
-  Chain-immune. Corrupts tower signals nearby. Sprite shows scanline glitch band.
-  Counter: skip CHAIN entirely. Stack KINETIC/PIERCE volume.
+[CORRUPTOR]              MEGA              port: ICMP
+  HP 2200   SPD 0.7   DMG 10   armor 8   XP 340   boss-scaled
+  Chain IMMUNE (0) · Resist kinetic 0.85 · Resist energy 0.9
+  Chain-immune. Corrupts tower signals nearby.
+  Counter: Skip CHAIN entirely. Stack KINETIC/PIERCE volume.
 
-[VOID LORD]                          threat: FINAL ★ phase-shift mechanic
-  hp: 4500   speed: 0.8   damage: 15   armor: 10   slow-immune   bossScale: yes
-  resist (base): kinetic 0.6×, energy 0.65×, aoe 0.6×, chain 0.4×, pierce 0.7×
-  CRIT IGNORES BASE RESIST (but NOT phase-shift immunity).
-  Final threat. Phase-shifts damage immunity every 12s — watch the floating
-  IMMUNE: <TYPE> tag. Body tints + ground aura match the active immunity color.
-  Counter: multi-type coverage. Keep KINETIC + ENERGY + PIERCE all online so
+[VOID LORD]              FINAL             port: HTTP
+  HP 4500   SPD 0.8   DMG 15   armor 10   XP 600   slow-immune boss-scaled
+  Resist kinetic 0.6 · Resist energy 0.65 · Resist aoe 0.6
+  Resist chain 0.4 · Resist pierce 0.7
+  critIgnoresResist: true
+  PHASE-SHIFTS damage immunity every 12s — watch the floating IMMUNE tag.
+  Crits do NOT bypass the active phase shift.
+  Counter: Multi-type coverage. Keep KINETIC + ENERGY + PIERCE online so
   one rotation can never shut you down.
 
+
 ═══════════════════════════════════════════════════════════════════════════════
-DAMAGE TYPES QUICK REFERENCE
+KEY MECHANICS
 ═══════════════════════════════════════════════════════════════════════════════
-KINETIC   FIREWALL                              fundamental, blocked by armor
-ENERGY    HONEYPOT, QUANTUM, PULSE, SCRAMBLER,  versatile, melts JUGGERNAUT
-          SENTINEL, BOOSTER, DECRYPT
-PIERCE    ANTIVIRUS, RAILGUN, OVERWATCH         skips armor, weak vs PHANTOM/STEALTH
-AOE       ICE-BREAKER, ARTILLERY                reveals STEALTH, kills GLITCH/SWARM
-CHAIN     CHAIN LIGHTNING                       ⚠ useless on CORRUPTOR (immune)
+
+PORTS / EXPLOITS
+  Every enemy has an "open port" (SSH/HTTP/DNS/SMB/ICMP). Turrets with a
+  matching exploit deal +25% damage and pop an EXPLOIT! floater.
+  Secondary layer orthogonal to damage-type resistances.
+
+CLOAKING (invisTimer)
+  GHOST PROTOCOL sector modifier / daily mutator spawns cloaked enemies.
+  Single-target turrets (FIREWALL, ANTIVIRUS, QUANTUM, RAILGUN, SNIPER,
+  PULSE, HONEYPOT, SENTINEL, SCRAMBLER) CANNOT target cloaked enemies.
+  AOE and CHAIN turrets see through cloak AND reveal on hit (permanent).
+  GHOST enemy flicker is a visual-only gimmick, not a targeting block.
+
+SUBNET LINKS
+  Adjacent turrets (≤1 cell, incl. diagonals) form a subnet.
+    +8% damage per extra turret in subnet
+    +12% damage per unique type in subnet
+  Cap +60%. Diversity matters more than size.
+
+OVERDRIVE ([O] hotkey on selected tower)
+  4s @ 3× dmg / 2× rate → 6s offline → 30s recharge.
+  Non-support turrets only. Best for boss waves or crowd surges.
+
+HEAT BUILDUP (FIREWALL signature)
+  Consecutive shots on same target +10% dmg (cap +50% at streak 6).
+  Resets on target change.
+
+PACKET DROPS
+  8% of kills drop a packet (bosses always drop one). Tap within 5s:
+    +D  pink   +50% tower dmg 8s
+    +R  cyan   +50% fire rate 8s
+    XP  green  instant +15 XP
+    +H  yellow restore 5 integrity
+
+PROGRAM DECK     removed — active abilities retired as broken.
+
+ASCENSION / ICE DEPTH  (unlocks after any hard clear, max 10)
+  Stacking global difficulty. Each level: +8% enemy HP, +3% speed;
+  every 2 levels adds a turret lock; every 3 reduces draft size by 1.
+
+NG+  (per-map tiers, max 5)
+  First victory unlocks NG+1. Each victory at current tier raises max.
+  Enemy HP +50%/tier, protocol reward +25%/tier.
+
+DAILY CONTRACT  (seeded run, same for everyone per day)
+  Unlocks after 3 map clears. Rolls a map + difficulty + mutator.
+  GHOST PROTOCOL is gated behind owning at least one AOE/CHAIN turret.
+
+SECTOR MODIFIERS  (always-on per-act effects)
+  Act 1: no modifier (tutorial)
+  Act 2: PACKET BURSTS   — 30% spawns drop an echo 0.1s later
+  Act 3: ENCRYPTED       — enemies spawn with HP shield (regen after 2s)
+  Act 4: STEALTH         — 15% spawns arrive cloaked
+  Act 5: REPLICATION     — 15% of kills spawn a worm offspring
+  Act 6: ROOTKIT JAM     — while a boss is alive, jam a random tower every 3s
+  Act 7: OMEGA PROTOCOL  — all five modifiers at reduced strength
 
 ═══════════════════════════════════════════════════════════════════════════════
