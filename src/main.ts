@@ -558,7 +558,18 @@ function startLoop() {
           // Tutorial: explain XP / protocols / progression on first ever wave clear.
           showTutorialIfNew(save, () => writeSave(save), 'first_wave_clear');
         },
-        onNewEnemy: (defId) => showEnemyIntroBanner(defId),
+        onNewEnemy: (defId) => {
+          // Show the intro banner ONCE ever per save, not once per run.
+          // Was firing every time a first-encounter happened in a given run,
+          // which meant every new map re-introduced enemies the player had
+          // already seen + dismissed. seenThisRun is kept (engine uses it
+          // to fire onNewEnemy) but the banner itself is gated by the
+          // persistent save.seenEnemies list.
+          if (save.seenEnemies.includes(defId)) return;
+          save.seenEnemies.push(defId);
+          writeSave(save);
+          showEnemyIntroBanner(defId);
+        },
         onAutoStart: () => {
           if (!run) return;
           if (tryShowIntelForUpcomingWave(run)) return;
