@@ -434,7 +434,7 @@ const BRANCH_SPECS: BranchSpec[] = [];
         apply: (s) => { addEffect(s, T, 'supercharge'); } },
       { shortName: 'CRITICAL TUNE', description: 'QUANTUM +12% crit chance, +10% damage.', rarity: 'rare',
         apply: (s) => { bumpCrit(s, T, 0.12); bumpDmg(s, T, 0.10); addEffect(s, T, 'quantum_super_tune'); } },
-      { shortName: 'DECOHERENCE OVERLOAD', description: 'QUANTUM crit chance pinned at +50%.',
+      { shortName: 'DECOHERENCE OVERLOAD', description: 'QUANTUM crits deal ×5.0 (was ×3.5). Every 5 non-crits in a row guarantees a crit.',
         apply: (s) => { addEffect(s, T, 'quantum_super_caps'); } },
     ],
   });

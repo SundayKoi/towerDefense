@@ -1324,8 +1324,14 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   let critChance = (def.crit?.chance ?? 0) + s.mods.globalCritChance + specificCrit;
   // Quantum unstable: +8% crit chance
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'unstable')) critChance += 0.08;
-  // Quantum SUPERPOSITION capstone: +50% crit chance baseline
-  if (t.def === 'quantum' && hasEffect(s, 'quantum', 'quantum_super_caps')) critChance += 0.50;
+  // DECOHERENCE OVERLOAD pity timer: after 5 non-crits in a row, force the
+  // next shot to crit. Smooths the RNG spike of ~68% max crit chance so a
+  // bad streak can't drag on. Counter tracked in extras; reset on any crit
+  // (natural or forced).
+  let pityForceCrit = false;
+  if (t.def === 'quantum' && hasEffect(s, 'quantum', 'quantum_super_caps')) {
+    if ((t.extras.noCritStreak ?? 0) >= 5) pityForceCrit = true;
+  }
   // NETLINK antivirus+quantum: ANTIVIRUS gains +15% crit chance when subnet-linked
   if (t.def === 'antivirus' && hasEffect(s, 'antivirus', 'netlink_antivirus_quantum')
       && (hasSubnetLink(s, 'antivirus', 'quantum') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
@@ -1345,10 +1351,23 @@ function fire(s: RunState, t: TowerInstance, target: EnemyInstance): void {
   if (critChance > 0 && Math.random() < critChance) isCrit = true;
   // Precision matrix: ANTIVIRUS marks cause quantum guaranteed crit
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'precision_matrix') && (target.marked ?? 0) > 0) isCrit = true;
+  // Pity: DECOHERENCE OVERLOAD forces a crit after 5 non-crits.
+  if (pityForceCrit) isCrit = true;
+  // Track the streak so the pity timer knows when to fire next time.
+  if (t.def === 'quantum' && hasEffect(s, 'quantum', 'quantum_super_caps')) {
+    t.extras.noCritStreak = isCrit ? 0 : (t.extras.noCritStreak ?? 0) + 1;
+  }
 
   // Quantum observer: boost crit mult on next shot. Lens (quantum_obs_lens) gives observer-charged shots
   // an additional +30% damage as a clean substitute for "ignore armor" (engine-simpler).
   let critMult = def.crit?.mult ?? 3;
+  // DECOHERENCE OVERLOAD: crit mult +1.5 (quantum 3.5 → 5.0). Applied before
+  // observer/lens bonuses so it compounds with the OBSERVER branch's charge
+  // system — though OBSERVER is a separate branch and keystone-exclusive,
+  // this keeps the math clean if a future card blends them.
+  if (t.def === 'quantum' && hasEffect(s, 'quantum', 'quantum_super_caps')) {
+    critMult += 1.5;
+  }
   let observerLensBonus = 1.0;
   if (t.def === 'quantum' && hasEffect(s, 'quantum', 'observer') && (t.extras.observerCharge ?? 0) > 0) {
     critMult += (t.extras.observerCharge ?? 0) * 0.5;

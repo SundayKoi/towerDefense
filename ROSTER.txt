@@ -141,7 +141,7 @@ TURRETS  (14 total)
  [*] RESONANCE                if first shot crits, double-shot also crits
     SUPERCHARGE              post-crit: next shot +50% dmg (5s CD)
  [*] CRITICAL TUNE            +12% crit chance, +10% damage
- [C] DECOHERENCE OVERLOAD     +50% crit chance (flat)
+ [C] DECOHERENCE OVERLOAD     crits ×5.0 (was ×3.5) + pity: 5 non-crits = forced crit
 
   Branch: COLLAPSE (unlock: Act 4 map 4, easy clear)
     WAVE COLLAPSE            hits reduce target armor 50% for 1.5s

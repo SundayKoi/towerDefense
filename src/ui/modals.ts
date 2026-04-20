@@ -23,7 +23,8 @@ function displayCritChance(r: _RS, id: _TID): number {
 
   let critChance = (def.crit?.chance ?? 0) + r.mods.globalCritChance + (r.mods.towerCrit[id] ?? 0);
   if (id === 'quantum' && has('unstable')) critChance += 0.08;
-  if (id === 'quantum' && has('quantum_super_caps')) critChance += 0.50;
+  // DECOHERENCE OVERLOAD no longer bumps crit CHANCE — now bumps crit mult
+  // + adds a pity timer. See engine.fire() for the runtime logic.
   if (id === 'antivirus'
       && has('netlink_antivirus_quantum')
       && (hasSubnetLink(r, 'antivirus', 'quantum')
