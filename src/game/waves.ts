@@ -136,7 +136,8 @@ export function getWavePreview(map: MapDef, difficulty: Difficulty, wave: number
   const modTags: string[] = [];
   const mods = map.modifiers;
   if (mods?.packetBursts) modTags.push(`PACKET BURSTS ${Math.round(mods.packetBursts * 100)}%`);
-  if (mods?.encrypted) modTags.push(`ENCRYPTED +${Math.round(mods.encrypted * 100)}% HP SHIELD`);
+  if (mods?.lagSpike) modTags.push(`LAG SPIKE (${Math.round((1 + mods.lagSpike) * 100)}% / 2s every 25s)`);
+  if (mods?.encrypted) modTags.push(`ENCRYPTED +${Math.round(mods.encrypted * 100)}% HP SHIELD (+25% vs EXPOSED)`);
   if (mods?.stealthChance) modTags.push(`STEALTH ${Math.round(mods.stealthChance * 100)}%`);
   if (mods?.replication) modTags.push(`REPLICATION ${Math.round(mods.replication * 100)}%`);
   if (mods?.rootkit) modTags.push(`ROOTKIT JAM ${mods.rootkit}s`);

@@ -17,7 +17,7 @@ import type { MapDef } from '@/types';
 //   Act 1 / Map 3 E  : CHAIN LIGHTNING(early AOE)
 //   Act 1 / Map 4 E  : ICE-BREAKER    (AOE + reveal — stealth counter)
 //   Act 2 / Map 1 E  : SCRAMBLER      (armor strip for act 3 prep)
-//   Act 2 / Map 3 E  : PULSE          (EMP burst, counters packet bursts)
+//   Act 2 / Map 3 E  : PULSE          (EMP burst, big arena clears on lag spikes)
 //   Act 2 / Map 4 M  : ARTILLERY      (heavy AOE — rewarded for medium clear)
 //   Act 3 / Map 1 E  : SNIPER         (extreme single-target)
 //   Act 3 / Map 3 E  : RAILGUN        (pierce legendary)
@@ -47,10 +47,10 @@ export interface ActMeta {
 export const ACTS: ActMeta[] = [
   { act: 1, name: 'SYSTEM BOOT',     tagline: 'Learn the grid.',
     brief: 'Standard intrusions — no network modifiers. Learn your turrets, your card drafts, and the singleton rule. Each map rewards a new turret.' },
-  { act: 2, name: 'PACKET STORM',    tagline: 'Expect density spikes.',
-    brief: 'PACKET BURSTS: every spawn has a 30% chance to drop a second enemy 0.1s later. Crowd control and AOE are king. PULSE arrives early this act.' },
-  { act: 3, name: 'ENCRYPTED CORE',  tagline: 'Strip their shields fast.',
-    brief: 'ENCRYPTED PAYLOADS: enemies spawn with regenerating data shields absorbed before HP. Chain, pulse, and scrambler strip shields efficiently. RAILGUN unlocks here.' },
+  { act: 2, name: 'PACKET STORM',    tagline: 'The network lags — enemies warp.',
+    brief: 'LAG SPIKE: every 25s of a wave, every enemy on the grid surges at 2× speed for 2s. Read the telegraph and front-load burst before the surge closes the distance. PULSE arrives early this act.' },
+  { act: 3, name: 'ENCRYPTED CORE',  tagline: 'Crack the shield, expose the target.',
+    brief: 'ENCRYPTED PAYLOADS: enemies spawn with regenerating data shields absorbed before HP. Cracking a shield EXPOSES the enemy — +25% damage for 3s. Chain, pulse, and scrambler strip shields efficiently. RAILGUN unlocks here.' },
   { act: 4, name: 'STEALTH NET',     tagline: 'Reveal or die.',
     brief: 'STEALTH PROTOCOL: 30% of enemies spawn permanently cloaked. AOE hits reveal them. ICE and pulse are your main counters — DATA MINER unlocks this act.' },
   { act: 5, name: 'VOID SWARM',      tagline: 'Kill the chain reaction.',
@@ -58,7 +58,7 @@ export const ACTS: ActMeta[] = [
   { act: 6, name: 'APEX RUIN',       tagline: 'Your towers are the target.',
     brief: 'ROOTKIT INTRUSION: every 8 seconds while a boss is alive, a random tower is jammed for 2s. Redundant coverage and boss burn are critical.' },
   { act: 7, name: 'OMEGA PROTOCOL',  tagline: 'Every layer at once.',
-    brief: 'FUSION: all five act modifiers are active simultaneously at reduced strength. The finale — only proven builds clear Act 7 hard.' },
+    brief: 'FUSION: all five act modifiers are active simultaneously at reduced strength — lag spikes, shield cracks, stealth, replication, and rootkit intrusions. The finale — only proven builds clear Act 7 hard.' },
 ];
 
 export const MAPS: MapDef[] = [
@@ -221,7 +221,7 @@ export const MAPS: MapDef[] = [
   },
 
   // ═════════════════════════════════════════════════════════════════════
-  // ACT 2 — PACKET STORM. PACKET BURSTS modifier (30% spawn echo).
+  // ACT 2 — PACKET STORM. LAG SPIKE modifier (25s interval, 2s 2× speed surge).
   // ═════════════════════════════════════════════════════════════════════
 
   {
@@ -262,8 +262,8 @@ export const MAPS: MapDef[] = [
       mediumClear: { type: 'unlock-card',  id: 'syn_qm_sc' },
       hardClear:   { type: 'unlock-card',  id: 'exotic_time_dilation' },
     },
-    sector: 2, act: 2, actName: 'PACKET STORM', actTag: 'Expect density spikes.',
-    modifiers: { packetBursts: 0.3 },
+    sector: 2, act: 2, actName: 'PACKET STORM', actTag: 'The network lags — enemies warp.',
+    modifiers: { lagSpike: 1 },
   },
 
   {
@@ -304,8 +304,8 @@ export const MAPS: MapDef[] = [
       mediumClear: { type: 'unlock-card', id: 'syn_ch_ps' },
       hardClear:   { type: 'protocols',   id: '125' },
     },
-    sector: 2, act: 2, actName: 'PACKET STORM', actTag: 'Expect density spikes.',
-    modifiers: { packetBursts: 0.3 },
+    sector: 2, act: 2, actName: 'PACKET STORM', actTag: 'The network lags — enemies warp.',
+    modifiers: { lagSpike: 1 },
   },
 
   {
@@ -348,8 +348,8 @@ export const MAPS: MapDef[] = [
       mediumClear: { type: 'unlock-card',  id: 'syn_fw_av' },
       hardClear:   { type: 'unlock-card',  id: 'exotic_replicator' },
     },
-    sector: 2, act: 2, actName: 'PACKET STORM', actTag: 'Expect density spikes.',
-    modifiers: { packetBursts: 0.3 },
+    sector: 2, act: 2, actName: 'PACKET STORM', actTag: 'The network lags — enemies warp.',
+    modifiers: { lagSpike: 1 },
   },
 
   {
@@ -390,8 +390,8 @@ export const MAPS: MapDef[] = [
       mediumClear: { type: 'unlock-tower', id: 'mine' },
       hardClear:   { type: 'protocols',    id: '150' },
     },
-    sector: 2, act: 2, actName: 'PACKET STORM', actTag: 'Expect density spikes.',
-    modifiers: { packetBursts: 0.3 },
+    sector: 2, act: 2, actName: 'PACKET STORM', actTag: 'The network lags — enemies warp.',
+    modifiers: { lagSpike: 1 },
   },
 
   // ═════════════════════════════════════════════════════════════════════
@@ -1089,7 +1089,7 @@ export const MAPS: MapDef[] = [
       hardClear:   { type: 'unlock-branch', id: 'data_miner.eco' },
     },
     sector: 7, act: 7, actName: 'OMEGA PROTOCOL', actTag: 'Every layer at once.',
-    modifiers: { packetBursts: 0.15, encrypted: 0.10, stealthChance: 0.15, replication: 0.12, rootkit: 12 },
+    modifiers: { lagSpike: 0.5, encrypted: 0.10, stealthChance: 0.15, replication: 0.12, rootkit: 12 },
   },
 
   {
@@ -1132,7 +1132,7 @@ export const MAPS: MapDef[] = [
       hardClear:   { type: 'unlock-branch', id: 'data_miner.mta' },
     },
     sector: 7, act: 7, actName: 'OMEGA PROTOCOL', actTag: 'Every layer at once.',
-    modifiers: { packetBursts: 0.15, encrypted: 0.10, stealthChance: 0.15, replication: 0.12, rootkit: 12 },
+    modifiers: { lagSpike: 0.5, encrypted: 0.10, stealthChance: 0.15, replication: 0.12, rootkit: 12 },
   },
 
   {
@@ -1177,7 +1177,7 @@ export const MAPS: MapDef[] = [
       hardClear:   { type: 'protocols',     id: '650' },
     },
     sector: 7, act: 7, actName: 'OMEGA PROTOCOL', actTag: 'Every layer at once.',
-    modifiers: { packetBursts: 0.15, encrypted: 0.10, stealthChance: 0.15, replication: 0.12, rootkit: 12 },
+    modifiers: { lagSpike: 0.5, encrypted: 0.10, stealthChance: 0.15, replication: 0.12, rootkit: 12 },
   },
 
   {
@@ -1224,7 +1224,7 @@ export const MAPS: MapDef[] = [
       hardClear:   { type: 'protocols',     id: '1500' },
     },
     sector: 7, act: 7, actName: 'OMEGA PROTOCOL', actTag: 'Every layer at once.',
-    modifiers: { packetBursts: 0.15, encrypted: 0.10, stealthChance: 0.15, replication: 0.12, rootkit: 12 },
+    modifiers: { lagSpike: 0.5, encrypted: 0.10, stealthChance: 0.15, replication: 0.12, rootkit: 12 },
   },
 
   // ═════════════════════════════════════════════════════════════════════

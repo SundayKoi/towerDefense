@@ -28,6 +28,9 @@ export function getEffectiveModifiers(s: RunState): NonNullable<ReturnType<typeo
     stealthChance: Math.min(1, (base.stealthChance ?? 0) + (extra.stealthChance ?? 0)),
     replication: (base.replication ?? 0) + (extra.replication ?? 0),
     rootkit: base.rootkit ?? extra.rootkit ?? 0,
+    // Lag spike stacks by max, not sum — two sources of surge don't compound
+    // into a 3× warp, they just keep the strongest.
+    lagSpike: Math.max(base.lagSpike ?? 0, extra.lagSpike ?? 0),
   };
 }
 
@@ -82,6 +85,10 @@ export function startWave(s: RunState): void {
   s.spawnQueue = buildWaveSpawnQueue(map, s.difficulty, s.wave, s.totalWaves, s.contractMutators);
   s.spawnElapsed = 0;
   s.phase = 'wave';
+  // Reset lag-spike cadence on each wave so the first spike lands ~25s in, not
+  // mid-spawn-in. Active surge is also cleared so the wave starts at normal speed.
+  (s as any).lagSpikeCooldown = 25;
+  (s as any).lagSpikeActive = 0;
   audio.play('wave_start');
   haptics.fire('wave_start');
 }
@@ -96,6 +103,8 @@ export interface EngineEvents {
 }
 
 export function endWave(s: RunState, events: EngineEvents): void {
+  // Clear any in-flight lag surge so prep-phase stragglers don't keep warping.
+  (s as any).lagSpikeActive = 0;
   const bonus = 25 + s.wave * 8;
   grantXp(s, bonus);
   const isBoss = bossForWave(getMap(s.mapId), s.difficulty, s.wave) != null;
@@ -609,6 +618,32 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     }
   }
 
+  // LAG SPIKE sector modifier (Act 2 PACKET STORM) — every 25s of active wave,
+  // all enemies surge for 2s at +lagSpike speed. Only ticks during the wave
+  // phase so prep time doesn't drain the cooldown silently.
+  const lagSpikeMag = getEffectiveModifiers(s).lagSpike ?? 0;
+  if (s.phase === 'wave' && lagSpikeMag > 0) {
+    if ((s as any).lagSpikeActive > 0) {
+      (s as any).lagSpikeActive = Math.max(0, (s as any).lagSpikeActive - dtSec);
+    } else {
+      (s as any).lagSpikeCooldown = ((s as any).lagSpikeCooldown ?? 25) - dtSec;
+      if ((s as any).lagSpikeCooldown <= 0) {
+        (s as any).lagSpikeCooldown = 25;
+        (s as any).lagSpikeActive = 2;
+        s.shakeTime = Math.max(s.shakeTime, 0.25);
+        s.shakeAmp = Math.max(s.shakeAmp, 4);
+        s.floaters.push({
+          pos: { x: 8, y: 3 },
+          text: 'LAG SPIKE!',
+          vy: -18, life: 1.4, maxLife: 1.4,
+          color: '#ff9f00', size: 22,
+        });
+        audio.play('wave_start');
+        haptics.fire('wave_start');
+      }
+    }
+  }
+
   // Update enemies
   const map = getMap(s.mapId);
   for (const e of s.enemies) {
@@ -685,6 +720,10 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       if (!suppressRegen && e.shieldRegenTimer > 2 && e.shield < e.maxShield) {
         e.shield = Math.min(e.maxShield, e.shield + e.maxShield * 0.5 * dtSec);
       }
+    }
+    // CRACKED EXPOSURE countdown — set when a shield breaks in damageEnemy.
+    if ((e.crackedTimer ?? 0) > 0) {
+      e.crackedTimer = Math.max(0, (e.crackedTimer ?? 0) - dtSec);
     }
     // DECRYPT NODE — per-frame effects on enemies inside the aura.
     if (isEnemyInDecryptAura(s, e)) {
@@ -772,7 +811,10 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       }
     }
 
-    const speed = e.baseSpeed * e.speedMult;
+    // LAG SPIKE: while active, add lagSpikeMag to the speed multiplier. Applied
+    // outside e.speedMult so slow debuffs still work during the surge.
+    const lagMult = (s as any).lagSpikeActive > 0 ? 1 + lagSpikeMag : 1;
+    const speed = e.baseSpeed * e.speedMult * lagMult;
     e.progress += speed * dtSec;
     const path = map.paths[e.pathIndex] ?? map.paths[0];
     const pos = posOnPath(path, e.progress);
@@ -2498,11 +2540,26 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
     const absorbed = Math.min(e.shield!, final);
     e.shield = e.shield! - absorbed;
     final -= absorbed;
+    // CRACKED EXPOSURE: when the shield just broke, expose the enemy for 3s.
+    // Bonus damage applies to the overflow of this same shot and every hit
+    // until the shield regenerates past 0 and cracks again.
+    if (e.shield === 0 && (e.maxShield ?? 0) > 0) {
+      e.crackedTimer = 3;
+      if (!silent) s.floaters.push({
+        pos: { x: e.pos.x, y: e.pos.y - 0.4 },
+        text: 'EXPOSED!', vy: -18, life: 1, maxLife: 1,
+        color: '#88e8ff', size: 14,
+      });
+    }
     if (final <= 0) {
       if (!silent) e.hitFlash = isCrit ? 0.25 : 0.18;
       if (source) s.damageDealt[source] = (s.damageDealt[source] ?? 0) + absorbed;
       return absorbed;
     }
+  }
+  // CRACKED EXPOSURE: +25% damage on HP while exposed.
+  if ((e.crackedTimer ?? 0) > 0) {
+    final *= 1.25;
   }
   const hpBefore = e.hp;
   e.hp -= final;

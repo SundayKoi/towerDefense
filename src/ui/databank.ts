@@ -428,7 +428,7 @@ function renderProgressionTab(save: SaveData): string {
   // ── DAILY CONTRACT ─────────────────────────────────────────────────
   out.push(`<div class="progress-section"><div class="progress-head">DAILY CONTRACT</div>`);
   out.push(`<div class="progress-sub">Seeded run — same (map, difficulty, mutator) for everyone on the same day. Unlocks after clearing 3 maps. Tracks best wave + clear time.</div>`);
-  out.push(`<div class="progress-sub">Mutators rotate daily: PACKET STORM (+40% burst spawns), ENCRYPTED PAYLOADS (+30% shield HP), GHOST PROTOCOL (25% cloaked — needs AOE/chain turret), REPLICATING VIRUS (15% worm offspring on kill), ROOTKIT SWEEP (jam every 4s near bosses).</div>`);
+  out.push(`<div class="progress-sub">Mutators rotate daily: PACKET STORM (+40% burst spawns), ENCRYPTED PAYLOADS (+30% shield HP — crack it for +25% DMG/3s EXPOSED), GHOST PROTOCOL (25% cloaked — needs AOE/chain turret), REPLICATING VIRUS (15% worm offspring on kill), ROOTKIT SWEEP (jam every 4s near bosses).</div>`);
   out.push(`</div>`);
 
   return out.join('');

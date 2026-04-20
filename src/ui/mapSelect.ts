@@ -13,7 +13,7 @@ const THREAT_COLOR: Record<string, string> = {
 
 const SECTOR_INFO: Record<number, { name: string; modifier: string }> = {
   1: { name: 'SYSTEM BOOT',         modifier: '' },
-  2: { name: 'PACKET STORM',        modifier: 'PACKET BURSTS' },
+  2: { name: 'PACKET STORM',        modifier: 'LAG SPIKE' },
   3: { name: 'ENCRYPTED CORE',      modifier: 'ENCRYPTED PAYLOADS' },
   4: { name: 'STEALTH NET',         modifier: 'STEALTH PROTOCOL' },
   5: { name: 'VOID SWARM',          modifier: 'REPLICATION VIRUS' },

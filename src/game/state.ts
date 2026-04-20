@@ -305,7 +305,7 @@ export function createRun(mapId: string, difficulty: Difficulty, save: SaveData,
     contractMutators: (() => {
       if (brutal) {
         return {
-          packetBursts: 0.4 * 0.6,
+          lagSpike:     0.6,   // +60% speed during spikes (max-stacked, not additive)
           encrypted:    0.3 * 0.6,
           stealthChance:0.25 * 0.6,
           replication:  0.15 * 0.6,
