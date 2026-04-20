@@ -1578,24 +1578,41 @@ export function drawDraft(level: number, unlockedIds: Set<string>, context: Draf
   });
   if (pool.length === 0) return [];
 
+  // Split filler (repeatable universal cards) out of the main pool. They
+  // only enter the draw when the non-filler pool can't fill every slot —
+  // otherwise a player building a specific turret could lose a slot to a
+  // filler pick even though real upgrades were still eligible.
+  const real = pool.filter((c) => !c.repeatable);
+  const filler = pool.filter((c) => c.repeatable);
+
   const rarityW: Record<string, number> = {};
   for (const r of Object.keys(BASE_WEIGHTS)) {
     rarityW[r] = BASE_WEIGHTS[r] + PER_LEVEL[r] * level;
   }
 
-  const picks: string[] = [];
+  const drawFrom = (source: CardDef[], used: Set<string>, n: number): string[] => {
+    const out: string[] = [];
+    while (out.length < n) {
+      const weighted = source
+        .filter((c) => !used.has(c.id))
+        .map((c) => ({ card: c, weight: rarityW[c.rarity] * categoryWeight(c.category, level, context) }));
+      const totalW = weighted.reduce((sum, x) => sum + x.weight, 0);
+      if (totalW <= 0 || weighted.length === 0) break;
+      let r = Math.random() * totalW;
+      let picked = weighted[weighted.length - 1];
+      for (const w of weighted) { r -= w.weight; if (r <= 0) { picked = w; break; } }
+      used.add(picked.card.id);
+      out.push(picked.card.id);
+    }
+    return out;
+  };
+
   const used = new Set<string>();
-  while (picks.length < count) {
-    const weighted = pool
-      .filter((c) => !used.has(c.id))
-      .map((c) => ({ card: c, weight: rarityW[c.rarity] * categoryWeight(c.category, level, context) }));
-    const totalW = weighted.reduce((sum, x) => sum + x.weight, 0);
-    if (totalW <= 0 || weighted.length === 0) break;
-    let r = Math.random() * totalW;
-    let picked = weighted[weighted.length - 1];
-    for (const w of weighted) { r -= w.weight; if (r <= 0) { picked = w; break; } }
-    used.add(picked.card.id);
-    picks.push(picked.card.id);
+  const picks: string[] = [];
+  // Always prefer real cards first. Only tap filler when real runs out.
+  picks.push(...drawFrom(real, used, count));
+  if (picks.length < count && filler.length > 0) {
+    picks.push(...drawFrom(filler, used, count - picks.length));
   }
   return picks;
 }
