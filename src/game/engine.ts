@@ -900,21 +900,13 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
   // Tower updates
   for (const t of s.towers) {
     if (t.def === 'sentinel') {
+      tickTowerDebuffs(s, t, dtSec);
       updateSentinelTower(s, t, dtSec);
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
       continue;
     }
     if (t.def === 'pulse') {
-      // debuff ticking (in-place splice to avoid per-frame array allocation)
-      for (const d of t.debuffs) d.timeLeft -= dtSec;
-      for (let i = t.debuffs.length - 1; i >= 0; i--) {
-        if (t.debuffs[i].timeLeft <= 0) {
-          grantDebuffGrace(s, t, t.debuffs[i].kind);
-          t.debuffs.splice(i, 1);
-        }
-      }
-      if ((t.debuffCooldowns.jammed ?? 0) > 0) t.debuffCooldowns.jammed = Math.max(0, (t.debuffCooldowns.jammed ?? 0) - dtSec);
-      if ((t.debuffCooldowns.infected ?? 0) > 0) t.debuffCooldowns.infected = Math.max(0, (t.debuffCooldowns.infected ?? 0) - dtSec);
+      tickTowerDebuffs(s, t, dtSec);
       updatePulseTower(s, t, dtSec);
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
       continue;
@@ -922,6 +914,7 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     if (t.def === 'data_miner') {
       // DECRYPT NODE — passive damage-amplification aura. The multiplier is
       // applied in damageEnemy. Here we just pulse the visual.
+      tickTowerDebuffs(s, t, dtSec);
       t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
       if (t.extras.flashTimer <= 0) { t.extras.flashTimer = 1.2; t.fireFlash = 0.18; }
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
@@ -929,12 +922,14 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     }
     if (t.def === 'booster_node') {
       // Passive aura — handled in effectiveDamage / effectiveFireRate. Just pulse a flash for visuals.
+      tickTowerDebuffs(s, t, dtSec);
       t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
       if (t.extras.flashTimer <= 0) { t.extras.flashTimer = 1.5; t.fireFlash = 0.2; }
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
       continue;
     }
     if (t.def === 'heat_sink') {
+      tickTowerDebuffs(s, t, dtSec);
       updateHeatSink(s, t, dtSec);
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
       continue;
@@ -1302,6 +1297,23 @@ function grantDebuffGrace(s: RunState, t: TowerInstance, kind: 'jammed' | 'infec
   t.debuffCooldowns[kind] = grace;
 }
 
+// Per-frame debuff bookkeeping shared by every tower — ticks active debuff
+// timers, fires the grace-period grant on expiry, and decays the grace-period
+// cooldowns. Previously inlined only in updateTower(), which meant passive
+// turrets (booster_node, data_miner, sentinel, heat_sink) that `continue`d
+// before hitting updateTower never expired their debuffs.
+function tickTowerDebuffs(s: RunState, t: TowerInstance, dt: number): void {
+  for (const d of t.debuffs) d.timeLeft -= dt;
+  for (let i = t.debuffs.length - 1; i >= 0; i--) {
+    if (t.debuffs[i].timeLeft <= 0) {
+      grantDebuffGrace(s, t, t.debuffs[i].kind);
+      t.debuffs.splice(i, 1);
+    }
+  }
+  if ((t.debuffCooldowns.jammed ?? 0) > 0) t.debuffCooldowns.jammed = Math.max(0, (t.debuffCooldowns.jammed ?? 0) - dt);
+  if ((t.debuffCooldowns.infected ?? 0) > 0) t.debuffCooldowns.infected = Math.max(0, (t.debuffCooldowns.infected ?? 0) - dt);
+}
+
 export function applyTowerDebuff(
   s: RunState,
   t: TowerInstance,
@@ -1435,23 +1447,11 @@ function applyAreaDebuffToClosest(
 }
 
 function updateTower(s: RunState, t: TowerInstance, dt: number): void {
-  for (const d of t.debuffs) d.timeLeft -= dt;
-  // In-place splice to avoid per-frame array allocation per tower. When a
-  // debuff expires, start a 2s grace period during which the tower can't be
-  // re-hit with the same debuff kind — breaks the phantom+rootkit+sector-mod
-  // cascade that used to chain-lock entire subnet clusters.
-  for (let i = t.debuffs.length - 1; i >= 0; i--) {
-    if (t.debuffs[i].timeLeft <= 0) {
-      grantDebuffGrace(s, t, t.debuffs[i].kind);
-      t.debuffs.splice(i, 1);
-    }
-  }
+  tickTowerDebuffs(s, t, dt);
   // SHOCK CYCLE (heat_sink PURGE branch): tick down the +25% rate window.
   if ((t.extras.shockBoostTimer ?? 0) > 0) {
     t.extras.shockBoostTimer = Math.max(0, (t.extras.shockBoostTimer ?? 0) - dt);
   }
-  if ((t.debuffCooldowns.jammed ?? 0) > 0) t.debuffCooldowns.jammed = Math.max(0, (t.debuffCooldowns.jammed ?? 0) - dt);
-  if ((t.debuffCooldowns.infected ?? 0) > 0) t.debuffCooldowns.infected = Math.max(0, (t.debuffCooldowns.infected ?? 0) - dt);
   // Overdrive timers — when offline, skip firing entirely.
   if (!tickOverdrive(t, dt)) { t.cooldown = Math.max(0, t.cooldown - dt); return; }
   t.cooldown = Math.max(0, t.cooldown - dt);
