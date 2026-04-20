@@ -829,7 +829,7 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       e.debuffTimer = (e.debuffTimer ?? 4) - dtSec;
       if (e.debuffTimer <= 0) {
         e.debuffTimer = 4;
-        applyAreaDebuffToClosest(s, e.pos, 2.5, 'infected', 3, 2);
+        applyAreaDebuffToClosest(s, e.pos, 2.5, 'infected', 3, 2, e);
       }
     }
 
@@ -839,7 +839,7 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     if (e.def === 'parasite') {
       for (const t of s.towers) {
         if (Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) <= 0.6) {
-          applyTowerDebuff(s, t, 'infected', 4);
+          applyTowerDebuff(s, t, 'infected', 4, e);
           e.alive = false;
           spawnDeathBurst(s, e.pos, ENEMIES.parasite.color, ENEMIES.parasite.accent, 8);
           s.floaters.push({ pos: { x: e.pos.x, y: e.pos.y - 0.4 }, text: 'INFECTED!', vy: -22, life: 1.5, maxLife: 1.5, color: '#a800ff', size: 16 });
@@ -909,7 +909,7 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       for (const d of t.debuffs) d.timeLeft -= dtSec;
       for (let i = t.debuffs.length - 1; i >= 0; i--) {
         if (t.debuffs[i].timeLeft <= 0) {
-          t.debuffCooldowns[t.debuffs[i].kind] = 2.0; // 2s grace
+          grantDebuffGrace(s, t, t.debuffs[i].kind);
           t.debuffs.splice(i, 1);
         }
       }
@@ -931,6 +931,11 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       // Passive aura — handled in effectiveDamage / effectiveFireRate. Just pulse a flash for visuals.
       t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dtSec;
       if (t.extras.flashTimer <= 0) { t.extras.flashTimer = 1.5; t.fireFlash = 0.2; }
+      if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
+      continue;
+    }
+    if (t.def === 'heat_sink') {
+      updateHeatSink(s, t, dtSec);
       if (t.fireFlash > 0) t.fireFlash = Math.max(0, t.fireFlash - dtSec);
       continue;
     }
@@ -1082,6 +1087,8 @@ function effectiveFireRate(s: RunState, t: TowerInstance, dt = 0): number {
   }
   // Overdrive: +100% fire rate for the boost duration.
   if ((t.extras.overdriveActive ?? 0) > 0) rate *= 2;
+  // SHOCK CYCLE (heat_sink PURGE branch): +25% fire rate after a cleanse.
+  if ((t.extras.shockBoostTimer ?? 0) > 0) rate *= 1.25;
   // Booster Node aura: in-range boosters add fire-rate buff.
   if (t.def !== 'booster_node' && t.def !== 'data_miner') {
     for (const b of s.towers) {
@@ -1202,12 +1209,152 @@ function tickOverdrive(t: TowerInstance, dt: number): boolean {
   return (t.extras.overdriveOffline ?? 0) <= 0;
 }
 
-export function applyTowerDebuff(s: RunState, t: TowerInstance, kind: 'jammed' | 'infected', duration: number): void {
+// ---------- HEAT SINK support ----------
+// Base capacity 3, bumped +2 by COOL RESERVES.
+function getHeatSinkCap(s: RunState, _sink: TowerInstance): number {
+  return hasEffect(s, 'heat_sink', 'heat_sink_itc_cap2') ? 5 : 3;
+}
+// Default vent downtime is 3s; CALIBRATED VENT cuts it 40%.
+function getHeatSinkVentDuration(s: RunState): number {
+  return hasEffect(s, 'heat_sink', 'heat_sink_itc_fastvent') ? 1.8 : 3.0;
+}
+// Nearest non-venting sink within its effectiveRange of targetPos, or undefined.
+function findOnlineHeatSink(s: RunState, targetPos: Vec2): TowerInstance | undefined {
+  let best: TowerInstance | undefined;
+  let bestD = Infinity;
+  for (const sink of s.towers) {
+    if (sink.def !== 'heat_sink') continue;
+    if ((sink.extras.ventTimer ?? 0) > 0) continue;
+    const range = effectiveRange(s, sink);
+    const d = Math.hypot(sink.pos.x - targetPos.x, sink.pos.y - targetPos.y);
+    if (d <= range && d < bestD) { best = sink; bestD = d; }
+  }
+  return best;
+}
+// Cleanse a tower's debuffs. PURGE branch extras: CRASH RECOVERY zeroes the
+// grace period, SHOCK CYCLE grants a 3s +25% fire-rate buff.
+function cleanseTower(s: RunState, t: TowerInstance): void {
+  if (t.debuffs.length === 0) return;
+  t.debuffs.length = 0;
+  if (hasEffect(s, 'heat_sink', 'heat_sink_prg_crash')) {
+    t.debuffCooldowns.jammed = 0;
+    t.debuffCooldowns.infected = 0;
+  }
+  if (hasEffect(s, 'heat_sink', 'heat_sink_prg_shock')) {
+    t.extras.shockBoostTimer = 3;
+  }
+  s.floaters.push({
+    pos: { x: t.pos.x, y: t.pos.y - 0.6 },
+    text: 'CLEANSED', vy: -22, life: 1.0, maxLife: 1.0,
+    color: '#00ffaa', size: 12,
+  });
+}
+function cleanseNearbyTowers(s: RunState, sink: TowerInstance, maxTargets: number): void {
+  const range = effectiveRange(s, sink);
+  const candidates: { t: TowerInstance; d: number }[] = [];
+  for (const t of s.towers) {
+    if (t.id === sink.id || t.debuffs.length === 0) continue;
+    const d = Math.hypot(t.pos.x - sink.pos.x, t.pos.y - sink.pos.y);
+    if (d <= range) candidates.push({ t, d });
+  }
+  candidates.sort((a, b) => a.d - b.d);
+  for (let i = 0; i < Math.min(maxTargets, candidates.length); i++) {
+    cleanseTower(s, candidates[i].t);
+  }
+}
+// Force the sink offline for its vent duration. Pure mechanical reset — PURGE
+// cleanses are driven by the independent PURGE CYCLE timer (time-based, not
+// vent-triggered) so the branch works even without the INTERCEPT keystone.
+function triggerHeatSinkVent(s: RunState, sink: TowerInstance): void {
+  sink.extras.heat = 0;
+  sink.extras.ventTimer = getHeatSinkVentDuration(s);
+  sink.fireFlash = 0.4;
+  s.floaters.push({
+    pos: { x: sink.pos.x, y: sink.pos.y - 0.5 },
+    text: 'VENT!', vy: -20, life: 1.2, maxLife: 1.2,
+    color: '#ff9f00', size: 16,
+  });
+  s.shakeTime = Math.max(s.shakeTime, 0.1);
+  s.shakeAmp = Math.max(s.shakeAmp, 2);
+}
+// PURGE CYCLE — time-based cleanse pulse driven by the PURGE keystone.
+function triggerHeatSinkPurge(s: RunState, sink: TowerInstance): void {
+  sink.fireFlash = 0.3;
+  s.floaters.push({
+    pos: { x: sink.pos.x, y: sink.pos.y - 0.5 },
+    text: 'PURGE', vy: -20, life: 1.0, maxLife: 1.0,
+    color: '#00ffaa', size: 14,
+  });
+  if (hasEffect(s, 'heat_sink', 'heat_sink_prg_caps')) {
+    for (const t of s.towers) cleanseTower(s, t);
+  } else {
+    cleanseNearbyTowers(s, sink, 99);
+  }
+}
+// Set the standard 2s grace period — extended by 2s if an online heat sink
+// with FIRMWARE PATCH is in range of the tower recovering.
+function grantDebuffGrace(s: RunState, t: TowerInstance, kind: 'jammed' | 'infected'): void {
+  let grace = 2.0;
+  if (hasEffect(s, 'heat_sink', 'heat_sink_wrd_grace')
+      && findOnlineHeatSink(s, t.pos)) {
+    grace = 4.0;
+  }
+  t.debuffCooldowns[kind] = grace;
+}
+
+export function applyTowerDebuff(
+  s: RunState,
+  t: TowerInstance,
+  kind: 'jammed' | 'infected',
+  duration: number,
+  source?: EnemyInstance,
+): void {
   // Grace-period immunity: if this tower just recovered from the same kind of
   // debuff, skip. Stops cascading re-applications (phantom death + rootkit
   // aura + sector modifier firing back-to-back) from looking like permanent
   // lockdown on a clustered subnet.
   if ((t.debuffCooldowns[kind] ?? 0) > 0) return;
+
+  // HEAT SINK intercept — an online sink within range soaks the debuff before
+  // it touches the target. Heat sinks absorb debuffs on themselves normally.
+  if (t.def !== 'heat_sink') {
+    const sink = findOnlineHeatSink(s, t.pos);
+    if (sink) {
+      const intercept = hasEffect(s, 'heat_sink', 'heat_sink_itc_key');
+      const wardCaps = hasEffect(s, 'heat_sink', 'heat_sink_wrd_caps');
+      if (intercept || wardCaps) {
+        // ZERO-LATENCY voids the debuff without banking heat; otherwise TWIN
+        // halves the cost so two debuffs fit per heat unit.
+        const zeroLatency = hasEffect(s, 'heat_sink', 'heat_sink_itc_caps');
+        if (!zeroLatency) {
+          const cost = hasEffect(s, 'heat_sink', 'heat_sink_itc_twin') ? 0.5 : 1;
+          sink.extras.heat = (sink.extras.heat ?? 0) + cost;
+          if (sink.extras.heat >= getHeatSinkCap(s, sink)) {
+            triggerHeatSinkVent(s, sink);
+          }
+        }
+        // PHASE REFLECT — 30% chance to slow the attacking enemy back.
+        if (source && hasEffect(s, 'heat_sink', 'heat_sink_wrd_reflect') && Math.random() < 0.30) {
+          if (!ENEMIES[source.def].slowImmune) {
+            source.speedMult = Math.min(source.speedMult, 0.65);
+            source.slowTimer = Math.max(source.slowTimer, 1.5);
+          }
+        }
+        s.floaters.push({
+          pos: { x: sink.pos.x, y: sink.pos.y - 0.5 },
+          text: 'ABSORB', vy: -18, life: 0.9, maxLife: 0.9,
+          color: '#ff6b00', size: 12,
+        });
+        sink.fireFlash = Math.max(sink.fireFlash, 0.25);
+        return;
+      }
+      // FIELD PROJECTOR (non-caps WARD key): halve the landing duration.
+      if (hasEffect(s, 'heat_sink', 'heat_sink_wrd_key')) {
+        duration *= 0.5;
+      }
+    }
+  }
+
   const existing = t.debuffs.find((d) => d.kind === kind);
   if (existing) { existing.timeLeft = Math.max(existing.timeLeft, duration); return; }
   t.debuffs.push({ kind, timeLeft: duration });
@@ -1222,12 +1369,59 @@ export function applyTowerDebuff(s: RunState, t: TowerInstance, kind: 'jammed' |
   });
 }
 
+// Per-frame tick for heat_sink towers — vent countdown, network-shield bleed,
+// auto-purge cadence, and an idle pulse so the sprite reads as "active".
+function updateHeatSink(s: RunState, t: TowerInstance, dt: number): void {
+  // Mirror the computed cap onto extras so the renderer can draw a gauge
+  // without re-deriving it.
+  t.extras.heatCap = getHeatSinkCap(s, t);
+  if ((t.extras.ventTimer ?? 0) > 0) {
+    t.extras.ventTimer = Math.max(0, (t.extras.ventTimer ?? 0) - dt);
+    if (t.extras.ventTimer === 0) {
+      s.floaters.push({
+        pos: { x: t.pos.x, y: t.pos.y - 0.55 },
+        text: 'ONLINE', vy: -18, life: 0.9, maxLife: 0.9,
+        color: '#00ff88', size: 12,
+      });
+    }
+  }
+  // NETWORK SHIELD: at cap, leak 1 unit every 2s instead of forced venting.
+  if (hasEffect(s, 'heat_sink', 'heat_sink_wrd_bleed') && (t.extras.ventTimer ?? 0) <= 0) {
+    const cap = getHeatSinkCap(s, t);
+    if ((t.extras.heat ?? 0) >= cap - 0.001) {
+      t.extras.bleedTimer = (t.extras.bleedTimer ?? 2) - dt;
+      if ((t.extras.bleedTimer ?? 0) <= 0) {
+        t.extras.bleedTimer = 2;
+        t.extras.heat = Math.max(0, (t.extras.heat ?? 0) - 1);
+      }
+    } else {
+      t.extras.bleedTimer = 2;
+    }
+  }
+  // PURGE CYCLE — time-based cleanse pulse. Rapid Cycle shortens the interval.
+  if (hasEffect(s, 'heat_sink', 'heat_sink_prg_key')) {
+    const interval = hasEffect(s, 'heat_sink', 'heat_sink_prg_rapid') ? 7 : 10;
+    t.extras.purgeTimer = (t.extras.purgeTimer ?? interval) - dt;
+    if ((t.extras.purgeTimer ?? 0) <= 0) {
+      t.extras.purgeTimer = interval;
+      triggerHeatSinkPurge(s, t);
+    }
+  }
+  // Idle flash pulse so the sprite doesn't look dead between absorbs.
+  t.extras.flashTimer = (t.extras.flashTimer ?? 0) - dt;
+  if ((t.extras.flashTimer ?? 0) <= 0) {
+    t.extras.flashTimer = 1.2;
+    t.fireFlash = Math.max(t.fireFlash, 0.14);
+  }
+}
+
 // AOE debuff helper — sort towers by distance, apply debuff to the N closest
 // within radius. Caps cascade damage on clustered subnet builds so one phantom
 // death doesn't shut down a 6-tower cluster for 3 seconds.
 function applyAreaDebuffToClosest(
   s: RunState, origin: Vec2, radius: number,
   kind: 'jammed' | 'infected', duration: number, maxTargets: number,
+  source?: EnemyInstance,
 ): void {
   const inRange: { t: TowerInstance; d: number }[] = [];
   for (const t of s.towers) {
@@ -1236,7 +1430,7 @@ function applyAreaDebuffToClosest(
   }
   inRange.sort((a, b) => a.d - b.d);
   for (let i = 0; i < Math.min(maxTargets, inRange.length); i++) {
-    applyTowerDebuff(s, inRange[i].t, kind, duration);
+    applyTowerDebuff(s, inRange[i].t, kind, duration, source);
   }
 }
 
@@ -1248,9 +1442,13 @@ function updateTower(s: RunState, t: TowerInstance, dt: number): void {
   // cascade that used to chain-lock entire subnet clusters.
   for (let i = t.debuffs.length - 1; i >= 0; i--) {
     if (t.debuffs[i].timeLeft <= 0) {
-      t.debuffCooldowns[t.debuffs[i].kind] = 2.0;
+      grantDebuffGrace(s, t, t.debuffs[i].kind);
       t.debuffs.splice(i, 1);
     }
+  }
+  // SHOCK CYCLE (heat_sink PURGE branch): tick down the +25% rate window.
+  if ((t.extras.shockBoostTimer ?? 0) > 0) {
+    t.extras.shockBoostTimer = Math.max(0, (t.extras.shockBoostTimer ?? 0) - dt);
   }
   if ((t.debuffCooldowns.jammed ?? 0) > 0) t.debuffCooldowns.jammed = Math.max(0, (t.debuffCooldowns.jammed ?? 0) - dt);
   if ((t.debuffCooldowns.infected ?? 0) > 0) t.debuffCooldowns.infected = Math.max(0, (t.debuffCooldowns.infected ?? 0) - dt);
@@ -2613,7 +2811,7 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
     if (phase < 1 && hpBefore / e.maxHp >= 0.66 && e.hp / e.maxHp < 0.66) {
       e.bossPhase = 1;
       for (let i = 0; i < 3; i++) spawnWormAt(s, e.pos, e.pathIndex, e.progress);
-      applyAreaDebuffToClosest(s, e.pos, 4.0, 'jammed', 3, 2);
+      applyAreaDebuffToClosest(s, e.pos, 4.0, 'jammed', 3, 2, e);
       s.floaters.push({
         pos: { x: e.pos.x, y: e.pos.y - 0.8 },
         text: 'KERNEL PANIC',
@@ -2628,7 +2826,7 @@ export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: 
       e.enraged = true;
       e.speedMult = Math.max(e.speedMult, 1.35);
       for (let i = 0; i < 3; i++) spawnWormAt(s, e.pos, e.pathIndex, e.progress);
-      applyAreaDebuffToClosest(s, e.pos, 4.5, 'jammed', 2, 3);
+      applyAreaDebuffToClosest(s, e.pos, 4.5, 'jammed', 2, 3, e);
       s.floaters.push({
         pos: { x: e.pos.x, y: e.pos.y - 0.9 },
         text: 'CORE DUMP // ENRAGED',
@@ -2738,7 +2936,7 @@ function killEnemy(s: RunState, e: EnemyInstance): void {
   // jam on every tower within 3.5 tiles — a subnet cluster would go dark
   // for 3 whole seconds on a single kill.
   if (e.def === 'phantom') {
-    applyAreaDebuffToClosest(s, e.pos, 2.5, 'jammed', 1.5, 2);
+    applyAreaDebuffToClosest(s, e.pos, 2.5, 'jammed', 1.5, 2, e);
   }
 
   // Honeypot detonation: death inside puddle explodes

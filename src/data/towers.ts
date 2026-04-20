@@ -223,4 +223,24 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     description: 'Passive damage aura — enemies inside take +15% damage from all sources. No combat.',
     special: 'Enemies within aura take +15% damage from ALL sources.',
   },
+  heat_sink: {
+    // Pure support. Intercepts tower debuffs (rootkit pulses, phantom infections,
+    // sector rootkit, parasite bites) destined for towers within range — banks
+    // them as HEAT, then forcibly VENTS when cap is reached. While venting the
+    // sink is offline for 3s and can't absorb. Zero offensive output; the
+    // extras.heat / extras.ventTimer fields drive its entire behavior.
+    id: 'heat_sink',
+    name: 'HEAT SINK',
+    damage: 0,
+    range: 2.5,
+    fireRate: 0,
+    projectileSpeed: 0,
+    projectileColor: '#ff6b00',
+    trailColor: '#aa3a00',
+    baseColor: '#331408',
+    accentColor: '#ff6b00',
+    damageType: 'energy',
+    description: 'Passive support — intercepts debuffs targeting nearby towers. Banks HEAT, vents when full.',
+    special: 'Absorbs 3 debuffs. At cap, vents for 3s (offline, can\'t absorb). Act 6 HARD unlock.',
+  },
 };

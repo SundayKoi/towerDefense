@@ -32,7 +32,7 @@ RUNNERS  (pick one per run — swaps the starting passive + bans one turret)
 
 
 ═══════════════════════════════════════════════════════════════════════════════
-TURRETS  (14 total)
+TURRETS  (15 total)
 ═══════════════════════════════════════════════════════════════════════════════
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -460,6 +460,37 @@ TURRETS  (14 total)
     SYNC FIELD               aura enemies can't regen (shield/HP)
  [*] STUTTER                  every 3s, all aura enemies stunned 0.4s
  [C] TOTAL CORRUPTION         bosses take DOUBLE aura damage
+
+───────────────────────────────────────────────────────────────────────────────
+[HEAT SINK] (heat_sink)                       unlock: Act 6 map 4 · HARD
+  RNG 2.5  pure support (no damage, no firing)
+  Intercepts tower debuffs within range. Banks absorbed hits as HEAT (cap 3).
+  At cap, VENTS — goes offline 3s and can't absorb. Heat sinks absorb debuffs
+  on themselves normally (only nearby towers benefit from intercept).
+
+  Branch: INTERCEPT (starter — bigger absorb pool)
+    INTERCEPT CORE           keystone: enables the absorb/vent mechanic
+    COOL RESERVES            heat capacity +2 (5 total)
+ [*] DEEP CACHE               intercept range +1 tile (3.5)
+    CALIBRATED VENT          vent downtime −40% (3s → 1.8s)
+ [*] TWIN CHANNELS            each absorbed debuff costs only 0.5 heat
+ [C] ZERO-LATENCY             absorbs never bank heat — can't be forced to vent
+
+  Branch: WARD (unlock: Act 7 map 3, hard clear)
+    FIELD PROJECTOR          keystone: debuffs that land nearby last 50% shorter
+    RESONANT LINK            ward range +0.5
+ [*] FIRMWARE PATCH           +2s grace period for towers shaking debuffs
+    PHASE REFLECT            30% intercept → 35% slow back to source enemy
+ [*] NETWORK SHIELD           at cap, bleed 1 heat/2s instead of forced vent
+ [C] FIRMWARE OVERWRITE       nearby towers fully immune while sink is online
+
+  Branch: PURGE (unlock: Act 7 map 4, hard clear)
+    PURGE CYCLE              keystone: every 10s, pulse-cleanse nearby towers
+    COLD PURGE               cleanse range +0.5
+ [*] SHOCK CYCLE              cleansed towers +25% rate for 3s
+    RAPID CYCLE              pulse interval −30% (10s → 7s)
+ [*] CRASH RECOVERY           cleansed towers skip re-debuff grace
+ [C] FULL SYSTEM RESTORE      pulses become map-wide — cleanse EVERY tower
 
 
 ═══════════════════════════════════════════════════════════════════════════════

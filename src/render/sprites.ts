@@ -709,6 +709,72 @@ const towerSVG: Record<TowerId, () => string> = {
         <circle cx='64' cy='6' r='0.8'/>
       </g>
     </svg>`,
+  heat_sink: () => `
+    <svg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'>
+      <defs>
+        <linearGradient id='hs-body' x1='0' y1='0' x2='0' y2='1'>
+          <stop offset='0' stop-color='#ff9f00'/>
+          <stop offset='0.5' stop-color='#6b2a08'/>
+          <stop offset='1' stop-color='#1a0804'/>
+        </linearGradient>
+        <radialGradient id='hs-core' cx='50%' cy='50%'>
+          <stop offset='0' stop-color='#fff3cc'/>
+          <stop offset='0.4' stop-color='#ff9f00'/>
+          <stop offset='1' stop-color='#331408'/>
+        </radialGradient>
+        <filter id='hs-glow'><feGaussianBlur stdDeviation='2.4'/><feMerge><feMergeNode/><feMergeNode in='SourceGraphic'/></feMerge></filter>
+      </defs>
+      <!-- Ground shadow -->
+      <ellipse cx='64' cy='114' rx='38' ry='5' fill='#000' opacity='0.5'/>
+      <!-- Octagonal plinth -->
+      <polygon points='36,30 92,30 108,46 108,96 92,112 36,112 20,96 20,46' fill='#160604' stroke='#ff6b00' stroke-width='1.2'/>
+      <polygon points='40,34 88,34 102,48 102,94 88,108 40,108 26,94 26,48' fill='url(#hs-body)' stroke='#ff9f00' stroke-width='1'/>
+      <!-- Fins (left + right vertical stacks of cooling blades) -->
+      <g stroke='#ff9f00' stroke-width='0.8' fill='#0a0302'>
+        <rect x='12' y='50' width='10' height='6' rx='1'/>
+        <rect x='12' y='60' width='10' height='6' rx='1'/>
+        <rect x='12' y='70' width='10' height='6' rx='1'/>
+        <rect x='12' y='80' width='10' height='6' rx='1'/>
+        <rect x='106' y='50' width='10' height='6' rx='1'/>
+        <rect x='106' y='60' width='10' height='6' rx='1'/>
+        <rect x='106' y='70' width='10' height='6' rx='1'/>
+        <rect x='106' y='80' width='10' height='6' rx='1'/>
+      </g>
+      <!-- Fin heat glow -->
+      <g fill='#ff6b00' opacity='0.75' filter='url(#hs-glow)'>
+        <rect x='14' y='52' width='6' height='1.5'/>
+        <rect x='14' y='72' width='6' height='1.5'/>
+        <rect x='108' y='62' width='6' height='1.5'/>
+        <rect x='108' y='82' width='6' height='1.5'/>
+      </g>
+      <!-- Radiator grid on body -->
+      <g stroke='#ff6b00' stroke-width='0.5' opacity='0.7'>
+        <line x1='38' y1='44' x2='90' y2='44'/>
+        <line x1='38' y1='52' x2='90' y2='52'/>
+        <line x1='38' y1='88' x2='90' y2='88'/>
+        <line x1='38' y1='96' x2='90' y2='96'/>
+      </g>
+      <!-- Central heat core -->
+      <circle cx='64' cy='70' r='18' fill='url(#hs-core)' stroke='#ff9f00' stroke-width='1.2' filter='url(#hs-glow)'/>
+      <circle cx='64' cy='70' r='10' fill='#ffd98a' opacity='0.85'/>
+      <circle cx='64' cy='70' r='4' fill='#ffffff'/>
+      <!-- Warning chevrons around core -->
+      <g fill='#ff3300' opacity='0.85'>
+        <polygon points='64,46 60,52 68,52'/>
+        <polygon points='64,94 60,88 68,88'/>
+        <polygon points='40,70 46,66 46,74'/>
+        <polygon points='88,70 82,66 82,74'/>
+      </g>
+      <!-- Top vent pipe -->
+      <rect x='58' y='14' width='12' height='18' rx='2' fill='#0a0302' stroke='#ff9f00' stroke-width='1'/>
+      <circle cx='64' cy='18' r='3' fill='#ff6b00' filter='url(#hs-glow)'/>
+      <!-- Vent plume -->
+      <g fill='#ff9f00' opacity='0.7' filter='url(#hs-glow)'>
+        <circle cx='60' cy='10' r='1.2'/>
+        <circle cx='67' cy='6' r='0.9'/>
+        <circle cx='63' cy='3' r='0.7'/>
+      </g>
+    </svg>`,
 };
 
 // ---------- ENEMY SPRITES ----------

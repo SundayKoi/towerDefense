@@ -18,7 +18,8 @@ export type TowerId =
   | 'scrambler'
   | 'sentinel'
   | 'booster_node'
-  | 'data_miner';
+  | 'data_miner'
+  | 'heat_sink';
 
 export type EnemyId =
   | 'worm'

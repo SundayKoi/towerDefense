@@ -1035,7 +1035,7 @@ export const MAPS: MapDef[] = [
     rewards: {
       easyClear:   { type: 'unlock-branch', id: 'mine.scr' },
       mediumClear: { type: 'protocols',     id: '425' },
-      hardClear:   { type: 'protocols',     id: '525' },
+      hardClear:   { type: 'unlock-tower',  id: 'heat_sink' },
     },
     sector: 6, act: 6, actName: 'APEX RUIN', actTag: 'Your towers are the target.',
     modifiers: { rootkit: 8 },
@@ -1174,7 +1174,7 @@ export const MAPS: MapDef[] = [
     rewards: {
       easyClear:   { type: 'unlock-branch', id: 'scrambler.crs' },
       mediumClear: { type: 'unlock-branch', id: 'sentinel.plz' },
-      hardClear:   { type: 'protocols',     id: '650' },
+      hardClear:   { type: 'unlock-branch', id: 'heat_sink.wrd' },
     },
     sector: 7, act: 7, actName: 'OMEGA PROTOCOL', actTag: 'Every layer at once.',
     modifiers: { lagSpike: 0.5, encrypted: 0.10, stealthChance: 0.15, replication: 0.12, rootkit: 12 },
@@ -1221,7 +1221,7 @@ export const MAPS: MapDef[] = [
     rewards: {
       easyClear:   { type: 'unlock-branch', id: 'booster_node.res' },
       mediumClear: { type: 'unlock-branch', id: 'booster_node.crt' },
-      hardClear:   { type: 'protocols',     id: '1500' },
+      hardClear:   { type: 'unlock-branch', id: 'heat_sink.prg' },
     },
     sector: 7, act: 7, actName: 'OMEGA PROTOCOL', actTag: 'Every layer at once.',
     modifiers: { lagSpike: 0.5, encrypted: 0.10, stealthChance: 0.15, replication: 0.12, rootkit: 12 },

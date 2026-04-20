@@ -656,6 +656,41 @@ function drawTower(ctx: CanvasRenderingContext2D, vp: RenderViewport, t: TowerIn
     ctx.setLineDash([]);
     ctx.restore();
   }
+  // HEAT SINK — dashed intercept ring (red while venting, amber when online)
+  // plus a vertical heat gauge pipe on the left so absorb pressure is legible.
+  if (t.def === 'heat_sink') {
+    const venting = (t.extras.ventTimer ?? 0) > 0;
+    const auraColor = venting ? '#ff3355' : '#ff9f00';
+    const auraRange = def.range * cs;
+    const auraPulse = 0.55 + 0.45 * Math.sin(performance.now() / (venting ? 180 : 420));
+    ctx.save();
+    ctx.globalAlpha = 0.22 + auraPulse * 0.14;
+    ctx.strokeStyle = auraColor;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.shadowColor = auraColor;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(cx, cy, auraRange, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    // Heat gauge — tiny vertical pip on top-left corner showing fill ratio.
+    const heat = t.extras.heat ?? 0;
+    const cap = t.extras.heatCap ?? 3;
+    const ratio = venting ? 0 : Math.min(1, heat / Math.max(1, cap));
+    if (ratio > 0 || venting) {
+      const gx = t.grid.x * cs + 4;
+      const gyTop = t.grid.y * cs + 4;
+      const gh = 14;
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(gx, gyTop, 3, gh);
+      ctx.fillStyle = venting ? '#ff3355' : (ratio > 0.8 ? '#ff3300' : ratio > 0.5 ? '#ff9f00' : '#ffd98a');
+      ctx.fillRect(gx, gyTop + gh * (1 - ratio), 3, gh * ratio);
+      ctx.restore();
+    }
+  }
   // Buffed-turret indicator — a small "+" dot at the top-right corner for any
   // non-support tower currently receiving a subnet bonus. Makes booster's
   // effect visible on the TARGETS, not just the source.

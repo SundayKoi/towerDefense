@@ -153,6 +153,15 @@ const DEPLOY: CardDef[] = [
     description: 'Gain a DECRYPT NODE token. Passive aura — enemies in range take +15% damage from ALL sources.',
     apply: (s) => { addToken(s, 'data_miner', 1); },
   },
+  {
+    id: 'deploy_heat_sink',
+    name: 'DEPLOY: HEAT SINK',
+    rarity: 'epic',
+    category: 'deploy',
+    towerHint: 'heat_sink',
+    description: 'Gain a HEAT SINK token. Passive support — intercepts debuffs targeting nearby towers, vents when full.',
+    apply: (s) => { addToken(s, 'heat_sink', 1); },
+  },
 ];
 
 // ==================== UPGRADE BRANCH HELPERS ====================
@@ -1048,6 +1057,66 @@ const BRANCH_SPECS: BranchSpec[] = [];
   });
 }
 
+// ===== HEAT SINK =====
+{
+  const T = 'heat_sink' as TowerId;
+  const TL = 'HEAT SINK';
+  // INTERCEPT — bigger capacity / range for absorbing debuffs
+  BRANCH_SPECS.push({
+    tower: T, towerLabel: TL, branchKey: 'itc', branchLabel: 'INTERCEPT', branchTagSuffix: 'intercept',
+    cards: [
+      { shortName: 'INTERCEPT CORE', description: 'HEAT SINK absorbs debuffs targeting towers within range. Base capacity: 3.',
+        apply: (s) => { addEffect(s, T, 'heat_sink_itc_key'); } },
+      { shortName: 'COOL RESERVES', description: 'HEAT SINK capacity +2 (5 total).',
+        apply: (s) => { addEffect(s, T, 'heat_sink_itc_cap2'); } },
+      { shortName: 'DEEP CACHE', description: 'HEAT SINK intercept range +1 tile (3.5).', rarity: 'rare',
+        apply: (s) => { bumpRange(s, T, 1.0); addEffect(s, T, 'heat_sink_itc_range'); } },
+      { shortName: 'CALIBRATED VENT', description: 'HEAT SINK vent downtime -40% (3s → 1.8s).',
+        apply: (s) => { addEffect(s, T, 'heat_sink_itc_fastvent'); } },
+      { shortName: 'TWIN CHANNELS', description: 'HEAT SINK absorbs two same-frame debuffs at once instead of one.', rarity: 'rare',
+        apply: (s) => { addEffect(s, T, 'heat_sink_itc_twin'); } },
+      { shortName: 'ZERO-LATENCY', description: 'Absorbed debuffs are voided instantly — no heat stored, never forced to vent.',
+        apply: (s) => { addEffect(s, T, 'heat_sink_itc_caps'); } },
+    ],
+  });
+  // WARD — reduce the blow when debuffs do land
+  BRANCH_SPECS.push({
+    tower: T, towerLabel: TL, branchKey: 'wrd', branchLabel: 'WARD', branchTagSuffix: 'ward',
+    cards: [
+      { shortName: 'FIELD PROJECTOR', description: 'Nearby towers take 50% shorter debuffs while HEAT SINK is online.',
+        apply: (s) => { addEffect(s, T, 'heat_sink_wrd_key'); } },
+      { shortName: 'RESONANT LINK', description: 'Ward field radius +0.5 tiles.',
+        apply: (s) => { bumpRange(s, T, 0.5); addEffect(s, T, 'heat_sink_wrd_range'); } },
+      { shortName: 'FIRMWARE PATCH', description: 'Nearby towers gain +2s grace-period immunity after shaking off a debuff.', rarity: 'rare',
+        apply: (s) => { addEffect(s, T, 'heat_sink_wrd_grace'); } },
+      { shortName: 'PHASE REFLECT', description: '30% chance an intercepted debuff bounces back as a 35% slow on the source enemy.',
+        apply: (s) => { addEffect(s, T, 'heat_sink_wrd_reflect'); } },
+      { shortName: 'NETWORK SHIELD', description: 'At max heat, HEAT SINK auto-bleeds one unit every 2s instead of forced venting.', rarity: 'rare',
+        apply: (s) => { addEffect(s, T, 'heat_sink_wrd_bleed'); } },
+      { shortName: 'FIRMWARE OVERWRITE', description: 'While HEAT SINK is online, towers in range are fully immune to debuffs — sink soaks everything.',
+        apply: (s) => { addEffect(s, T, 'heat_sink_wrd_caps'); } },
+    ],
+  });
+  // PURGE — actively clean debuffs already on towers
+  BRANCH_SPECS.push({
+    tower: T, towerLabel: TL, branchKey: 'prg', branchLabel: 'PURGE', branchTagSuffix: 'purge',
+    cards: [
+      { shortName: 'PURGE CYCLE', description: 'Every 10s, HEAT SINK pulses — cleanses all debuffs from towers in range.',
+        apply: (s) => { addEffect(s, T, 'heat_sink_prg_key'); } },
+      { shortName: 'COLD PURGE', description: 'Purge cleanse radius +0.5 tiles.',
+        apply: (s) => { bumpRange(s, T, 0.5); addEffect(s, T, 'heat_sink_prg_range'); } },
+      { shortName: 'SHOCK CYCLE', description: 'Cleansed towers get +25% fire rate for 3s after purge.', rarity: 'rare',
+        apply: (s) => { addEffect(s, T, 'heat_sink_prg_shock'); } },
+      { shortName: 'RAPID CYCLE', description: 'Purge interval −30% (10s → 7s).',
+        apply: (s) => { addEffect(s, T, 'heat_sink_prg_rapid'); } },
+      { shortName: 'CRASH RECOVERY', description: 'Cleansed towers skip the re-debuff grace period — ready to absorb the next hit.', rarity: 'rare',
+        apply: (s) => { addEffect(s, T, 'heat_sink_prg_crash'); } },
+      { shortName: 'FULL SYSTEM RESTORE', description: 'Purges become map-wide — cleanse EVERY tower on the grid.',
+        apply: (s) => { addEffect(s, T, 'heat_sink_prg_caps'); } },
+    ],
+  });
+}
+
 // Build all branch cards
 function buildAllBranches(): CardDef[] {
   const out: CardDef[] = [];
@@ -1488,6 +1557,7 @@ export const STARTER_BRANCH: Record<TowerId, string> = {
   sentinel:     'fld',    // field — passive aura
   booster_node: 'amp',    // amplify — buff
   data_miner:   'thr',    // breach — damage aura
+  heat_sink:    'itc',    // intercept — absorb debuffs
 };
 
 // Every card ID that belongs to a specific tower branch. Used by the finishRun
