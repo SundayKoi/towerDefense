@@ -2,12 +2,39 @@ import { CARDS_BY_ID } from '@/data/cards';
 import { ENEMIES } from '@/data/enemies';
 import type { EnemyId, RunState } from '@/types';
 import { audio } from '@/audio/sfx';
+import { hasSubnetLink } from '@/game/engine';
 
 // --------- Build / stats modal ---------
 // Shows run progress, active buffs synthesized from the cards picked, towers placed, and the
 // full card draft log. Purely informational — opens from the HUD build button or pause.
 import { TOWERS } from '@/data/towers';
 import type { RunState as _RS, TowerId as _TID } from '@/types';
+
+// Mirror of the crit math in engine.fire(). The stats page previously only
+// summed def.crit + globalCritChance + towerCrit[id], missing effect-based
+// bumps (UNSTABLE CORE, DECOHERENCE OVERLOAD capstone, antivirus netlink).
+// Bug the player hit: picked every crit upgrade, stats panel still said 47%
+// while in-combat crit chance was actually capped at 100%. This helper keeps
+// the display in sync with the real combat formula.
+function displayCritChance(r: _RS, id: _TID): number {
+  const def = TOWERS[id];
+  const towerEffects = r.towerEffects[id];
+  const has = (tag: string) => towerEffects?.has(tag) ?? false;
+
+  let critChance = (def.crit?.chance ?? 0) + r.mods.globalCritChance + (r.mods.towerCrit[id] ?? 0);
+  if (id === 'quantum' && has('unstable')) critChance += 0.08;
+  if (id === 'quantum' && has('quantum_super_caps')) critChance += 0.50;
+  if (id === 'antivirus'
+      && has('netlink_antivirus_quantum')
+      && (hasSubnetLink(r, 'antivirus', 'quantum')
+          || r.towerEffects['booster_node']?.has('booster_res_caps'))) {
+    critChance += 0.15;
+  }
+  // Combat clamps at 100% (if (critChance > 0 && Math.random() < critChance)
+  // with critChance > 1 still rolls guaranteed crit).
+  return Math.min(1, critChance);
+}
+
 export function openBuildStats(r: _RS): HTMLElement {
   const el = document.createElement('div');
   el.className = 'modal-overlay';
@@ -35,7 +62,7 @@ export function openBuildStats(r: _RS): HTMLElement {
     const dmgMod = 1 + r.mods.globalDamagePct + (r.mods.towerDmg[id] ?? 0);
     const rngMod = 1 + r.mods.globalRangePct + (r.mods.towerRange[id] ?? 0);
     const rateMod = 1 + r.mods.globalRatePct + (r.mods.towerRate[id] ?? 0);
-    const critChance = (def.crit?.chance ?? 0) + r.mods.globalCritChance + (r.mods.towerCrit[id] ?? 0);
+    const critChance = displayCritChance(r, id);
     const critPct = Math.round(critChance * 100);
     const dealt = r.damageDealt[id] ?? 0;
     const pct = Math.round((dealt / totalDmg) * 100);
