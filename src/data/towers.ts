@@ -174,7 +174,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     baseColor: '#1a0010',
     accentColor: '#ff2d95',
     damageType: 'energy',
-    description: 'Rapid bolts strip 3 armor per hit for 3s. Enables lethal combos with other towers.',
+    description: 'Rapid bolts chip 1 armor per hit (DEC branch scales up to 6). Enables lethal combos against armored targets.',
   },
   sentinel: {
     id: 'sentinel',

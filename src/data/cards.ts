@@ -123,7 +123,7 @@ const DEPLOY: CardDef[] = [
     rarity: 'rare',
     category: 'deploy',
     towerHint: 'scrambler',
-    description: 'Gain a DISRUPTOR deploy token. Strips armor on every hit, enabling lethal combos.',
+    description: 'Gain a DISRUPTOR deploy token. Chips armor on every hit — DEC branch scales the strip up.',
     apply: (s) => { addToken(s, 'scrambler', 1); },
   },
   {
@@ -410,7 +410,7 @@ const BRANCH_SPECS: BranchSpec[] = [];
   BRANCH_SPECS.push({
     tower: T, towerLabel: TL, branchKey: 'pierce', branchLabel: 'PIERCE', branchTagSuffix: 'pierce',
     cards: [
-      { shortName: 'DEEP SCAN', description: 'ANTIVIRUS shots ignore 6 armor on hit.',
+      { shortName: 'DEEP SCAN', description: 'ANTIVIRUS shots strip 3 armor per hit.',
         apply: (s) => { addEffect(s, T, 'antivirus_pierce_key'); addEffect(s, T, 'antivirus_pierce_deep'); } },
       { shortName: 'ARMOR MELT', description: 'ANTIVIRUS hits permanently strip 1 armor per shot.',
         apply: (s) => { addEffect(s, T, 'antivirus_pierce_melt'); } },
@@ -420,7 +420,7 @@ const BRANCH_SPECS: BranchSpec[] = [];
         apply: (s) => { addEffect(s, T, 'adaptive'); addEffect(s, T, 'antivirus_pierce_exploit'); } },
       { shortName: 'ULTRASONIC SHOT', description: 'ANTIVIRUS projectiles travel 60% faster, +0.4 range.', rarity: 'rare',
         apply: (s) => { bumpRange(s, T, 0.4); addEffect(s, T, 'antivirus_pierce_ultra'); } },
-      { shortName: 'ARMOR ANNIHILATION', description: 'Each hit cracks 5 armor permanently.',
+      { shortName: 'ARMOR ANNIHILATION', description: 'Each hit cracks 2 armor permanently.',
         apply: (s) => { addEffect(s, T, 'antivirus_pierce_caps'); } },
     ],
   });
@@ -570,7 +570,7 @@ const BRANCH_SPECS: BranchSpec[] = [];
         apply: (s) => { addEffect(s, T, 'demolition'); } },
       { shortName: 'SHOCKWAVE SHELLS', description: 'ARTILLERY explosions stun all enemies in blast for 1.2s.', rarity: 'rare',
         apply: (s) => { addEffect(s, T, 'stun'); } },
-      { shortName: 'PENETRATOR SHELLS', description: 'Explosions strip 10 armor from enemies in blast for 4s.',
+      { shortName: 'PENETRATOR SHELLS', description: 'Explosions strip 5 armor from enemies in blast for 4s.',
         apply: (s) => { addEffect(s, T, 'armor_strip'); } },
       { shortName: 'WARHEAD TUNING', description: 'ARTILLERY +25% damage.', rarity: 'rare',
         apply: (s) => { bumpDmg(s, T, 0.25); addEffect(s, T, 'mine_dem_tune'); } },
@@ -760,9 +760,9 @@ const BRANCH_SPECS: BranchSpec[] = [];
         apply: (s) => { bumpDmg(s, T, 0.25); addEffect(s, T, 'pulse_ion_tune'); } },
       { shortName: 'STATIC FIELD', description: 'EMP +0.4 range and pierces shielded enemies.',
         apply: (s) => { bumpRange(s, T, 0.4); addEffect(s, T, 'pulse_ion_static'); } },
-      { shortName: 'CHARGED IONS', description: 'EMP bursts also strip 2 armor on hit.', rarity: 'rare',
+      { shortName: 'CHARGED IONS', description: 'EMP bursts also strip 1 armor on hit.', rarity: 'rare',
         apply: (s) => { addEffect(s, T, 'pulse_ion_charged'); } },
-      { shortName: 'PERMANENT STRIP', description: 'EMP bursts also strip 4 armor permanently.',
+      { shortName: 'PERMANENT STRIP', description: 'EMP bursts also strip 2 armor permanently.',
         apply: (s) => { addEffect(s, T, 'pulse_ion_caps'); } },
     ],
   });
@@ -832,9 +832,9 @@ const BRANCH_SPECS: BranchSpec[] = [];
   BRANCH_SPECS.push({
     tower: T, towerLabel: TL, branchKey: 'dec', branchLabel: 'DECRYPT', branchTagSuffix: 'decrypt',
     cards: [
-      { shortName: 'DEEP SCAN', description: 'DISRUPTOR strips 6 armor per hit instead of 3.',
+      { shortName: 'DEEP SCAN', description: 'DISRUPTOR strips 3 armor per hit instead of 1.',
         apply: (s) => { addEffect(s, T, 'scrambler_dec_key'); addEffect(s, T, 'deep_scan'); } },
-      { shortName: 'DEEP HACK', description: 'DISRUPTOR strips +2 additional armor per hit.',
+      { shortName: 'DEEP HACK', description: 'DISRUPTOR strips +1 additional armor per hit.',
         apply: (s) => { addEffect(s, T, 'deep_hack'); } },
       { shortName: 'BROADCAST', description: 'DISRUPTOR pulses apply armor strip to ALL enemies in range.', rarity: 'rare',
         apply: (s) => { addEffect(s, T, 'broadcast'); } },
@@ -842,7 +842,7 @@ const BRANCH_SPECS: BranchSpec[] = [];
         apply: (s) => { addEffect(s, T, 'null_field'); } },
       { shortName: 'DECRYPT TUNE', description: 'DISRUPTOR +0.4 range, +20% fire rate.', rarity: 'rare',
         apply: (s) => { bumpRange(s, T, 0.4); bumpRate(s, T, 0.2); addEffect(s, T, 'scrambler_dec_tune'); } },
-      { shortName: 'TOTAL DECRYPT', description: 'DISRUPTOR strips 12 armor per hit.',
+      { shortName: 'TOTAL DECRYPT', description: 'DISRUPTOR strips 6 armor per hit.',
         apply: (s) => { addEffect(s, T, 'scrambler_dec_caps'); } },
     ],
   });
@@ -1267,7 +1267,7 @@ const LEGACY_SYNERGY: CardDef[] = [
   },
   {
     id: 'syn_sc_ps', name: 'SIGNAL JAM', rarity: 'rare', category: 'upgrade', towerHint: 'scrambler', towerHint2: 'pulse',
-    description: '[DISRUPTOR + EMP ARRAY] EMP bursts apply 3 armor strip to every enemy hit.',
+    description: '[DISRUPTOR + EMP ARRAY] EMP bursts apply 1 armor strip to every enemy hit.',
     apply: (s) => { addEffect(s, 'scrambler', 'signal_jam'); addEffect(s, 'pulse', 'signal_jam'); },
   },
   {
@@ -1324,7 +1324,7 @@ const NETLINKS: CardDef[] = [
   {
     id: 'netlink_ic_sc', name: 'NETLINK: CRYO DECRYPT', rarity: 'rare', category: 'upgrade',
     towerHint: 'ice', towerHint2: 'scrambler',
-    description: '[NETLINK ICE+DISRUPTOR, must subnet-link] ICE explosions strip 2 armor from enemies hit.',
+    description: '[NETLINK ICE+DISRUPTOR, must subnet-link] ICE explosions strip 1 armor from enemies hit.',
     apply: (s) => {
       addEffect(s, 'ice', 'netlink_ice_scrambler');
       addEffect(s, 'scrambler', 'netlink_ice_scrambler');

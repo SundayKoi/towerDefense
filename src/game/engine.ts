@@ -504,15 +504,15 @@ function updatePulseTower(s: RunState, t: TowerInstance, dt: number): void {
 
       // Signal jam synergy: apply armor strip
       if (hasEffect(s, 'pulse', 'signal_jam')) {
-        e.armor = Math.max(0, e.armor - 3);
+        e.armor = Math.max(0, e.armor - 1);
       }
-      // PULSE IONIC CHARGED: strip 2 armor on hit
+      // PULSE IONIC CHARGED: strip 1 armor on hit
       if (hasEffect(s, 'pulse', 'pulse_ion_charged')) {
-        e.armor = Math.max(0, e.armor - 2);
+        e.armor = Math.max(0, e.armor - 1);
       }
-      // PULSE IONIC capstone: strip 4 armor permanently (no restore via collapseTimer)
+      // PULSE IONIC capstone: strip 2 armor permanently (no restore via collapseTimer)
       if (hasEffect(s, 'pulse', 'pulse_ion_caps')) {
-        e.armor = Math.max(0, e.armor - 4);
+        e.armor = Math.max(0, e.armor - 2);
       }
 
       // Storm pulse synergy: trigger chain arc on each hit
@@ -1900,11 +1900,14 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     target.slowTimer = Math.max(target.slowTimer, p.slow.duration);
   }
 
-  // Scrambler: reduce armor (dec branch). DEC capstone strips 12, dec_hack +2, deep_scan 6 base
+  // Scrambler: reduce armor (dec branch). Chip-style strips so armored enemies
+  // take several hits to fully expose — base 1, deep_scan 3, dec_hack +1,
+  // capstone 6 (override). Previously 3/6/+2/12 made mid-tier armor
+  // irrelevant on the first hit.
   if (p.fromTower === 'scrambler') {
-    let stripAmount = hasEffect(s, 'scrambler', 'deep_scan') ? 6 : 3;
-    if (hasEffect(s, 'scrambler', 'deep_hack')) stripAmount += 2;
-    if (hasEffect(s, 'scrambler', 'scrambler_dec_caps')) stripAmount = 12;
+    let stripAmount = hasEffect(s, 'scrambler', 'deep_scan') ? 3 : 1;
+    if (hasEffect(s, 'scrambler', 'deep_hack')) stripAmount += 1;
+    if (hasEffect(s, 'scrambler', 'scrambler_dec_caps')) stripAmount = 6;
     target.armor = Math.max(0, target.armor - stripAmount);
     // Cripple: also slow
     if (hasEffect(s, 'scrambler', 'cripple') && !ENEMIES[target.def].slowImmune) {
@@ -2018,9 +2021,9 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
 
   // Antivirus PIERCE branch: armor strip family
   if (p.fromTower === 'antivirus') {
-    // antivirus_pierce_deep keystone: strips 6 armor on hit (one-shot, like scrambler)
+    // antivirus_pierce_deep keystone: strips 3 armor on hit
     if (hasEffect(s, 'antivirus', 'antivirus_pierce_deep')) {
-      target.armor = Math.max(0, target.armor - 6);
+      target.armor = Math.max(0, target.armor - 3);
     }
     // antivirus_pierce_melt: permanent strip 1 armor per shot (no restoration via collapseTimer)
     if (hasEffect(s, 'antivirus', 'antivirus_pierce_melt')) {
@@ -2028,9 +2031,9 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       // Mutate enemy def's stored armor so it never restores from collapse — emulate via collapseTimer trick
       // We can't mutate ENEMIES[def].armor (shared), so just ensure collapseTimer doesn't restore by leaving it 0
     }
-    // antivirus_pierce_caps capstone: cracks 5 armor permanently per hit
+    // antivirus_pierce_caps capstone: cracks 2 armor permanently per hit
     if (hasEffect(s, 'antivirus', 'antivirus_pierce_caps')) {
-      target.armor = Math.max(0, target.armor - 5);
+      target.armor = Math.max(0, target.armor - 2);
     }
   }
 
@@ -2323,10 +2326,10 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       const next = findChainTarget(s, target, new Set([target.id]), 2.5);
       if (next) damageEnemy(s, next, p.damage * 0.6, p.isCrit ?? false, p.damageType, false, 'ice');
     }
-    // NETLINK ice+scrambler: ICE explosions strip 2 armor
+    // NETLINK ice+scrambler: ICE explosions strip 1 armor
     if (hasEffect(s, 'ice', 'netlink_ice_scrambler')
         && (hasSubnetLink(s, 'ice', 'scrambler') || hasEffect(s, 'booster_node', 'booster_res_caps'))) {
-      target.armor = Math.max(0, target.armor - 2);
+      target.armor = Math.max(0, target.armor - 1);
     }
     // Flash freeze synergy: freeze enemies inside honeypot puddles
     if (hasEffect(s, 'ice', 'flash_freeze') && !ENEMIES[target.def].slowImmune) {
@@ -2428,7 +2431,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       target.slowTimer = Math.max(target.slowTimer, 1.2);
     }
     if (hasEffect(s, 'mine', 'armor_strip')) {
-      target.armor = Math.max(0, target.armor - 10);
+      target.armor = Math.max(0, target.armor - 5);
     }
     if (hasEffect(s, 'mine', 'volatile_mixture') && target.alive) {
       const inPuddle = s.puddles.some((pu) => pu.fromTower === 'honeypot' &&
