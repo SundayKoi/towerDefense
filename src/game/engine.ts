@@ -669,7 +669,11 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     if (e.collapseTimer !== undefined && e.collapseTimer > 0) {
       e.collapseTimer -= dtSec;
       if (e.collapseTimer <= 0) {
-        e.armor = ENEMIES[e.def].armor ?? 0;
+        // Expire the temp multiplier only. e.armor reflects PERMANENT strips
+        // from scrambler/pulse/antivirus/mine and must not be overwritten —
+        // earlier code that set it back to the base value was wiping out
+        // every strip the player earned on the target.
+        e.collapseMult = 1;
         e.collapseTimer = undefined;
       }
     }
@@ -2197,10 +2201,12 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     if (sn) sn.cooldown = Math.max(0, sn.cooldown - 0.8);
   }
 
-  // Quantum collapse: reduce armor on hit, restore via engine timer (no setTimeout)
-  // COLLAPSE capstone: permanent — don't set timer so armor never restores.
+  // Quantum collapse: apply a temp armor multiplier via collapseMult instead of
+  // mutating e.armor, so permanent strips from other sources aren't wiped out
+  // when the 1.5s timer resets. COLLAPSE capstone: keep the multiplier active
+  // (no timer expiry) so it's effectively permanent.
   if (p.fromTower === 'quantum' && hasEffect(s, 'quantum', 'collapse')) {
-    target.armor = Math.max(0, target.armor * 0.5);
+    target.collapseMult = Math.min(target.collapseMult ?? 1, 0.5);
     if (!hasEffect(s, 'quantum', 'quantum_col_caps')) target.collapseTimer = 1.5;
   }
 
@@ -2428,7 +2434,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
     if (next) {
       // Uncertainty principle: arc also reduces armor 25% for 2s
       if (hasEffect(s, 'quantum', 'uncertainty')) {
-        next.armor = Math.max(0, next.armor * 0.75);
+        next.collapseMult = Math.min(next.collapseMult ?? 1, 0.75);
         next.collapseTimer = Math.max(next.collapseTimer ?? 0, 2.0);
       }
       s.projectiles.push({
@@ -2696,8 +2702,11 @@ function applyResistanceAndArmor(e: EnemyInstance, raw: number, type: DamageType
   // tower whose post-resist shot ≤ armor dealt literally zero (scrambler 10
   // energy * 1.4 vs 14 armor = 0), making low-damage/fast towers worthless
   // into armored targets. The floor keeps rapid-fire contributions real while
-  // still rewarding high-damage bursts against armor.
-  const reduced = final - (e.armor || 0) * (type === 'pierce' ? 0.2 : 1);
+  // still rewarding high-damage bursts against armor. collapseMult layers a
+  // temporary reduction (quantum COLLAPSE/UNCERTAINTY) on top of permanent
+  // strips without mutating e.armor itself.
+  const effArmor = (e.armor || 0) * (e.collapseMult ?? 1);
+  const reduced = final - effArmor * (type === 'pierce' ? 0.2 : 1);
   final = Math.max(final * 0.20, reduced);
   return Math.max(0, final);
 }

@@ -256,7 +256,8 @@ export interface EnemyInstance {
   angle: number;
   debuffTimer?: number;   // used by Rootkit to pace debuff application, -1 = signal has revived
   marked?: number;        // seconds remaining on mark debuff (takes +30% from all sources)
-  collapseTimer?: number; // seconds until armor restoration after quantum collapse
+  collapseTimer?: number; // seconds until quantum-collapse temp armor multiplier expires
+  collapseMult?: number;  // temp armor multiplier from quantum COLLAPSE/UNCERTAINTY — 1.0 = unaffected, 0.5 = half armor applied at damage-calc time
   // ENCRYPTED PAYLOADS sector modifier: enemies have a regenerating shield.
   shield?: number;        // current shield value (absorbed before HP)
   maxShield?: number;     // max shield value, for regen
