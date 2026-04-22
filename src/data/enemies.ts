@@ -297,10 +297,10 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     armor: 14,
     color: '#cc4400',
     accent: '#ff6600',
-    description: 'Heavily armored breach unit. Kinetic rounds are suboptimal. Energy melts it.',
-    counterTip: 'ENERGY towers (Quantum, Scrambler, Pulse, Sentinel) deal full damage. Kinetic is slow.',
+    description: 'Heavily armored breach unit. Kinetic rounds barely scratch it. Energy melts it.',
+    counterTip: 'ENERGY towers (Quantum, Scrambler, Pulse, Sentinel) deal full damage. Avoid Kinetic.',
     size: 1.3,
-    resistances: { kinetic: 0.4, aoe: 0.6, energy: 1.4, pierce: 0.7 },
+    resistances: { kinetic: 0.15, aoe: 0.6, energy: 1.4, pierce: 0.7 },
   },
   parasite: {
     id: 'parasite',
