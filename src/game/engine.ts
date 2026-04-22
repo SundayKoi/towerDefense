@@ -1882,6 +1882,13 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
   let markedPct = (hasEffect(s, 'firewall', 'hunter_instinct') && p.fromTower === 'firewall') ? 0.45 : 0.3;
   // Antivirus MARK capstone: marked enemies take +75% (was +30%) when antivirus is the source
   if (p.fromTower === 'antivirus' && hasEffect(s, 'antivirus', 'antivirus_mark_caps')) markedPct = Math.max(markedPct, 0.75);
+  // TOTAL SABOTAGE (scrambler SAB capstone): armor-stripped enemies take 2× from
+  // ALL sources while the mark is active. markedPct of 1.0 produces a 2.0× bonus.
+  if (hasEffect(s, 'scrambler', 'scrambler_sab_caps')
+      && target.armor < (ENEMIES[target.def].armor ?? 0)
+      && (target.marked ?? 0) > 0) {
+    markedPct = Math.max(markedPct, 1.0);
+  }
   const markedBonus = (target.marked ?? 0) > 0 ? 1 + markedPct : 1.0;
 
   // Quantum phase shift: treat armor as 0
@@ -1933,7 +1940,7 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
         damageEnemy(s, target, p.damage * exploitBonus, false, p.damageType, true);
       }
     }
-    // Overwrite: 20% chance to zero armor (35% with CRS BOOST)
+    // Overwrite: 20% chance to permanently zero armor (35% with CRS BOOST)
     {
       const owChance = hasEffect(s, 'scrambler', 'scrambler_crs_boost') ? 0.35 : 0.20;
       if (hasEffect(s, 'scrambler', 'overwrite') && Math.random() < owChance) {
@@ -1942,6 +1949,22 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
         // System crash: mark enemy at 0 armor
         if (hasEffect(s, 'scrambler', 'system_crash')) {
           target.marked = Math.max(target.marked ?? 0, 3);
+        }
+        // CASCADE FAILURE: OVERWRITE-nullified enemies emit a small EMP burst —
+        // 0.8 tile radius, brief slow on non-immune enemies, small magenta
+        // ping so the player can see the chain reaction.
+        if (hasEffect(s, 'scrambler', 'scrambler_crs_cascade')) {
+          spawnExplosion(s, { x: target.pos.x, y: target.pos.y }, '#ff2d95', 0.8);
+          for (const e of s.enemies) {
+            if (!e.alive || e.id === target.id) continue;
+            if (Math.hypot(e.pos.x - target.pos.x, e.pos.y - target.pos.y) <= 0.8) {
+              damageEnemy(s, e, p.damage * 0.35, false, 'energy', false, 'scrambler');
+              if (!ENEMIES[e.def].slowImmune) {
+                e.speedMult = Math.min(e.speedMult, 0.6);
+                e.slowTimer = Math.max(e.slowTimer, 1.0);
+              }
+            }
+          }
         }
       }
     }

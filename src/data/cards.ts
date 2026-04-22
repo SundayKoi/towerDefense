@@ -866,7 +866,7 @@ const BRANCH_SPECS: BranchSpec[] = [];
   BRANCH_SPECS.push({
     tower: T, towerLabel: TL, branchKey: 'crs', branchLabel: 'CRASH', branchTagSuffix: 'crash',
     cards: [
-      { shortName: 'OVERWRITE', description: '20% chance each hit completely nullifies target armor for 2.5s.',
+      { shortName: 'OVERWRITE', description: '20% chance each hit permanently nullifies target armor.',
         apply: (s) => { addEffect(s, T, 'scrambler_crs_key'); addEffect(s, T, 'overwrite'); } },
       { shortName: 'SYSTEM CRASH', description: 'OVERWRITE-nullified enemies become marked for +40% from all sources.',
         apply: (s) => { addEffect(s, T, 'system_crash'); } },

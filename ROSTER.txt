@@ -276,7 +276,7 @@ TURRETS  (15 total)
  [C] TOTAL SABOTAGE           debuffed take 2× damage from all sources
 
   Branch: CRASH (unlock: Act 7 map 3, easy clear)
-    OVERWRITE                20% chance hit nullifies armor 2.5s
+    OVERWRITE                20% chance hit permanently nullifies armor
     SYSTEM CRASH             nullified enemies marked for +40% from all
  [*] OVERWRITE BOOST          proc chance raised to 35%
     CRASH RANGE              +0.6 range
