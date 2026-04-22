@@ -1,4 +1,5 @@
 import type { EnemyId, MapDef, RunState, Difficulty } from '@/types';
+import { ENEMIES } from '@/data/enemies';
 
 // Per-difficulty profile. Difficulty = constraint change, not just stat inflation.
 // Easy   : 4-card draft, +1 starting reroll, gentle enemy gates, soft HP curve.
@@ -103,6 +104,10 @@ function pickEnemyForWave(map: MapDef, difficulty: Difficulty, wave: number, tot
   pool = pool.filter((e) => {
     const gate = prof.enemyGates[e as string];
     if (gate !== undefined && wave < gate) return false;
+    // Easy mode: keep bossScale enemies (daemon/kernel/leviathan/corruptor/swarm/voidlord)
+    // out of random phase pools entirely. They still spawn as designated bosses
+    // via map.bosses — this filter only affects the random mob draw.
+    if (difficulty === 'easy' && ENEMIES[e].bossScale) return false;
     return true;
   });
   if (pool.length === 0) pool = ['worm'];
@@ -131,7 +136,9 @@ export function getWavePreview(map: MapDef, difficulty: Difficulty, wave: number
   else pool = [...map.enemyPool.phase3];
   pool = pool.filter((e) => {
     const gate = prof.enemyGates[e as string];
-    return gate === undefined || wave >= gate;
+    if (gate !== undefined && wave < gate) return false;
+    if (difficulty === 'easy' && ENEMIES[e].bossScale) return false;
+    return true;
   });
   const modTags: string[] = [];
   const mods = map.modifiers;
