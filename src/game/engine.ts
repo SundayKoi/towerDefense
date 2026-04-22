@@ -2669,8 +2669,14 @@ function applyResistanceAndArmor(e: EnemyInstance, raw: number, type: DamageType
   if (resist != null && !(isCrit && def.critIgnoresResist)) {
     final *= resist;
   }
-  final = Math.max(0, final - (e.armor || 0) * (type === 'pierce' ? 0.2 : 1));
-  return final;
+  // Flat armor subtraction, with a 20% damage floor. Without the floor, any
+  // tower whose post-resist shot ≤ armor dealt literally zero (scrambler 10
+  // energy * 1.4 vs 14 armor = 0), making low-damage/fast towers worthless
+  // into armored targets. The floor keeps rapid-fire contributions real while
+  // still rewarding high-damage bursts against armor.
+  const reduced = final - (e.armor || 0) * (type === 'pierce' ? 0.2 : 1);
+  final = Math.max(final * 0.20, reduced);
+  return Math.max(0, final);
 }
 
 export function damageEnemy(s: RunState, e: EnemyInstance, dmg: number, isCrit: boolean, type: DamageType, silent = false, source?: TowerId): number {
