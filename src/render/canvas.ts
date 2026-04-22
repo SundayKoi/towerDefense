@@ -220,6 +220,33 @@ export function renderRun(vp: RenderViewport, s: RunState, hoverCell: Vec2 | nul
   // Floaters
   drawFloaters(ctx, vp, s);
 
+  // LAG SPIKE overlay — red vignette + "LAG SPIKE!" banner during the 2s surge.
+  // Covers the full viewport (with slack for the screen-shake offset) so the
+  // player can't miss it even if the centered floater is buried under HUD.
+  const lagActive = (s as any).lagSpikeActive ?? 0;
+  if (lagActive > 0) {
+    // Ramp in fast, fade over the final 40% of the window.
+    const alpha = Math.min(1, lagActive / 0.8);
+    ctx.save();
+    // Tinted vignette — darker at the corners, transparent in the middle.
+    const grad = ctx.createRadialGradient(
+      vp.width / 2, vp.height / 2, Math.min(vp.width, vp.height) * 0.3,
+      vp.width / 2, vp.height / 2, Math.max(vp.width, vp.height) * 0.7,
+    );
+    grad.addColorStop(0, 'rgba(255, 60, 0, 0)');
+    grad.addColorStop(1, `rgba(255, 60, 0, ${0.55 * alpha})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(-100, -100, vp.width + 200, vp.height + 200);
+    // Top banner text — always readable even when the center is busy.
+    ctx.fillStyle = `rgba(255, 200, 60, ${alpha})`;
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#ff3300';
+    ctx.shadowBlur = 12;
+    ctx.fillText('// LAG SPIKE //', vp.width / 2, 44);
+    ctx.restore();
+  }
+
   // Scanline overlay disabled — interacts poorly with the additive bloom pass
   // on dark map backgrounds. CSS-layer scanlines in index.html already provide
   // the CRT feel without touching the game canvas. Leaving the function defined
@@ -1008,6 +1035,22 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
   const size = cs * e.size;
 
   ctx.save();
+  // LAG SPIKE surge — pulsing red halo on every enemy while the surge is
+  // active. Drawn before the sprite so it reads as a ground aura.
+  const lagActive = ((_currentRenderRun as any)?.lagSpikeActive ?? 0) > 0;
+  if (lagActive) {
+    const pulse = 0.65 + 0.35 * Math.sin(t * 18 + e.id);
+    ctx.save();
+    ctx.globalAlpha = 0.9 * pulse;
+    ctx.strokeStyle = '#ff3300';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#ff6600';
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   // Boss spawn aura — big pulsing ring under any boss while they're in the
   // first ~8% of their path. Telegraphs arrival and draws the eye. Stacks
   // cleanly under the VOIDLORD immunity aura.

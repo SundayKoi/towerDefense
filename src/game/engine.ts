@@ -85,9 +85,10 @@ export function startWave(s: RunState): void {
   s.spawnQueue = buildWaveSpawnQueue(map, s.difficulty, s.wave, s.totalWaves, s.contractMutators);
   s.spawnElapsed = 0;
   s.phase = 'wave';
-  // Reset lag-spike cadence on each wave so the first spike lands ~25s in, not
-  // mid-spawn-in. Active surge is also cleared so the wave starts at normal speed.
-  (s as any).lagSpikeCooldown = 25;
+  // First spike fires 8s into the wave — short enough to hit on early easy
+  // waves that clear in 20-30s total. Subsequent interval is 20s (see
+  // update loop). Active surge is cleared so the wave starts at normal speed.
+  (s as any).lagSpikeCooldown = 8;
   (s as any).lagSpikeActive = 0;
   audio.play('wave_start');
   haptics.fire('wave_start');
@@ -626,12 +627,12 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     if ((s as any).lagSpikeActive > 0) {
       (s as any).lagSpikeActive = Math.max(0, (s as any).lagSpikeActive - dtSec);
     } else {
-      (s as any).lagSpikeCooldown = ((s as any).lagSpikeCooldown ?? 25) - dtSec;
+      (s as any).lagSpikeCooldown = ((s as any).lagSpikeCooldown ?? 20) - dtSec;
       if ((s as any).lagSpikeCooldown <= 0) {
-        (s as any).lagSpikeCooldown = 25;
+        (s as any).lagSpikeCooldown = 20;
         (s as any).lagSpikeActive = 2;
-        s.shakeTime = Math.max(s.shakeTime, 0.25);
-        s.shakeAmp = Math.max(s.shakeAmp, 4);
+        s.shakeTime = Math.max(s.shakeTime, 0.35);
+        s.shakeAmp = Math.max(s.shakeAmp, 6);
         s.floaters.push({
           pos: { x: 8, y: 3 },
           text: 'LAG SPIKE!',
