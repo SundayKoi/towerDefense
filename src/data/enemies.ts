@@ -294,7 +294,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     speed: 0.6,
     xp: 42,
     damage: 4,
-    armor: 22,
+    armor: 14,
     color: '#cc4400',
     accent: '#ff6600',
     description: 'Heavily armored breach unit. Kinetic rounds barely scratch it. Energy melts it.',
