@@ -293,7 +293,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     hp: 400,
     speed: 0.6,
     xp: 42,
-    damage: 4,
+    damage: 2,
     armor: 14,
     color: '#cc4400',
     accent: '#ff6600',

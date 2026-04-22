@@ -565,7 +565,7 @@ Ports: open port → 25% bonus damage from matching turret exploit.
   Counter: ICE-BREAKER or PULSE kills it before the split.
 
 [JUGGERNAUT]             HIGH              port: SSH
-  HP 400   SPD 0.6   DMG 4   armor 14   XP 42
+  HP 400   SPD 0.6   DMG 2   armor 14   XP 42
   Resist kinetic 0.15 · Resist aoe 0.6 · Weak energy 1.4 · Resist pierce 0.7
   Heavily armored breach unit. Kinetic barely scratches.
   Counter: ENERGY towers deal full damage. Avoid KINETIC.
