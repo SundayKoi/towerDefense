@@ -619,8 +619,8 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
     }
   }
 
-  // LAG SPIKE sector modifier (Act 2 PACKET STORM) — every 25s of active wave,
-  // all enemies surge for 2s at +lagSpike speed. Only ticks during the wave
+  // LAG SPIKE sector modifier (Act 2 PACKET STORM) — every 20s of active wave,
+  // all enemies surge for 1s at +lagSpike speed. Only ticks during the wave
   // phase so prep time doesn't drain the cooldown silently.
   const lagSpikeMag = getEffectiveModifiers(s).lagSpike ?? 0;
   if (s.phase === 'wave' && lagSpikeMag > 0) {
@@ -630,7 +630,7 @@ export function updateRun(s: RunState, dtSec: number, events: EngineEvents): voi
       (s as any).lagSpikeCooldown = ((s as any).lagSpikeCooldown ?? 20) - dtSec;
       if ((s as any).lagSpikeCooldown <= 0) {
         (s as any).lagSpikeCooldown = 20;
-        (s as any).lagSpikeActive = 2;
+        (s as any).lagSpikeActive = 1;
         s.shakeTime = Math.max(s.shakeTime, 0.35);
         s.shakeAmp = Math.max(s.shakeAmp, 6);
         s.floaters.push({

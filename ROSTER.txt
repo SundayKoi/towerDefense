@@ -677,7 +677,7 @@ DAILY CONTRACT  (seeded run, same for everyone per day)
 
 SECTOR MODIFIERS  (always-on per-act effects)
   Act 1: no modifier (tutorial)
-  Act 2: LAG SPIKE       — every 25s, all enemies surge at 2× speed for 2s
+  Act 2: LAG SPIKE       — every 20s, all enemies surge at 2× speed for 1s
   Act 3: ENCRYPTED       — enemies spawn with HP shield (regen after 2s); cracking it EXPOSES the enemy for +25% DMG over 3s
   Act 4: STEALTH         — 15% spawns arrive cloaked
   Act 5: REPLICATION     — 15% of kills spawn a worm offspring

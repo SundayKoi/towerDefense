@@ -211,7 +211,7 @@ export interface MapDef {
     stealthChance?: number;    // chance (0–1) an enemy spawns permanently cloaked
     replication?: number;      // chance (0–1) a killed enemy spawns a worm offspring
     rootkit?: number;          // jam interval (sec) — every N seconds while a boss is alive, jam a random tower
-    lagSpike?: number;         // intensity (0–1) of periodic 2s speed surges every 25s — adds this much to the speed multiplier
+    lagSpike?: number;         // intensity (0–1) of periodic 1s speed surges every 20s — adds this much to the speed multiplier
   };
 }
 

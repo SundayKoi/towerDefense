@@ -48,7 +48,7 @@ export const ACTS: ActMeta[] = [
   { act: 1, name: 'SYSTEM BOOT',     tagline: 'Learn the grid.',
     brief: 'Standard intrusions — no network modifiers. Learn your turrets, your card drafts, and the singleton rule. Each map rewards a new turret.' },
   { act: 2, name: 'PACKET STORM',    tagline: 'The network lags — enemies warp.',
-    brief: 'LAG SPIKE: every 25s of a wave, every enemy on the grid surges at 2× speed for 2s. Read the telegraph and front-load burst before the surge closes the distance. PULSE arrives early this act.' },
+    brief: 'LAG SPIKE: every 20s of a wave, every enemy on the grid surges at 2× speed for 1s. Read the telegraph and front-load burst before the surge closes the distance. PULSE arrives early this act.' },
   { act: 3, name: 'ENCRYPTED CORE',  tagline: 'Crack the shield, expose the target.',
     brief: 'ENCRYPTED PAYLOADS: enemies spawn with regenerating data shields absorbed before HP. Cracking a shield EXPOSES the enemy — +25% damage for 3s. Chain, pulse, and scrambler strip shields efficiently. RAILGUN unlocks here.' },
   { act: 4, name: 'STEALTH NET',     tagline: 'Reveal or die.',
@@ -221,7 +221,7 @@ export const MAPS: MapDef[] = [
   },
 
   // ═════════════════════════════════════════════════════════════════════
-  // ACT 2 — PACKET STORM. LAG SPIKE modifier (25s interval, 2s 2× speed surge).
+  // ACT 2 — PACKET STORM. LAG SPIKE modifier (20s interval, 1s 2× speed surge).
   // ═════════════════════════════════════════════════════════════════════
 
   {
