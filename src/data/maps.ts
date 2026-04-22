@@ -378,7 +378,7 @@ export const MAPS: MapDef[] = [
     enemyPool: {
       phase1: ['spider', 'trojan', 'bomber'],
       phase2: ['bomber', 'phantom', 'wraith', 'parasite'],
-      phase3: ['wraith', 'rootkit', 'corruptor', 'juggernaut'],
+      phase3: ['wraith', 'rootkit', 'bomber', 'juggernaut'],
     },
     bosses: {
       easy:   { 10: 'daemon', 20: 'corruptor' },
