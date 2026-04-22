@@ -513,20 +513,20 @@ Ports: open port → 25% bonus damage from matching turret exploit.
   Counter: FIREWALL / HONEYPOT / ICE-BREAKER.
 
 [TROJAN]                 MEDIUM            port: SSH
-  HP 105   SPD 1.1   DMG 2   armor 4   XP 16
+  HP 105   SPD 1.1   DMG 1   armor 4   XP 16
   Resist kinetic 0.65 · Weak pierce 1.3
   Armored payload carrier. Slow but durable.
   Counter: PIERCE weapons bypass armor; KINETIC struggles.
 
 [ROOTKIT]                HIGH              port: SSH
-  HP 260   SPD 0.85   DMG 3   armor 8   XP 32
+  HP 260   SPD 0.85   DMG 2   armor 8   XP 32
   Resist kinetic 0.45 · Weak pierce 1.5 · Resist aoe 0.75
   Root-level intrusion. Extremely armored.
   Counter: RAILGUN/ANTIVIRUS pierce shreds them.
   NOTE: Removed from grid01 pool — too punishing with 3-turret starter.
 
 [PHANTOM]                HIGH              port: HTTP
-  HP 65   SPD 2.0   DMG 2   XP 20
+  HP 65   SPD 2.0   DMG 1   XP 20
   Resist kinetic 0.5 · Resist pierce 0.6 · Weak energy 1.3
   critIgnoresResist: true (crits bypass phase resistance)
   Phases out of reality. Kinetic half-misses.
@@ -534,7 +534,7 @@ Ports: open port → 25% bonus damage from matching turret exploit.
   SPECIAL: On death — EMP burst jams 2 closest towers for 1.5s.
 
 [WRAITH]                 EXTREME           port: HTTP
-  HP 145   SPD 1.6   DMG 4   XP 38   slow-immune
+  HP 145   SPD 1.6   DMG 2   XP 38   slow-immune
   Resist chain 0.35 · Resist energy 0.8
   Slow-immune. Shreds through chain attacks.
   Counter: Burst damage (ICE / RAILGUN) beats DPS. Chain is weak.
@@ -547,25 +547,25 @@ Ports: open port → 25% bonus damage from matching turret exploit.
   Counter: Priority kill. HONEYPOT slows them for easy pickoff.
 
 [BOMBER]                 HIGH              port: ICMP
-  HP 85   SPD 1.3   DMG 5   XP 24
+  HP 85   SPD 1.3   DMG 3   XP 24
   Resist aoe 0.5
   Detonates on arrival at the mainframe. Devastates the core if it gets there.
   Counter: AOE resisted — PIERCE or KINETIC works best.
 
 [GHOST] (stealth)        HIGH              port: HTTP
-  HP 72   SPD 1.8   DMG 2   XP 26   50% flicker-invis
+  HP 72   SPD 1.8   DMG 1   XP 26   50% flicker-invis
   Weak aoe 1.5 · Resist pierce 0.55
   Phases in and out of detection. Flicker-visual only (not cloak-gated).
   Counter: AOE reveals them with +50% damage. SNIPER wastes shots.
 
 [GLITCH]                 MEDIUM            port: SMB
-  HP 80   SPD 1.6   DMG 2   XP 18
+  HP 80   SPD 1.6   DMG 1   XP 18
   Weak aoe 1.3
   Corrupted packet. Splits into 2 WORMS on death.
   Counter: ICE-BREAKER or PULSE kills it before the split.
 
 [JUGGERNAUT]             HIGH              port: SSH
-  HP 400   SPD 0.6   DMG 2   armor 14   XP 42
+  HP 400   SPD 0.6   DMG 1   armor 14   XP 42
   Resist kinetic 0.15 · Resist aoe 0.6 · Weak energy 1.4 · Resist pierce 0.7
   Heavily armored breach unit. Kinetic barely scratches.
   Counter: ENERGY towers deal full damage. Avoid KINETIC.
@@ -580,7 +580,7 @@ Ports: open port → 25% bonus damage from matching turret exploit.
 ─── BOSS / MEGA ──────────────────────────────────────────────────────────────
 
 [KERNEL]                 BOSS              port: ICMP
-  HP 900   SPD 0.75   DMG 5   armor 7   XP 140   boss-scaled
+  HP 900   SPD 0.75   DMG 3   armor 7   XP 140   boss-scaled
   Resist kinetic 0.7 · Resist aoe 0.85 · Weak pierce 1.15
   Core system boss. TWO-PHASE:
     66% HP → KERNEL PANIC: spawns 3 worms + jams closest 2 towers 3s
@@ -589,32 +589,32 @@ Ports: open port → 25% bonus damage from matching turret exploit.
   Counter: Burst THROUGH phase gates so jams don't stall mid-kill.
 
 [DAEMON]                 BOSS              port: SMB
-  HP 650   SPD 1.2   DMG 4   armor 3   XP 115   boss-scaled
+  HP 650   SPD 1.2   DMG 2   armor 3   XP 115   boss-scaled
   Resist chain 0.7 · Weak energy 1.2
   Spawns 3 WORMS at 50% HP (one-shot).
   Counter: Burst through 50% HP. ENERGY or KINETIC preferred.
 
 [LEVIATHAN]              MEGA              port: SSH
-  HP 1800   SPD 0.6   DMG 8   armor 10   XP 280   slow-immune boss-scaled
+  HP 1800   SPD 0.6   DMG 4   armor 10   XP 280   slow-immune boss-scaled
   Resist aoe 0.6 · Resist chain 0.4 · Weak pierce 1.2
   Slow-immune. Regenerates 1.5% maxHP/s if undamaged for >1s.
   AOE and chain damped.
   Counter: Single-target heavy hitters. RAILGUN + QUANTUM.
 
 [SWARM QUEEN]            MEGA              port: SMB
-  HP 1200   SPD 0.9   DMG 6   XP 220   boss-scaled
+  HP 1200   SPD 0.9   DMG 3   XP 220   boss-scaled
   Weak aoe 1.4 · Weak chain 1.2
   Spawns a CRAWLER every 1.5s while alive.
   Counter: ICE-BREAKER + CHAIN shreds her and her brood.
 
 [CORRUPTOR]              MEGA              port: ICMP
-  HP 2200   SPD 0.7   DMG 10   armor 12   XP 340   boss-scaled
+  HP 2200   SPD 0.7   DMG 5   armor 12   XP 340   boss-scaled
   Chain IMMUNE (0) · Resist kinetic 0.85 · Resist energy 0.9
   Chain-immune. Corrupts tower signals nearby.
   Counter: Skip CHAIN entirely. Stack KINETIC/PIERCE volume.
 
 [VOID LORD]              FINAL             port: HTTP
-  HP 4500   SPD 0.8   DMG 15   armor 15   XP 600   slow-immune boss-scaled
+  HP 4500   SPD 0.8   DMG 8   armor 15   XP 600   slow-immune boss-scaled
   Resist kinetic 0.6 · Resist energy 0.65 · Resist aoe 0.6
   Resist chain 0.4 · Resist pierce 0.7
   critIgnoresResist: true
