@@ -2096,9 +2096,16 @@ function hitEnemy(s: RunState, p: Projectile, target: EnemyInstance): void {
       damageEnemy(s, target, p.damage * markedBonus, p.isCrit ?? false, p.damageType, true, 'firewall');
     }
     if (hasEffect(s, 'firewall', 'firewall_siege_caps')) {
-      // 2× HP% damage = 2× of 1% maxHp per shot bonus, scaled to feel meaningful
-      const bonus = target.maxHp * 0.04; // 4% maxHp bonus dmg vs high-HP targets
+      // OBLITERATE: 8% maxHp bonus vs high-HP targets, delivered armor-ignoring
+      // via the save/restore trick (mirrors quantum PHASE SHIFT). At 4% through
+      // the normal armor/resist path the bonus rounded to ~zero against armored
+      // enemies, making the capstone read as a non-effect on the very targets
+      // it's supposed to punish.
+      const bonus = target.maxHp * 0.08;
+      const savedArmor = target.armor;
+      target.armor = 0;
       damageEnemy(s, target, bonus, p.isCrit ?? false, p.damageType, true, 'firewall');
+      if (target.alive) target.armor = savedArmor;
     }
   }
 

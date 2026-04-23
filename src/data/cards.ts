@@ -306,7 +306,7 @@ const BRANCH_SPECS: BranchSpec[] = [];
         apply: (s) => { bumpDmg(s, T, 0.15); addEffect(s, T, 'firewall_siege_focus'); } },
       { shortName: 'ARMOR CRUSHER', description: 'FIREWALL deals double damage to enemies above 75% HP.', rarity: 'rare',
         apply: (s) => { addEffect(s, T, 'firewall_siege_crusher'); } },
-      { shortName: 'OBLITERATE', description: 'FIREWALL shots deal 2× HP% damage to targets above 75% HP.',
+      { shortName: 'OBLITERATE', description: 'FIREWALL shots deal +8% of max HP as armor-ignoring bonus damage to targets above 75% HP.',
         apply: (s) => { addEffect(s, T, 'firewall_siege_caps'); } },
     ],
   });

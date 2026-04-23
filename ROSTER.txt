@@ -64,7 +64,7 @@ TURRETS  (15 total)
  [*] SIEGE CALIBRATION        +20% crit chance
     FOCUSED FIRE             +30% damage when one enemy in range (15 + 15 cond)
  [*] ARMOR CRUSHER            double damage to enemies above 75% HP
- [C] OBLITERATE               2× HP% damage to targets above 75% HP
+ [C] OBLITERATE               +8% max-HP armor-ignoring bonus vs targets above 75% HP
 
 ───────────────────────────────────────────────────────────────────────────────
 [HONEYPOT]                                                       starter
