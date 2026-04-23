@@ -4,7 +4,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   firewall: {
     id: 'firewall',
     name: 'FIREWALL',
-    damage: 14,
+    damage: 17,
     range: 2.4,
     fireRate: 1.3,
     projectileSpeed: 14,
@@ -19,7 +19,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   honeypot: {
     id: 'honeypot',
     name: 'HONEYPOT',
-    damage: 4,
+    damage: 5,
     range: 2.0,
     fireRate: 1.8,
     projectileSpeed: 10,
@@ -37,7 +37,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     // 60 was one-shotting 28-HP worms from wave 1. Rebalanced: ~3 shots per
     // base worm, ~4 per trojan (pre-armor). Still the best starter DPS
     // per-shot, still pierce-typed so it ignores most armor.
-    damage: 30,
+    damage: 38,
     range: 3.8,
     fireRate: 0.55,
     projectileSpeed: 22,
@@ -68,7 +68,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     name: 'ICE-BREAKER',
     // 90 AOE meant every hit cleared a cluster. Kept AOE radius + slow fire
     // rate intact; damage down so swarms take 2 volleys not 1.
-    damage: 45,
+    damage: 55,
     range: 2.8,
     fireRate: 0.4,
     projectileSpeed: 12,
@@ -83,7 +83,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   mine: {
     id: 'mine',
     name: 'ARTILLERY',
-    damage: 35,
+    damage: 44,
     range: 5.5,
     fireRate: 0.55,
     projectileSpeed: 7,
@@ -99,7 +99,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   chain: {
     id: 'chain',
     name: 'CHAIN LIGHTNING',
-    damage: 22,
+    damage: 28,
     range: 2.5,
     fireRate: 0.75,
     projectileSpeed: 30,
@@ -117,7 +117,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     // Still the heaviest pierce weapon; nerfed to 110 so it doesn't trivialize
     // every line of enemies in one shot. Pairs with ANTIVIRUS for a full
     // armor-shred loadout without being a solo "i-win" pick.
-    damage: 110,
+    damage: 138,
     range: 5.0,
     fireRate: 0.25,
     projectileSpeed: 40,
@@ -132,7 +132,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   pulse: {
     id: 'pulse',
     name: 'EMP ARRAY',
-    damage: 32,
+    damage: 40,
     range: 2.2,
     fireRate: 0.4, // recharge: ~2.5s between bursts (cooldown used as burst timer)
     projectileSpeed: 0,
@@ -149,7 +149,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     name: 'OVERWATCH',
     // 380 was 1-shotting every non-boss enemy deep into the campaign. 180
     // keeps the "single heavy strike" feel without deleting whole waves.
-    damage: 180,
+    damage: 225,
     range: 6.5,
     fireRate: 0.18,
     projectileSpeed: 55,
@@ -165,7 +165,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   scrambler: {
     id: 'scrambler',
     name: 'DISRUPTOR',
-    damage: 10,
+    damage: 13,
     range: 2.4,
     fireRate: 2.8,
     projectileSpeed: 20,
@@ -179,7 +179,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
   sentinel: {
     id: 'sentinel',
     name: 'SENTINEL NODE',
-    damage: 12, // damage per second to all enemies in range (passive field)
+    damage: 15, // damage per second to all enemies in range (passive field)
     range: 2.8,
     fireRate: 1, // unused - sentinel applies damage every frame
     projectileSpeed: 0,
@@ -188,7 +188,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     baseColor: '#0d0018',
     accentColor: '#b847ff',
     damageType: 'energy',
-    description: 'Passive field: 12 dmg/s and 20% slow to all enemies in range. No projectiles.',
+    description: 'Passive field: 15 dmg/s and 20% slow to all enemies in range. No projectiles.',
     slow: { pct: 0.20, duration: 0.3 },
   },
   booster_node: {
