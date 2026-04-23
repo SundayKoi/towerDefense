@@ -1247,12 +1247,39 @@ function drawEnemy(ctx: CanvasRenderingContext2D, vp: RenderViewport, e: EnemyIn
     ctx.restore();
   }
 
+  // ENCRYPTED PAYLOADS shield — pulsing cyan halo around the enemy while shield > 0.
+  // Intensity scales with shield fraction so the halo fades as the shield cracks.
+  if ((e.shield ?? 0) > 0 && (e.maxShield ?? 0) > 0) {
+    const shieldPct = Math.max(0, Math.min(1, (e.shield ?? 0) / (e.maxShield ?? 1)));
+    const pulse = 0.65 + 0.35 * Math.sin(t * 5 + e.id * 0.7);
+    ctx.save();
+    ctx.globalAlpha = 0.55 * shieldPct * pulse;
+    ctx.strokeStyle = '#66eeff';
+    ctx.shadowColor = '#00fff0';
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // HP bar
   const hpPct = Math.max(0, e.hp / e.maxHp);
   const barW = Math.max(size * 0.7, 16);
   const barH = e.isBoss ? 6 : 3;
   const bx = cx - barW / 2;
   const by = cy - size * 0.55;
+  // Shield bar sits 2px above the HP bar when the enemy has a shield.
+  const hasShield = (e.maxShield ?? 0) > 0;
+  if (hasShield) {
+    const shieldPct = Math.max(0, Math.min(1, (e.shield ?? 0) / (e.maxShield ?? 1)));
+    const sby = by - (barH + 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(bx - 1, sby - 1, barW + 2, barH + 2);
+    ctx.fillStyle = '#66eeff';
+    ctx.fillRect(bx, sby, barW * shieldPct, barH);
+  }
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
   ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
   ctx.fillStyle = hpPct > 0.5 ? '#00ff88' : hpPct > 0.25 ? '#ffd600' : '#ff3355';
