@@ -254,7 +254,7 @@ TURRETS  (15 total)
 
 ───────────────────────────────────────────────────────────────────────────────
 [DISRUPTOR] (scrambler)                             unlock: Act 2 map 1 · easy
-  DMG 10   RNG 2.4   RATE 2.8/s   TYPE ENERGY
+  DMG 13   RNG 2.4   RATE 2.2/s   TYPE ENERGY
   Rapid bolts chip 1 armor per hit — DEC branch scales. Enables combos —
   ANTIVIRUS +25% vs armor-stripped, SIGNAL BREAK slows them further.
   EXPLOIT: HTTP (+25% vs phantom/wraith/stealth/voidlord)

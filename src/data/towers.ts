@@ -167,7 +167,7 @@ export const TOWERS: Record<TowerId, TowerDef> = {
     name: 'DISRUPTOR',
     damage: 13,
     range: 2.4,
-    fireRate: 2.8,
+    fireRate: 2.2,
     projectileSpeed: 20,
     projectileColor: '#ff2d95',
     trailColor: '#aa1a5c',
