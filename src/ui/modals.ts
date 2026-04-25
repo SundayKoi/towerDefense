@@ -271,6 +271,12 @@ export function openCardDraft(
 
   const sourceLabel = s.draftSource === 'level' ? `LEVEL ${s.level}` : s.draftSource === 'wave' ? `WAVE ${s.wave} CLEAR` : 'STARTER';
 
+  // Two-tap confirmation prevents accidental picks when the player taps to grab
+  // a packet (or anything else) just as the draft pops up. First tap on a card
+  // highlights it and reveals CONFIRM; tapping the same card again or pressing
+  // CONFIRM commits the pick. Tapping a different card switches the selection.
+  let selectedId: string | null = null;
+
   const render = () => {
     const canReroll = s.draftRerollsLeft > 0;
     const cardsHtml = s.draftOptions.map((id) => {
@@ -285,7 +291,9 @@ export function openCardDraft(
           lockoutHtml = `<div class="card-lockout">\u26A0 LOCKS OUT: ${names.join(' / ')}</div>`;
         }
       }
-      return `<button class="card card-${c.rarity}" data-id="${id}">
+      const selectedClass = selectedId === id ? ' card-selected' : '';
+      const confirmHint = selectedId === id ? '<div class="card-confirm-hint">TAP AGAIN TO CONFIRM</div>' : '';
+      return `<button class="card card-${c.rarity}${selectedClass}" data-id="${id}">
         <div class="card-frame">
           <div class="card-rarity">${c.rarity.toUpperCase()}</div>
           <div class="card-name">${c.name}</div>
@@ -293,15 +301,18 @@ export function openCardDraft(
           <div class="card-desc">${c.description}</div>
           ${lockoutHtml}
           <div class="card-category">${c.category.toUpperCase()}</div>
+          ${confirmHint}
         </div>
       </button>`;
     }).join('');
+    const confirmDisabled = selectedId === null ? 'disabled' : '';
     el.innerHTML = `
       <div class="modal draft-modal">
         <div class="draft-title">INTRUSION DRAFT <span class="draft-wave">${sourceLabel}</span></div>
         <div class="draft-cards">${cardsHtml}</div>
         <div class="draft-actions">
-          <button class="btn btn-primary" id="draft-reroll" ${canReroll ? '' : 'disabled'}>REROLL (${s.draftRerollsLeft} LEFT)</button>
+          <button class="btn btn-primary" id="draft-confirm" ${confirmDisabled}>CONFIRM PICK</button>
+          <button class="btn btn-ghost" id="draft-reroll" ${canReroll ? '' : 'disabled'}>REROLL (${s.draftRerollsLeft})</button>
           <button class="btn btn-ghost" id="draft-skip">SKIP</button>
         </div>
       </div>
@@ -309,22 +320,40 @@ export function openCardDraft(
     wire();
   };
 
+  const commitPick = (id: string) => {
+    const c = CARDS_BY_ID[id];
+    if (c && c.rarity === 'legendary') audio.play('card_legendary');
+    else audio.play('ui_click');
+    el.remove();
+    onPick(id);
+  };
+
   const wire = () => {
     el.querySelectorAll<HTMLButtonElement>('.card').forEach((b) => {
       b.onclick = () => {
         const id = b.dataset.id!;
-        const c = CARDS_BY_ID[id];
-        if (c && c.rarity === 'legendary') audio.play('card_legendary');
-        else audio.play('ui_click');
-        el.remove();
-        onPick(id);
+        if (selectedId === id) {
+          // Second tap on already-selected card commits.
+          commitPick(id);
+          return;
+        }
+        // First tap (or switching selection) just highlights.
+        selectedId = id;
+        audio.play('ui_hover');
+        render();
       };
     });
+    const confirmBtn = el.querySelector('#draft-confirm') as HTMLButtonElement;
+    confirmBtn.onclick = () => {
+      if (!selectedId) return;
+      commitPick(selectedId);
+    };
     const rerollBtn = el.querySelector('#draft-reroll') as HTMLButtonElement;
     rerollBtn.onclick = () => {
       if (s.draftRerollsLeft <= 0) { audio.play('sell'); return; }
       s.draftRerollsLeft -= 1;
       s.draftOptions = redraw();
+      selectedId = null;
       audio.play('card_reveal');
       render();
     };

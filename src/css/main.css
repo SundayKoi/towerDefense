@@ -936,6 +936,32 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
   text-align: left;
   line-height: 1.3;
 }
+.card.card-selected {
+  transform: translateY(-4px) scale(1.04);
+  outline: 2px solid #00fff0;
+  outline-offset: 2px;
+  box-shadow: 0 0 28px rgba(0, 255, 240, 0.55);
+  z-index: 1;
+}
+.card.card-selected .card-frame {
+  border-color: #00fff0;
+}
+.card-confirm-hint {
+  margin-top: 8px;
+  padding: 4px 6px;
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  color: #00fff0;
+  background: rgba(0, 255, 240, 0.14);
+  text-align: center;
+  animation: card-confirm-pulse 0.9s ease-in-out infinite;
+}
+@keyframes card-confirm-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
 
 .draft-actions { display: flex; justify-content: center; gap: 12px; margin-top: 10px; }
 .draft-credits {
