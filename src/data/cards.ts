@@ -185,6 +185,12 @@ interface BranchCardSpec {
   description: string;
   rarity?: Rarity;               // forced; defaults vary by slot
   apply: (s: RunState) => void;
+  // Extra card IDs this card depends on, in addition to the branch keystone.
+  // Use when one mid-branch card is mechanically useless without another
+  // (e.g. TESLA COIL only fires on MEGAVOLT shots, so it requires MEGAVOLT).
+  // IDs follow the same prefix rules as the branch (`{tower}_{branchKey}_N`),
+  // and the prefix-rewrite in buildAllBranches handles booster_node/data_miner.
+  extraRequires?: string[];
 }
 
 function buildBranch(spec: BranchSpec, otherKeystones: string[]): CardDef[] {
@@ -226,6 +232,10 @@ function buildBranch(spec: BranchSpec, otherKeystones: string[]): CardDef[] {
     if (isCaps) {
       // capstone gates on keystone + cards 2 and 4 (by convention)
       card.requires = [ids[0], ids[2], ids[4]];
+    }
+    // Per-card extra requirements (e.g. TESLA COIL needs MEGAVOLT picked).
+    if (c.extraRequires && c.extraRequires.length > 0) {
+      card.requires = [...(card.requires ?? []), ...c.extraRequires];
     }
     out.push(card);
   }
@@ -611,7 +621,8 @@ const BRANCH_SPECS: BranchSpec[] = [];
       { shortName: 'MEGAVOLT', description: 'Every 6th CHAIN shot fires a megavolt — no arc limit.', rarity: 'rare',
         apply: (s) => { addEffect(s, T, 'megavolt'); } },
       { shortName: 'TESLA COIL', description: 'MEGAVOLT shots leave electric puddles (15 dps) at each hit.',
-        apply: (s) => { addEffect(s, T, 'tesla_coil'); } },
+        apply: (s) => { addEffect(s, T, 'tesla_coil'); },
+        extraRequires: ['chain_strm_2'] /* MEGAVOLT */ },
       { shortName: 'STORM RANGE', description: 'CHAIN +0.6 range.', rarity: 'rare',
         apply: (s) => { bumpRange(s, T, 0.6); addEffect(s, T, 'chain_strm_range'); } },
       { shortName: 'TWELVE-FOLD', description: 'CHAIN base jump count raised to 12.',
