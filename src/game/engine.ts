@@ -174,7 +174,10 @@ function spawnEnemy(s: RunState, defId: keyof typeof ENEMIES, pathIndex: number,
   const shieldPct = mods.encrypted ?? 0;
   const maxShield = shieldPct > 0 ? Math.round(hp * shieldPct) : 0;
   const stealthRoll = mods.stealthChance ?? 0;
-  const isStealthSpawn = stealthRoll > 0 && Math.random() < stealthRoll;
+  // Wave 1 is the tutorial gimme — 4 worms at 12 HP — and starter towers don't
+  // have stealth counters yet. Letting STEALTH PROTOCOL cloak those worms
+  // means a cloaked leak silently eats the XP that gets the player to level 2.
+  const isStealthSpawn = stealthRoll > 0 && s.wave > 1 && Math.random() < stealthRoll;
 
   s.enemies.push({
     id: nextId(),
