@@ -472,14 +472,23 @@ function drawPaths(ctx: CanvasRenderingContext2D, vp: RenderViewport, map: MapDe
 }
 
 function drawEndPortal(ctx: CanvasRenderingContext2D, vp: RenderViewport, map: MapDef, t: number): void {
-  // Entry portals (cyan) and core at the end of each path
+  // Entry portals (cyan) at every path start; core (red drain) at every path
+  // end. Maps with multiple distinct exits (GLITCHWIRE's X-cross, RUIN.PROTOCOL's
+  // four-into-one) used to draw only paths[0]'s exit, hiding the fact that
+  // enemies could leak through other endpoints.
   for (const p of map.paths) {
-    const startPt = p.points[0];
-    drawPortal(ctx, vp, startPt, '#00fff0', t, false);
+    drawPortal(ctx, vp, p.points[0], '#00fff0', t, false);
   }
-  // The "core" - end of first path
-  const endPt = map.paths[0].points[map.paths[0].points.length - 1];
-  drawCore(ctx, vp, endPt, t);
+  // Dedupe end points so a converging set of paths doesn't stack 4 cores at the
+  // same tile — a tile-level Set keyed by integer cell coords is enough.
+  const seen = new Set<string>();
+  for (const p of map.paths) {
+    const endPt = p.points[p.points.length - 1];
+    const key = `${Math.round(endPt.x)},${Math.round(endPt.y)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    drawCore(ctx, vp, endPt, t);
+  }
 }
 
 function drawPortal(ctx: CanvasRenderingContext2D, vp: RenderViewport, g: Vec2, color: string, t: number, isEnd: boolean): void {
