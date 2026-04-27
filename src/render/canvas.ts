@@ -493,12 +493,13 @@ function drawEndPortal(ctx: CanvasRenderingContext2D, vp: RenderViewport, map: M
 
 function drawPortal(ctx: CanvasRenderingContext2D, vp: RenderViewport, g: Vec2, color: string, t: number, isEnd: boolean): void {
   const cs = vp.cellSize;
-  // Paths end at x=cols or y=rows (outside-edge exits). The portal decoration
-  // would draw half a cell past the canvas and clip against the viewport. Clamp
-  // the draw center so the ring stays fully visible on-canvas.
-  const marg = cs * 0.75;
-  const cx = Math.min(vp.width  - marg, Math.max(marg, g.x * cs + cs / 2));
-  const cy = Math.min(vp.height - marg, Math.max(marg, g.y * cs + cs / 2));
+  // Use the actual cell-center even for edge exits at x=cols / y=rows so the
+  // portal sits ON the path it terminates. The earlier clamp inset the portal
+  // 0.75 cells from the boundary, which made the ring float off the track.
+  // Half the ring naturally extends past the canvas edge — that's the intended
+  // "going off-grid" visual; the canvas clips it cleanly.
+  const cx = g.x * cs + cs / 2;
+  const cy = g.y * cs + cs / 2;
   ctx.save();
   // Slow expanding rings — 1 full cycle per ~1.8 seconds, with 3 rings phased for a steady, calm pulse.
   for (let i = 0; i < 3; i++) {
@@ -525,10 +526,11 @@ function drawPortal(ctx: CanvasRenderingContext2D, vp: RenderViewport, g: Vec2, 
 
 function drawCore(ctx: CanvasRenderingContext2D, vp: RenderViewport, g: Vec2, t: number): void {
   const cs = vp.cellSize;
-  // Clamp so edge-anchored cores (x=cols, y=rows) don't spill off-canvas.
-  const marg = cs * 0.75;
-  const cx = Math.min(vp.width  - marg, Math.max(marg, g.x * cs + cs / 2));
-  const cy = Math.min(vp.height - marg, Math.max(marg, g.y * cs + cs / 2));
+  // Match drawPortal — center on the actual path endpoint, even when that's
+  // half a cell past the canvas edge. The off-canvas half clips cleanly and
+  // makes the core read as the literal "exit" rather than floating inside.
+  const cx = g.x * cs + cs / 2;
+  const cy = g.y * cs + cs / 2;
   ctx.save();
   ctx.shadowColor = '#ff2d95';
   ctx.shadowBlur = 20;
